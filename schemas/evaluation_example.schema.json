@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evaluation_example.schema.json",
+  "title": "Evaluation example",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "sample_id", "location_id", "split", "description", "search_scope", "ground_truth", "provenance", "reproducibility", "quality"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "sample_id": {"type": "string", "minLength": 1},
+    "location_id": {"type": "string", "minLength": 1},
+    "split": {"enum": ["smoke", "development", "test"]},
+    "description": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "language", "source_type", "instructions_version"],
+      "properties": {
+        "text": {"type": "string", "minLength": 1},
+        "language": {"type": "string", "minLength": 2},
+        "source_type": {"enum": ["human_in_situ", "manual_controlled", "vlm_generated", "existing_dataset"]},
+        "instructions_version": {"type": "string", "minLength": 1}
+      }
+    },
+    "search_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region_id", "scope_type"],
+      "properties": {
+        "region_id": {"type": "string", "minLength": 1},
+        "scope_type": {"enum": ["catalog_region", "user_bbox", "user_radius"]}
+      }
+    },
+    "ground_truth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latitude", "longitude", "crs", "capture_method", "catalog_assignment"],
+      "properties": {
+        "latitude": {"type": "number", "minimum": -90, "maximum": 90},
+        "longitude": {"type": "number", "minimum": -180, "maximum": 180},
+        "crs": {"const": "EPSG:4326"},
+        "capture_method": {"type": "string", "minLength": 1},
+        "reported_accuracy_m": {"type": ["number", "null"], "minimum": 0},
+        "catalog_assignment": {"type": ["object", "null"]}
+      }
+    },
+    "provenance": {"type": "object"},
+    "reproducibility": {"type": "object"},
+    "quality": {"type": "object"}
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "region_config.schema.json",
+  "title": "TFG region configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "region", "catalog", "artifacts"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "bbox", "crs"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "crs": {"const": "EPSG:4326"},
+        "bbox": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["north", "south", "east", "west"],
+          "properties": {
+            "north": {"type": "number", "minimum": -90, "maximum": 90},
+            "south": {"type": "number", "minimum": -90, "maximum": 90},
+            "east": {"type": "number", "minimum": -180, "maximum": 180},
+            "west": {"type": "number", "minimum": -180, "maximum": 180}
+          }
+        }
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projected_crs", "candidate_spacing_m", "candidate_generation"],
+      "properties": {
+        "projected_crs": {"const": "EPSG:25830"},
+        "candidate_spacing_m": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "candidate_generation": {"type": "string", "minLength": 1}
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_osm", "processed_osm", "manifest", "embeddings"],
+      "properties": {
+        "raw_osm": {"type": "string", "minLength": 1},
+        "processed_osm": {"type": "string", "minLength": 1},
+        "manifest": {"type": "string", "minLength": 1},
+        "embeddings": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

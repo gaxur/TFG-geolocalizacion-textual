@@ -1,0 +1,33 @@
+% !TeX program = pdflatex
+% !BIB program = biber
+\documentclass[a4paper,11pt,oneside,openany]{report}
+\input{metadata}
+\input{config}
+\addbibresource{bibliografia.bib}
+
+\begin{document}
+% Numeración arábiga continua, sin reinicios; portada contada, cifra oculta.
+\input{preliminares/portada}
+\input{preliminares/resumen}
+\input{preliminares/agradecimientos}
+\tableofcontents
+\listoffigures
+\listoftables
+
+\include{capitulos/01_introduccion}
+\include{capitulos/02_estado_del_arte}
+\include{capitulos/03_analisis}
+\include{capitulos/04_diseno}
+\include{capitulos/05_implementacion}
+\include{capitulos/06_evaluacion}
+\include{capitulos/07_conclusiones}
+\printbibliography[heading=bibintoc,title={Bibliografía}]
+
+\appendix
+\include{anexos/anexo_a}
+\include{anexos/anexo_b}
+\include{anexos/anexo_c}
+\ifejemplos
+  \include{anexos/ejemplos}
+\fi
+\end{document}

@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "region": {
+    "name": "madrid_pilot",
+    "bbox": {
+      "north": 40.4200,
+      "south": 40.4120,
+      "east": -3.6990,
+      "west": -3.7090
+    },
+    "crs": "EPSG:4326"
+  },
+  "catalog": {
+    "projected_crs": "EPSG:25830",
+    "candidate_spacing_m": null,
+    "candidate_generation": "pending_experiment"
+  },
+  "artifacts": {
+    "raw_osm": "data/raw/osm",
+    "processed_osm": "data/processed/osm",
+    "manifest": "data/processed/catalog/manifest.json",
+    "embeddings": "data/processed/embeddings"
+  }
+}

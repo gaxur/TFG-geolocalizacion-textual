@@ -1,0 +1,39 @@
+% Adaptación del modelo oficial de Biblioteca UZ (ver recursos/FUENTES.md).
+% No se usa titlepage: report reiniciaría el contador al terminar.
+\newgeometry{top=3.24cm,left=2.81cm,right=2.81cm,bottom=2cm}
+\thispagestyle{empty}
+\begingroup
+\centering
+\carlitoTLF
+\setstretch{1}
+\IfFileExists{\logoUniversidadTFG}{%
+  \includegraphics[height=2.4cm]{\logoUniversidadTFG}\par
+}{\textbf{\universidadTFG}\par
+  \textit{TODO: incorporar logotipo oficial}\par}
+\vspace{1.2cm}
+\setlength{\fboxrule}{0.96pt}
+\setlength{\fboxsep}{4pt}
+\fcolorbox{tfgblue}{white}{%
+  \parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{%
+    \centering\color{tfgink}\fontsize{28}{34}\selectfont\bfseries\tipoTrabajoTFG\strut}}
+\par\vspace{1.5cm}
+{\color{tfgink}\fontsize{20}{24}\selectfont\bfseries\tituloTFG\par}
+\vspace{0.6cm}
+{\color{tfggray}\fontsize{18}{22}\selectfont\tituloTFGEnglish\par}
+\vspace{1.1cm}
+{\small\color{tfggray}\textsc{Autor/es}\par}\medskip
+{\Large\autorTFG\par}
+\vspace{0.8cm}
+{\small\color{tfggray}\textsc{Director/es}\par}\medskip
+{\large\directorTFG\par}
+\vspace{0.6cm}
+{\departamentoTFG\par}
+\vfill
+{\titulacionTFG\par}\medskip
+{\centroTFG\par}
+{\universidadTFG\par}\medskip
+{Curso: \cursoTFG\par}
+{\fechaTFG\par}
+\endgroup
+\clearpage
+\restoregeometry

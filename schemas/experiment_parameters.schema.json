@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "experiment_parameters.schema.json",
+  "title": "Configurable experimental parameters",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "experiment_id", "parameters"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "experiment_id": {"type": "string", "minLength": 1},
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_spacing_m", "min_candidates", "target_candidates", "max_candidates", "proximity_radii_m", "relaxation_factors", "scoring_weights", "confidence_thresholds", "language_strategy", "distance_thresholds_m", "confidence_interval_method"],
+      "properties": {
+        "candidate_spacing_m": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "min_candidates": {"type": ["integer", "null"], "minimum": 1},
+        "target_candidates": {"type": ["integer", "null"], "minimum": 1},
+        "max_candidates": {"type": ["integer", "null"], "minimum": 1},
+        "proximity_radii_m": {"type": ["object", "null"]},
+        "relaxation_factors": {"type": ["array", "null"]},
+        "scoring_weights": {"type": ["object", "null"]},
+        "confidence_thresholds": {"type": ["object", "null"]},
+        "language_strategy": {"type": ["string", "null"]},
+        "distance_thresholds_m": {"type": ["array", "null"]},
+        "confidence_interval_method": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

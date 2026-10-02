@@ -1,0 +1,46 @@
+\chapter{EJEMPLOS de uso de la plantilla (eliminar)}
+\label{anx:ejemplos}
+Estos ejemplos comprueban la infraestructura; no describen el TFG.
+
+\section{Figura, tabla y referencias cruzadas}
+La \cref{fig:ejemplo} es un marcador sin imagen externa.
+\begin{figure}[htbp]
+  \centering
+  \fbox{\parbox[c][2cm][c]{0.65\linewidth}{\centering EJEMPLO: imagen}}
+  % Sustituir el marcador por: \includegraphics[width=.7\linewidth]{mi_figura.png}
+  \caption{EJEMPLO de figura; sustituir por material propio o atribuido.}
+  \label{fig:ejemplo}
+\end{figure}
+La \cref{tab:ejemplo} contiene datos de prueba sin significado experimental.
+\begin{table}[htbp]
+  \centering
+  \caption{EJEMPLO de tabla, sin resultados del TFG.}
+  \label{tab:ejemplo}
+  \begin{tabular}{lr}
+    \toprule
+    Elemento de prueba & Valor de prueba \\
+    \midrule
+    A & 1 \\
+    B & 2 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Ecuación y código}
+La \cref{eq:ejemplo} solo muestra la notación matemática.
+\begin{equation}
+  s = \sum_{i=1}^{n} i
+  \label{eq:ejemplo}
+\end{equation}
+El \cref{lst:ejemplo} demuestra la inclusión de código.
+\begin{lstlisting}[language=Python,caption={EJEMPLO de código prescindible},label={lst:ejemplo}]
+def sumar(a, b):
+    # Ejemplo mínimo: no es implementación del TFG.
+    return a + b
+\end{lstlisting}
+
+\section{Citas, acrónimos, URL y nota al pie}
+Referencias completamente ficticias: \cite{ejemplo:libro,ejemplo:articulo}.
+Primera mención: \ac{API}. Segunda mención: \ac{API}.
+URL reservada para ejemplos: \url{https://example.org}.
+Una nota de prueba\footnote{EJEMPLO de nota al pie, eliminable.}.

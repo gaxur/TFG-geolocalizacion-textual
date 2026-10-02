@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "manifest.schema.json",
+  "title": "Reference catalog manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "manifest_id", "region_id", "catalog_version", "candidates"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "manifest_id": {"type": "string", "minLength": 1},
+    "region_id": {"type": "string", "minLength": 1},
+    "catalog_version": {"type": "string", "minLength": 1},
+    "osm_snapshot_id": {"type": ["string", "null"]},
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["candidate_id", "latitude", "longitude", "cell_geometry", "artifacts"],
+        "properties": {
+          "candidate_id": {"type": "string", "minLength": 1},
+          "latitude": {"type": "number", "minimum": -90, "maximum": 90},
+          "longitude": {"type": "number", "minimum": -180, "maximum": 180},
+          "cell_geometry": {"type": ["object", "null"]},
+          "artifacts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["osm_image", "osm_embedding", "satellite_image", "satellite_embedding", "scene_id", "scene_graph", "scene_embedding"],
+            "properties": {
+              "osm_image": {"type": ["string", "null"]},
+              "osm_embedding": {"type": ["string", "null"]},
+              "satellite_image": {"type": ["string", "null"]},
+              "satellite_embedding": {"type": ["string", "null"]},
+              "scene_id": {"type": ["string", "null"]},
+              "scene_graph": {"type": ["string", "null"]},
+              "scene_embedding": {"type": ["string", "null"]}
+            }
+          },
+          "generation": {"type": "object"}
+        }
+      }
+    }
+  }
+}
