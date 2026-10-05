@@ -64,6 +64,8 @@ La operación del entorno validado de CrossText2Loc se documenta en
 `compose.cross-text2loc.yaml`.
 Los resultados y la limitación metodológica del protocolo oficial se resumen en
 [docs/CROSSTEXT2LOC_REPRODUCTION.md](docs/CROSSTEXT2LOC_REPRODUCTION.md).
+La implementación del modelo geográfico y manifest del piloto se documenta en
+[docs/PHASE1_GEOGRAPHIC_CATALOG.md](docs/PHASE1_GEOGRAPHIC_CATALOG.md).
 
 ## Organización y ejecución futura en DGX
 

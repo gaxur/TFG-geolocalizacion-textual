@@ -1,6 +1,17 @@
 """Contratos y validadores independientes de los modelos del TFG."""
 
 from .config import load_region_config
+from .catalog import build_catalog, candidate_id, write_manifest
+from .crs import epsg25830_to_wgs84, wgs84_to_epsg25830
 from .validation import SchemaValidationError, validate_document
 
-__all__ = ["SchemaValidationError", "load_region_config", "validate_document"]
+__all__ = [
+    "SchemaValidationError",
+    "build_catalog",
+    "candidate_id",
+    "epsg25830_to_wgs84",
+    "load_region_config",
+    "validate_document",
+    "wgs84_to_epsg25830",
+    "write_manifest",
+]

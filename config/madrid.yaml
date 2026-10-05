@@ -12,8 +12,12 @@
   },
   "catalog": {
     "projected_crs": "EPSG:25830",
+    "catalog_version": "madrid-pilot-grid-v1",
+    "candidate_id_prefix": "MADP",
     "candidate_spacing_m": null,
-    "candidate_generation": "pending_experiment"
+    "cell_size_m": null,
+    "candidate_generation": "projected_square_grid",
+    "border_policy": "full_cell_within_bbox"
   },
   "artifacts": {
     "raw_osm": "data/raw/osm",

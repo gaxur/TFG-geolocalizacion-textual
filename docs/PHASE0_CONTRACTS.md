@@ -48,3 +48,6 @@ necesita.
 `provenance.py` produce JSON canónico y hashes SHA-256 de parámetros. Las fases
 posteriores deberán añadir snapshot OSM, versión de catálogo, versión de código,
 checkpoint y hashes de artefactos cuando esos recursos existan.
+
+La evolución de estos contratos para construir la cuadrícula y el manifest
+físico se documenta en [PHASE1_GEOGRAPHIC_CATALOG.md](PHASE1_GEOGRAPHIC_CATALOG.md).

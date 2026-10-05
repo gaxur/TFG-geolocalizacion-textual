@@ -8,6 +8,7 @@ núcleo libre de dependencias externas.
 from __future__ import annotations
 
 from collections.abc import Mapping
+import re
 from typing import Any
 
 
@@ -74,15 +75,28 @@ def _validate_region_config(document: Mapping[str, Any]) -> None:
     catalog = document["catalog"]
     if not isinstance(catalog, Mapping):
         raise SchemaValidationError("catalog debe ser un objeto")
-    _required(catalog, ("projected_crs", "candidate_spacing_m", "candidate_generation"), "catalog")
-    _no_unknown(catalog, {"projected_crs", "candidate_spacing_m", "candidate_generation"}, "catalog")
+    catalog_fields = (
+        "projected_crs", "catalog_version", "candidate_id_prefix",
+        "candidate_spacing_m", "cell_size_m", "candidate_generation",
+        "border_policy",
+    )
+    _required(catalog, catalog_fields, "catalog")
+    _no_unknown(catalog, set(catalog_fields), "catalog")
     if catalog["projected_crs"] != "EPSG:25830":
         raise SchemaValidationError("catalog.projected_crs debe ser EPSG:25830")
-    spacing = catalog["candidate_spacing_m"]
-    if spacing is not None:
-        _number(spacing, "catalog.candidate_spacing_m", 0)
-    if not isinstance(catalog["candidate_generation"], str) or not catalog["candidate_generation"]:
-        raise SchemaValidationError("catalog.candidate_generation debe ser texto no vacío")
+    for field in ("catalog_version", "candidate_id_prefix"):
+        if not isinstance(catalog[field], str) or not catalog[field]:
+            raise SchemaValidationError(f"catalog.{field} debe ser texto no vacío")
+    if not re.fullmatch(r"[A-Z][A-Z0-9]*", catalog["candidate_id_prefix"]):
+        raise SchemaValidationError("catalog.candidate_id_prefix no es válido")
+    for field in ("candidate_spacing_m", "cell_size_m"):
+        value = catalog[field]
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1):
+            raise SchemaValidationError(f"catalog.{field} debe ser entero positivo o null")
+    if catalog["candidate_generation"] != "projected_square_grid":
+        raise SchemaValidationError("catalog.candidate_generation no está soportado")
+    if catalog["border_policy"] != "full_cell_within_bbox":
+        raise SchemaValidationError("catalog.border_policy no está soportado")
 
     artifacts = document["artifacts"]
     if not isinstance(artifacts, Mapping):
@@ -127,12 +141,74 @@ def _validate_llm(document: Mapping[str, Any]) -> None:
 
 def _validate_manifest(document: Mapping[str, Any]) -> None:
     context = "manifest"
-    required = ("schema_version", "manifest_id", "region_id", "catalog_version", "candidates")
+    required = (
+        "schema_version", "manifest_id", "region_id", "catalog_version",
+        "osm_snapshot_id", "generation", "provenance", "candidates",
+    )
     _required(document, required, context)
-    _no_unknown(document, set(required) | {"osm_snapshot_id"}, context)
+    _no_unknown(document, set(required), context)
     _version(document, context)
+    for field in ("manifest_id", "region_id", "catalog_version"):
+        if not isinstance(document[field], str) or not document[field]:
+            raise SchemaValidationError(f"manifest.{field} debe ser texto no vacío")
+    if document["osm_snapshot_id"] is not None and not isinstance(document["osm_snapshot_id"], str):
+        raise SchemaValidationError("manifest.osm_snapshot_id debe ser texto o null")
+    generation = document["generation"]
+    if not isinstance(generation, Mapping):
+        raise SchemaValidationError("manifest.generation debe ser un objeto")
+    generation_fields = (
+        "region_bbox_wgs84", "source_crs", "projected_crs", "spacing_m",
+        "cell_size_m", "border_policy", "order", "grid_hash",
+        "generator_version",
+    )
+    _required(generation, generation_fields, "manifest.generation")
+    _no_unknown(generation, set(generation_fields), "manifest.generation")
+    _validate_bbox(generation["region_bbox_wgs84"], "manifest.generation.region_bbox_wgs84")
+    if generation["source_crs"] != "EPSG:4326" or generation["projected_crs"] != "EPSG:25830":
+        raise SchemaValidationError("CRS de generación no soportados")
+    for field in ("spacing_m", "cell_size_m"):
+        value = generation[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise SchemaValidationError(f"manifest.generation.{field} debe ser entero positivo")
+    if generation["border_policy"] != "full_cell_within_bbox":
+        raise SchemaValidationError("manifest.generation.border_policy no está soportado")
+    if generation["order"] != "row_south_to_north_then_column_west_to_east":
+        raise SchemaValidationError("manifest.generation.order no está soportado")
+    if not isinstance(generation["grid_hash"], str) or not re.fullmatch(r"[0-9a-f]{12}", generation["grid_hash"]):
+        raise SchemaValidationError("manifest.generation.grid_hash no es válido")
+    if generation["generator_version"] != "phase1-grid-v1":
+        raise SchemaValidationError("manifest.generation.generator_version no está soportado")
+    provenance = document["provenance"]
+    if not isinstance(provenance, Mapping):
+        raise SchemaValidationError("manifest.provenance debe ser un objeto")
+    provenance_fields = (
+        "schema_version", "artifact_id", "source", "source_version",
+        "input_hashes", "parameters_hash", "code_version",
+    )
+    _required(provenance, provenance_fields, "manifest.provenance")
+    _no_unknown(provenance, set(provenance_fields), "manifest.provenance")
+    _version(provenance, "manifest.provenance")
+    if not isinstance(provenance["input_hashes"], Mapping):
+        raise SchemaValidationError("manifest.provenance.input_hashes debe ser un objeto")
+    if any(
+        not isinstance(key, str)
+        or not isinstance(value, str)
+        or not re.fullmatch(r"[0-9a-f]{64}", value)
+        for key, value in provenance["input_hashes"].items()
+    ):
+        raise SchemaValidationError("manifest.provenance.input_hashes debe contener hashes SHA-256")
+    for field in ("artifact_id", "source"):
+        if not isinstance(provenance[field], str) or not provenance[field]:
+            raise SchemaValidationError(f"manifest.provenance.{field} debe ser texto no vacío")
+    for field in ("source_version", "code_version"):
+        if provenance[field] is not None and not isinstance(provenance[field], str):
+            raise SchemaValidationError(f"manifest.provenance.{field} debe ser texto o null")
+    parameters_hash = provenance["parameters_hash"]
+    if not isinstance(parameters_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", parameters_hash):
+        raise SchemaValidationError("manifest.provenance.parameters_hash debe ser SHA-256")
     if not isinstance(document["candidates"], list):
         raise SchemaValidationError("manifest.candidates debe ser una lista")
+    candidate_ids = set()
     for candidate in document["candidates"]:
         if not isinstance(candidate, Mapping):
             raise SchemaValidationError("cada candidato debe ser un objeto")
@@ -141,14 +217,57 @@ def _validate_manifest(document: Mapping[str, Any]) -> None:
         _no_unknown(candidate, set(required_candidate) | {"generation"}, "candidate")
         if not isinstance(candidate["candidate_id"], str) or not candidate["candidate_id"]:
             raise SchemaValidationError("candidate_id debe ser texto no vacío")
+        if candidate["candidate_id"] in candidate_ids:
+            raise SchemaValidationError("candidate_id debe ser único")
+        candidate_ids.add(candidate["candidate_id"])
         _number(candidate["latitude"], "candidate.latitude", -90, 90)
         _number(candidate["longitude"], "candidate.longitude", -180, 180)
+        geometry = candidate["cell_geometry"]
+        if not isinstance(geometry, Mapping):
+            raise SchemaValidationError("candidate.cell_geometry debe ser un objeto")
+        _required(geometry, ("type", "coordinates"), "candidate.cell_geometry")
+        _no_unknown(geometry, {"type", "coordinates"}, "candidate.cell_geometry")
+        if geometry["type"] != "Polygon":
+            raise SchemaValidationError("candidate.cell_geometry.type debe ser Polygon")
+        coordinates = geometry["coordinates"]
+        if not isinstance(coordinates, list) or len(coordinates) != 1:
+            raise SchemaValidationError("candidate.cell_geometry.coordinates debe contener un anillo")
+        ring = coordinates[0]
+        if not isinstance(ring, list) or len(ring) != 5 or ring[0] != ring[-1]:
+            raise SchemaValidationError("el polígono debe ser un rectángulo cerrado")
+        for point in ring:
+            if not isinstance(point, list) or len(point) != 2:
+                raise SchemaValidationError("cada vértice debe ser [longitude, latitude]")
+            _number(point[0], "cell_geometry.longitude", -180, 180)
+            _number(point[1], "cell_geometry.latitude", -90, 90)
+        longitudes = {point[0] for point in ring[:-1]}
+        latitudes = {point[1] for point in ring[:-1]}
+        if len(longitudes) < 2 or len(latitudes) < 2:
+            raise SchemaValidationError("candidate.cell_geometry no puede ser degenerada")
+        if not min(longitudes) <= candidate["longitude"] <= max(longitudes):
+            raise SchemaValidationError("candidate.longitude debe estar dentro de la celda")
+        if not min(latitudes) <= candidate["latitude"] <= max(latitudes):
+            raise SchemaValidationError("candidate.latitude debe estar dentro de la celda")
         artifacts = candidate["artifacts"]
         if not isinstance(artifacts, Mapping):
             raise SchemaValidationError("candidate.artifacts debe ser un objeto")
         artifact_fields = ("osm_image", "osm_embedding", "satellite_image", "satellite_embedding", "scene_id", "scene_graph", "scene_embedding")
         _required(artifacts, artifact_fields, "candidate.artifacts")
         _no_unknown(artifacts, set(artifact_fields), "candidate.artifacts")
+        if any(value is not None and not isinstance(value, str) for value in artifacts.values()):
+            raise SchemaValidationError("los artefactos deben ser texto o null")
+        candidate_generation = candidate.get("generation")
+        if not isinstance(candidate_generation, Mapping):
+            raise SchemaValidationError("candidate.generation debe ser un objeto")
+        fields = ("row", "column", "center_easting_m", "center_northing_m")
+        _required(candidate_generation, fields, "candidate.generation")
+        _no_unknown(candidate_generation, set(fields), "candidate.generation")
+        for field in ("row", "column"):
+            value = candidate_generation[field]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise SchemaValidationError(f"candidate.generation.{field} debe ser entero no negativo")
+        for field in ("center_easting_m", "center_northing_m"):
+            _number(candidate_generation[field], f"candidate.generation.{field}")
 
 
 def _validate_experiment(document: Mapping[str, Any]) -> None:

@@ -76,12 +76,35 @@ def valid_manifest():
         "region_id": "madrid_pilot",
         "catalog_version": "catalog-fixture",
         "osm_snapshot_id": None,
+        "generation": {
+            "region_bbox_wgs84": {"north": 40.42, "south": 40.412, "east": -3.699, "west": -3.709},
+            "source_crs": "EPSG:4326",
+            "projected_crs": "EPSG:25830",
+            "spacing_m": 25,
+            "cell_size_m": 25,
+            "border_policy": "full_cell_within_bbox",
+            "order": "row_south_to_north_then_column_west_to_east",
+            "grid_hash": "0123456789ab",
+            "generator_version": "phase1-grid-v1",
+        },
+        "provenance": {
+            "schema_version": "1.0",
+            "artifact_id": "manifest-fixture",
+            "source": "fixture",
+            "source_version": None,
+            "input_hashes": {"fixture": "0" * 64},
+            "parameters_hash": "0" * 64,
+            "code_version": None,
+        },
         "candidates": [
             {
                 "candidate_id": "candidate-001",
                 "latitude": 40.4168,
                 "longitude": -3.7038,
-                "cell_geometry": None,
+                "cell_geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-3.704, 40.416], [-3.703, 40.416], [-3.703, 40.417], [-3.704, 40.417], [-3.704, 40.416]]],
+                },
                 "artifacts": {
                     "osm_image": None,
                     "osm_embedding": None,
@@ -90,6 +113,12 @@ def valid_manifest():
                     "scene_id": None,
                     "scene_graph": None,
                     "scene_embedding": None,
+                },
+                "generation": {
+                    "row": 0,
+                    "column": 0,
+                    "center_easting_m": 440000.0,
+                    "center_northing_m": 4474000.0,
                 },
             }
         ],

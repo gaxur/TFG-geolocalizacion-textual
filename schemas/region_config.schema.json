@@ -30,11 +30,15 @@
     "catalog": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["projected_crs", "candidate_spacing_m", "candidate_generation"],
+      "required": ["projected_crs", "catalog_version", "candidate_id_prefix", "candidate_spacing_m", "cell_size_m", "candidate_generation", "border_policy"],
       "properties": {
         "projected_crs": {"const": "EPSG:25830"},
-        "candidate_spacing_m": {"type": ["number", "null"], "exclusiveMinimum": 0},
-        "candidate_generation": {"type": "string", "minLength": 1}
+        "catalog_version": {"type": "string", "minLength": 1},
+        "candidate_id_prefix": {"type": "string", "pattern": "^[A-Z][A-Z0-9]*$"},
+        "candidate_spacing_m": {"type": ["integer", "null"], "minimum": 1},
+        "cell_size_m": {"type": ["integer", "null"], "minimum": 1},
+        "candidate_generation": {"const": "projected_square_grid"},
+        "border_policy": {"const": "full_cell_within_bbox"}
       }
     },
     "artifacts": {
