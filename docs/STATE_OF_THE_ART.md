@@ -155,9 +155,11 @@ conceptualmente las siguientes decisiones de integración:
 - se compararán recuperación exacta por `candidate_id` y error geográfico, sin
   confundir una celda recuperada con una estimación GPS continua.
 
-El trabajo se encuentra todavía en la Fase 0 de implementación: contratos,
-schemas, configuración, validadores y provenance. No se ha generado el catálogo
-de Madrid ni se han ejecutado CrossText2Loc o GOTPR.
+La Fase 0 de implementación está completada: contratos, schemas, configuración,
+validadores y provenance. También se ha reproducido la evaluación oficial de
+CrossText2Loc NewYork-mixed OSM en la GB10; esta comprobación técnica no forma
+parte todavía del pipeline de Madrid. No se ha generado el catálogo de Madrid
+ni se ha ejecutado GOTPR.
 
 El roadmap no es completamente secuencial. Las fases de LLM/preselección y de
 infraestructura de evaluación pueden avanzar mientras D007, D013 y D016 siguen

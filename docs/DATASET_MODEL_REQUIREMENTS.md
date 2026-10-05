@@ -38,8 +38,12 @@ oficial de GOTPR.
 
 ## Estado de la auditoría
 
-Esta auditoría se realizó sobre código local clonado, sin descargar datasets,
-imágenes masivas ni checkpoints.
+La auditoría inicial se realizó sobre código local clonado, sin descargar
+datasets, imágenes masivas ni checkpoints. Posteriormente se completó una
+reproducción separada de NewYork-mixed OSM con los artefactos oficiales; véase
+[`CROSSTEXT2LOC_REPRODUCTION.md`](CROSSTEXT2LOC_REPRODUCTION.md). Esa reproducción
+no resuelve la generación de una galería compatible ni la transferencia a
+Madrid.
 
 | Repositorio | URL | Commit auditado |
 | --- | --- | --- |

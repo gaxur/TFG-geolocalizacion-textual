@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "experiment_id": "crosstext2loc-newyork-osm-gb10-v1",
+  "date": "2026-10-05",
+  "classification": "REPRODUCIDO",
+  "environment": {
+    "hardware": "Lenovo ThinkStation PGX / NVIDIA GB10",
+    "compute_capability": "12.1",
+    "docker_image": "crosstext2loc-gb10:ngc26.02",
+    "docker_image_id": "sha256:9df10d06a947b32d3c4f95601e9f1125073cbc067d76ee9da6f762d7eb254fc2",
+    "base_image": "nvcr.io/nvidia/pytorch@sha256:8014e4ffc674ae9cc9aecad04b64b29c3d311ed738e54ac3042d2d45690d19e9",
+    "python": "3.12.3",
+    "pytorch": "2.11.0a0+eb65b36914.nv26.02",
+    "torchvision": "0.25.0a0+1e53952f.nv26.02.44259020",
+    "cuda": "13.1",
+    "cuda_version": "13.1.1.006"
+  },
+  "software": {
+    "cvg_text_commit": "6910d2747a94fbe985309bde60cd4732bcbbf50f",
+    "openai_clip_commit": "dcba3cb2e2827b402d2701e7e1c7d9fed8a20ef1",
+    "model": "CLIP ViT-L/14@336",
+    "dtype": "float32",
+    "context_length": 300
+  },
+  "checkpoint": {
+    "filename": "long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth",
+    "size_bytes": 1712649548,
+    "sha256": "d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d",
+    "parameters": 428115457,
+    "parameter_bytes": 1712461828,
+    "missing_keys": [],
+    "unexpected_keys": []
+  },
+  "stages": {
+    "D0": "PASS",
+    "D1": "PASS",
+    "D2": "PASS",
+    "D3": "PASS",
+    "D4_attempt_1": "FAIL_INFRASTRUCTURE_GIT_DUBIOUS_OWNERSHIP",
+    "D4_retry": "PASS",
+    "D5": "PASS"
+  },
+  "dataset": {
+    "new_york": 1000,
+    "new_york_photos": 200,
+    "total": 1200,
+    "missing_images": 0,
+    "query_zip_used": false
+  },
+  "d5": {
+    "exit_code": 0,
+    "duration_seconds": 49.538392479065806,
+    "batch_size": 4,
+    "num_workers": 4,
+    "shuffle": false,
+    "candidate_count_per_query": 100,
+    "candidate_selection_uses_ground_truth_coordinate": true,
+    "metrics": {
+      "overall": {"count": 1200, "R@1": 59.08, "R@5": 82.75, "R@10": 90.0, "L@50": 62.0, "L@100": 66.75, "L@150": 69.67, "deviation_km": 0.18},
+      "panorama": {"count": 1000, "R@1": 59.3, "R@5": 82.9, "R@10": 90.1, "L@50": 62.4, "L@100": 67.8, "L@150": 70.9, "deviation_km": 0.17},
+      "single_view": {"count": 200, "R@1": 58.0, "R@5": 82.0, "R@10": 89.5, "L@50": 60.0, "L@100": 61.5, "L@150": 63.5, "deviation_km": 0.23}
+    }
+  }
+}

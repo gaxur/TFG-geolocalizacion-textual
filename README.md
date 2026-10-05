@@ -17,10 +17,10 @@ contexto original se conserva sin cambios en [BASELINE.md](BASELINE.md).
 Ya existen contratos propios de Fase 0 (`src/tfg_phase0/`, `schemas/`,
 `config/madrid.yaml`), documentación, una memoria LaTeX y un
 [prototipo frontend](frontend/README.md) **simulado**. El frontend no ejecuta
-modelos. La prioridad experimental actual es ML/inferencia: todavía no se ha
-reproducido CrossText2Loc ni generado un catálogo visual de Madrid.
+modelos. La reproducción oficial NewYork-mixed OSM de CrossText2Loc se completó
+en la NVIDIA GB10; todavía no se ha generado el catálogo de Madrid.
 
-El primer experimento previsto, **sin entrenamiento ni fine-tuning**, es:
+El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 
 ```text
 Texto New York → CrossText2Loc → checkpoint NewYork-mixed OSM
@@ -58,6 +58,12 @@ en Git**. [data/README.md](data/README.md),
 comandos, resultados y recursos sin inventar mediciones. Las instrucciones de
 adquisición de los datos y pesos se concretarán después de verificar su formato,
 tamaño y permisos.
+
+La operación del entorno validado de CrossText2Loc se documenta en
+[docs/CROSSTEXT2LOC_DOCKER.md](docs/CROSSTEXT2LOC_DOCKER.md) y utiliza
+`compose.cross-text2loc.yaml`.
+Los resultados y la limitación metodológica del protocolo oficial se resumen en
+[docs/CROSSTEXT2LOC_REPRODUCTION.md](docs/CROSSTEXT2LOC_REPRODUCTION.md).
 
 ## Organización y ejecución futura en DGX
 

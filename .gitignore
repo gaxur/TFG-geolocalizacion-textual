@@ -53,6 +53,8 @@
 /results/raw/
 /results/large/
 /results/cache/
+/results/cross_text2loc_docker/
+/results/cross_text2loc_wait_run/
 *.log
 *.tmp
 *.temp

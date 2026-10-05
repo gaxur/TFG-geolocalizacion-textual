@@ -1,0 +1,29 @@
+services:
+  crosstext2loc:
+    image: crosstext2loc-gb10:ngc26.02
+    build:
+      context: ./docker/crosstext2loc-gb10
+      dockerfile: Dockerfile
+    gpus: all
+    network_mode: none
+    read_only: true
+    stdin_open: true
+    tty: true
+    init: true
+    environment:
+      CUDA_VISIBLE_DEVICES: "0"
+      HOME: /root
+      HF_HOME: /tmp/huggingface
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /workspace/project/external/CVG-Text
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=1g
+    volumes:
+      - .:/workspace/project:ro
+      - ./results/cross_text2loc_docker:/output:rw
+      - ./results/cross_text2loc_docker/manual:/workspace/project/external/CVG-Text/results:rw
+      - ${HOME}/.cache/clip:/root/.cache/clip:ro
+    working_dir: /workspace/project/external/CVG-Text
+    entrypoint: ["/bin/bash"]
+    command: ["-lc", "sleep infinity"]
