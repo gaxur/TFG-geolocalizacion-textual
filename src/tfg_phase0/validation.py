@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import re
+import urllib.parse
 from typing import Any
 
 
@@ -57,8 +58,8 @@ def _validate_bbox(bbox: Any, context: str) -> None:
 
 def _validate_region_config(document: Mapping[str, Any]) -> None:
     context = "region_config"
-    _required(document, ("schema_version", "region", "catalog", "artifacts"), context)
-    _no_unknown(document, {"schema_version", "region", "catalog", "artifacts"}, context)
+    _required(document, ("schema_version", "region", "catalog", "osm_acquisition", "artifacts"), context)
+    _no_unknown(document, {"schema_version", "region", "catalog", "osm_acquisition", "artifacts"}, context)
     _version(document, context)
 
     region = document["region"]
@@ -97,6 +98,44 @@ def _validate_region_config(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("catalog.candidate_generation no está soportado")
     if catalog["border_policy"] != "full_cell_within_bbox":
         raise SchemaValidationError("catalog.border_policy no está soportado")
+
+    acquisition = document["osm_acquisition"]
+    if not isinstance(acquisition, Mapping):
+        raise SchemaValidationError("osm_acquisition debe ser un objeto")
+    acquisition_fields = (
+        "provider", "endpoint", "raw_format", "server_timeout_seconds",
+        "connect_timeout_seconds", "http_total_timeout_seconds", "max_retries",
+        "backoff_seconds", "retry_after_max_seconds", "max_raw_bytes",
+        "acquirer_version", "user_agent",
+    )
+    _required(acquisition, acquisition_fields, "osm_acquisition")
+    _no_unknown(acquisition, set(acquisition_fields), "osm_acquisition")
+    expected = {
+        "provider": "overpass", "raw_format": "osmxml",
+        "server_timeout_seconds": 60, "connect_timeout_seconds": 10,
+        "http_total_timeout_seconds": 120, "max_retries": 2,
+        "backoff_seconds": [5, 15], "retry_after_max_seconds": 60,
+        "acquirer_version": "phase2-overpass-v1",
+    }
+    for field, value in expected.items():
+        if acquisition[field] != value:
+            raise SchemaValidationError(f"osm_acquisition.{field} debe ser {value!r}")
+    endpoint = acquisition["endpoint"]
+    parsed_endpoint = urllib.parse.urlsplit(endpoint) if isinstance(endpoint, str) else None
+    if (
+        parsed_endpoint is None
+        or parsed_endpoint.scheme != "https"
+        or not parsed_endpoint.hostname
+        or parsed_endpoint.username is not None
+        or parsed_endpoint.password is not None
+        or parsed_endpoint.query
+        or parsed_endpoint.fragment
+    ):
+        raise SchemaValidationError("osm_acquisition.endpoint debe usar HTTPS")
+    if isinstance(acquisition["max_raw_bytes"], bool) or not isinstance(acquisition["max_raw_bytes"], int) or acquisition["max_raw_bytes"] < 1:
+        raise SchemaValidationError("osm_acquisition.max_raw_bytes debe ser entero positivo")
+    if not isinstance(acquisition["user_agent"], str) or not acquisition["user_agent"]:
+        raise SchemaValidationError("osm_acquisition.user_agent debe ser texto no vacío")
 
     artifacts = document["artifacts"]
     if not isinstance(artifacts, Mapping):
@@ -290,6 +329,86 @@ def _validate_experiment(document: Mapping[str, Any]) -> None:
             raise SchemaValidationError(f"parameters.{field} debe ser entero positivo o null")
 
 
+def _validate_osm_snapshot(document: Mapping[str, Any]) -> None:
+    context = "osm_snapshot"
+    fields = (
+        "schema_version", "osm_snapshot_id", "region_id", "provider", "endpoint",
+        "acquired_at_utc", "bbox", "query", "query_sha256", "raw_format",
+        "raw_size_bytes", "raw_sha256", "acquirer_version", "counts", "attempts",
+        "http", "license", "attribution", "selection",
+    )
+    _required(document, fields, context)
+    _no_unknown(document, set(fields), context)
+    _version(document, context)
+    if not isinstance(document["osm_snapshot_id"], str) or not re.fullmatch(r"osm-madrid-pilot-osmxml-sha256-[0-9a-f]{64}", document["osm_snapshot_id"]):
+        raise SchemaValidationError("osm_snapshot_id no es válido")
+    if document["region_id"] != "madrid_pilot" or document["provider"] != "overpass":
+        raise SchemaValidationError("región o proveedor OSM no soportado")
+    snapshot_endpoint = document["endpoint"]
+    parsed_snapshot_endpoint = (
+        urllib.parse.urlsplit(snapshot_endpoint)
+        if isinstance(snapshot_endpoint, str)
+        else None
+    )
+    if (
+        parsed_snapshot_endpoint is None
+        or parsed_snapshot_endpoint.scheme != "https"
+        or not parsed_snapshot_endpoint.hostname
+        or parsed_snapshot_endpoint.username is not None
+        or parsed_snapshot_endpoint.password is not None
+        or parsed_snapshot_endpoint.query
+        or parsed_snapshot_endpoint.fragment
+    ):
+        raise SchemaValidationError("endpoint OSM no es válido")
+    if not isinstance(document["acquired_at_utc"], str) or not document["acquired_at_utc"].endswith("Z"):
+        raise SchemaValidationError("acquired_at_utc debe ser UTC")
+    if not isinstance(document["query"], str) or not document["query"]:
+        raise SchemaValidationError("query debe ser texto no vacío")
+    _validate_bbox(document["bbox"], "osm_snapshot.bbox")
+    for field in ("query_sha256", "raw_sha256"):
+        if not isinstance(document[field], str) or not re.fullmatch(r"[0-9a-f]{64}", document[field]):
+            raise SchemaValidationError(f"osm_snapshot.{field} debe ser SHA-256")
+    if document["raw_format"] != "osmxml" or document["acquirer_version"] != "phase2-overpass-v1":
+        raise SchemaValidationError("formato o versión de adquirente no soportados")
+    if isinstance(document["raw_size_bytes"], bool) or not isinstance(document["raw_size_bytes"], int) or document["raw_size_bytes"] < 1:
+        raise SchemaValidationError("raw_size_bytes debe ser entero positivo")
+    if isinstance(document["attempts"], bool) or not isinstance(document["attempts"], int) or not 1 <= document["attempts"] <= 3:
+        raise SchemaValidationError("attempts debe estar entre 1 y 3")
+    counts = document["counts"]
+    if not isinstance(counts, Mapping):
+        raise SchemaValidationError("counts debe ser un objeto")
+    _required(counts, ("node", "way", "relation"), "osm_snapshot.counts")
+    _no_unknown(counts, {"node", "way", "relation"}, "osm_snapshot.counts")
+    if any(isinstance(value, bool) or not isinstance(value, int) or value < 1 for value in counts.values()):
+        raise SchemaValidationError("todos los conteos OSM deben ser positivos")
+    http = document["http"]
+    if not isinstance(http, Mapping):
+        raise SchemaValidationError("http debe ser un objeto")
+    _required(http, ("status", "content_type"), "osm_snapshot.http")
+    _no_unknown(http, {"status", "content_type"}, "osm_snapshot.http")
+    if isinstance(http["status"], bool) or not isinstance(http["status"], int) or not 100 <= http["status"] <= 599:
+        raise SchemaValidationError("http.status no es válido")
+    if http["content_type"] is not None and not isinstance(http["content_type"], str):
+        raise SchemaValidationError("http.content_type debe ser texto o null")
+    if document["license"] != "ODbL-1.0":
+        raise SchemaValidationError("license debe ser ODbL-1.0")
+    expected_attribution = (
+        "© OpenStreetMap contributors. Datos disponibles bajo la Open Database "
+        "License (ODbL). https://www.openstreetmap.org/copyright"
+    )
+    if document["attribution"] != expected_attribution:
+        raise SchemaValidationError("attribution OSM no es válida")
+    selection = document["selection"]
+    if not isinstance(selection, Mapping):
+        raise SchemaValidationError("selection debe ser un objeto")
+    _required(selection, ("seed", "closure"), "osm_snapshot.selection")
+    _no_unknown(selection, {"seed", "closure"}, "osm_snapshot.selection")
+    if selection["seed"] != "bbox filters for node, way and relation in D004":
+        raise SchemaValidationError("selection.seed no es válido")
+    if selection["closure"] != "downward recursive members added for structural completeness":
+        raise SchemaValidationError("selection.closure no es válido")
+
+
 def _validate_evaluation(document: Mapping[str, Any]) -> None:
     context = "evaluation_example"
     required = ("schema_version", "sample_id", "location_id", "split", "description", "search_scope", "ground_truth", "provenance", "reproducibility", "quality")
@@ -322,6 +441,7 @@ def validate_document(document: Any, schema_name: str) -> None:
         "llm_geo_query": _validate_llm,
         "evaluation_example": _validate_evaluation,
         "manifest": _validate_manifest,
+        "osm_snapshot": _validate_osm_snapshot,
         "experiment_parameters": _validate_experiment,
     }
     try:

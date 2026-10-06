@@ -40,6 +40,11 @@ Fuentes oficiales consultadas: [OSM Copyright](https://www.openstreetmap.org/cop
 jurídico; las condiciones aplicables a una cuenta o recurso concreto deben
 confirmarse antes de publicar.
 
+La infraestructura de Fase 2 materializa D043-D048 sin haber realizado una
+adquisición real. Antes de usar el endpoint se comprobará su política vigente;
+el raw continuará fuera de Git y la publicación de provenance o derivados se
+revisará según ODbL.
+
 **Proyecto:** localización geográfica a partir de descripciones textuales en Madrid  
 **Fecha de revisión:** 2 de octubre de 2026  
 **Estado:** guía de cumplimiento para el desarrollo y la memoria del TFG

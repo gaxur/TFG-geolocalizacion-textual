@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="test-fixture">
+  <node id="1" lat="40.4168" lon="-3.7038" version="1"><tag k="name" v="Fixture"/></node>
+  <node id="2" lat="40.4169" lon="-3.7037" version="1"/>
+  <way id="10" version="1"><nd ref="1"/><nd ref="2"/><tag k="highway" v="service"/></way>
+  <relation id="20" version="1"><member type="way" ref="10" role="outer"/><tag k="type" v="multipolygon"/></relation>
+  <relation id="21" version="1"><member type="relation" ref="20" role="subarea"/><tag k="type" v="boundary"/></relation>
+</osm>

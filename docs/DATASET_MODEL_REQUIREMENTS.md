@@ -20,8 +20,8 @@ oficial de GOTPR.
 | Componente | Viabilidad | Evidencia | Qué falta | Riesgo |
 | --- | --- | --- | --- | --- |
 | LLM como intérprete geográfico | VIABLE CON ADAPTACIÓN | D017, D026 y `schemas/llm_geo_query.schema.json` | Proveedor e implementación del adaptador | El LLM puede introducir restricciones no justificadas |
-| OpenStreetMap | CONFIRMADO | Datos y licencia documentados en OSM | Fijar versión y fecha de descarga; la región piloto ya está en D004 | Etiquetas incompletas o inconsistentes |
-| Overpass API | CONFIRMADO | API de consulta de datos OSM | Caché, rate limiting y consultas reproducibles | Límites de carga o cobertura |
+| OpenStreetMap | CONFIRMADO | Datos y licencia documentados en OSM; infraestructura raw D043-D048 implementada | Ejecutar una adquisición autorizada y fijar el snapshot real | Etiquetas incompletas o inconsistentes |
+| Overpass API | CONFIRMADO | Cliente, caché, validación y retries probados offline | Revisar política vigente y autorizar la primera llamada real | Límites de carga o cobertura |
 | Catálogo geográfico de Madrid | VIABLE CON ADAPTACIÓN | D001–D005, D012 y `docs/MADRID_DATASET.md` | Política de muestreo experimental; la bbox piloto ya está fijada | El catálogo puede no cubrir el lugar correcto |
 | Generación de imágenes OSM | VIABLE CON ADAPTACIÓN | `external/CVG-Text/download_osm_street.py:17-74` | Wrapper corregido y validación del recorte/área | Incompatibilidad de escala o formato |
 | Embeddings visuales | VIABLE CON ADAPTACIÓN | `external/CVG-Text/model_loader.py:27-215`; `evaluate.py:24-54` | Checkpoint fijado e índice persistente | Licencia o pesos no confirmados |

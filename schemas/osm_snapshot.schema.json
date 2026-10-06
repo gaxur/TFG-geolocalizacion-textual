@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "osm_snapshot.schema.json",
+  "title": "OSM snapshot provenance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "osm_snapshot_id", "region_id", "provider", "endpoint", "acquired_at_utc", "bbox", "query", "query_sha256", "raw_format", "raw_size_bytes", "raw_sha256", "acquirer_version", "counts", "attempts", "http", "license", "attribution", "selection"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "osm_snapshot_id": {"type": "string", "pattern": "^osm-madrid-pilot-osmxml-sha256-[0-9a-f]{64}$"},
+    "region_id": {"const": "madrid_pilot"},
+    "provider": {"const": "overpass"},
+    "endpoint": {"type": "string", "pattern": "^https://[^/?#]+(?:/[^?#]*)?$"},
+    "acquired_at_utc": {"type": "string", "format": "date-time"},
+    "bbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["north", "south", "east", "west"],
+      "properties": {
+        "north": {"type": "number"}, "south": {"type": "number"},
+        "east": {"type": "number"}, "west": {"type": "number"}
+      }
+    },
+    "query": {"type": "string", "minLength": 1},
+    "query_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "raw_format": {"const": "osmxml"},
+    "raw_size_bytes": {"type": "integer", "minimum": 1},
+    "raw_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "acquirer_version": {"const": "phase2-overpass-v1"},
+    "counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["node", "way", "relation"],
+      "properties": {
+        "node": {"type": "integer", "minimum": 1},
+        "way": {"type": "integer", "minimum": 1},
+        "relation": {"type": "integer", "minimum": 1}
+      }
+    },
+    "attempts": {"type": "integer", "minimum": 1, "maximum": 3},
+    "http": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "content_type"],
+      "properties": {
+        "status": {"type": "integer", "minimum": 100, "maximum": 599},
+        "content_type": {"type": ["string", "null"]}
+      }
+    },
+    "license": {"const": "ODbL-1.0"},
+    "attribution": {"type": "string", "minLength": 1},
+    "selection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["seed", "closure"],
+      "properties": {
+        "seed": {"const": "bbox filters for node, way and relation in D004"},
+        "closure": {"const": "downward recursive members added for structural completeness"}
+      }
+    }
+  }
+}

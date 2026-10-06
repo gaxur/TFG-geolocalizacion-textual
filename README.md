@@ -66,6 +66,9 @@ Los resultados y la limitación metodológica del protocolo oficial se resumen e
 [docs/CROSSTEXT2LOC_REPRODUCTION.md](docs/CROSSTEXT2LOC_REPRODUCTION.md).
 La implementación del modelo geográfico y manifest del piloto se documenta en
 [docs/PHASE1_GEOGRAPHIC_CATALOG.md](docs/PHASE1_GEOGRAPHIC_CATALOG.md).
+La infraestructura offline para adquirir y congelar un snapshot OSM se describe
+en [docs/PHASE2_OSM_SNAPSHOT.md](docs/PHASE2_OSM_SNAPSHOT.md); todavía no se ha
+realizado ninguna adquisición real.
 
 ## Organización y ejecución futura en DGX
 

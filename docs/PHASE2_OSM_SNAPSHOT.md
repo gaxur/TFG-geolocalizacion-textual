@@ -2,9 +2,10 @@
 
 ## Estado
 
-Fase 2 está **diseñada pero no implementada**. No se ha llamado a Overpass, no
-se ha descargado OSM y no se ha creado ningún snapshot. Las decisiones canónicas
-son D043-D048 de [DECISIONS.md](DECISIONS.md).
+La infraestructura de Fase 2 está **implementada y validada con fixtures
+locales**, pero no se ha llamado a Overpass, no se ha descargado OSM y no se ha
+creado ningún snapshot real. Las decisiones canónicas son D043-D048 de
+[DECISIONS.md](DECISIONS.md).
 
 ## Alcance aprobado
 
@@ -111,3 +112,18 @@ disponibilidad vigentes del endpoint y obtener autorización de ejecución. La
 publicación de provenance o derivados seguirá requiriendo la revisión ODbL de
 D045-D046. Estas comprobaciones operativas no reabren D048 ni autorizan por sí
 solas una llamada de red.
+
+## Materialización
+
+- `config/madrid.yaml` contiene los parámetros operativos fijados por D048.
+- `schemas/osm_snapshot.schema.json` define la provenance versionada.
+- `src/tfg_phase0/osm_snapshot.py` genera la consulta, valida OSM XML, aplica la
+  política de reintentos, construye la provenance y publica snapshots
+  inmutables.
+- `scripts/acquire_osm_snapshot.py` expone la adquisición, pero no se ha
+  ejecutado contra un endpoint real.
+- `tests/fixtures/osm/valid.osm` y `tests/test_phase2_osm_snapshot.py` validan el
+  flujo sin Internet mediante transporte inyectado.
+
+Los tests no invocan el transporte real. La primera adquisición continúa
+requiriendo una autorización separada.

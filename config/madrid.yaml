@@ -19,6 +19,20 @@
     "candidate_generation": "projected_square_grid",
     "border_policy": "full_cell_within_bbox"
   },
+  "osm_acquisition": {
+    "provider": "overpass",
+    "endpoint": "https://overpass-api.de/api/interpreter",
+    "raw_format": "osmxml",
+    "server_timeout_seconds": 60,
+    "connect_timeout_seconds": 10,
+    "http_total_timeout_seconds": 120,
+    "max_retries": 2,
+    "backoff_seconds": [5, 15],
+    "retry_after_max_seconds": 60,
+    "max_raw_bytes": 52428800,
+    "acquirer_version": "phase2-overpass-v1",
+    "user_agent": "TFG-geolocalizacion-textual/phase2-overpass-v1 (academic research)"
+  },
   "artifacts": {
     "raw_osm": "data/raw/osm",
     "processed_osm": "data/processed/osm",

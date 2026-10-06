@@ -4,7 +4,7 @@
   "title": "TFG region configuration",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "region", "catalog", "artifacts"],
+  "required": ["schema_version", "region", "catalog", "osm_acquisition", "artifacts"],
   "properties": {
     "schema_version": {"const": "1.0"},
     "region": {
@@ -39,6 +39,25 @@
         "cell_size_m": {"type": ["integer", "null"], "minimum": 1},
         "candidate_generation": {"const": "projected_square_grid"},
         "border_policy": {"const": "full_cell_within_bbox"}
+      }
+    },
+    "osm_acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "endpoint", "raw_format", "server_timeout_seconds", "connect_timeout_seconds", "http_total_timeout_seconds", "max_retries", "backoff_seconds", "retry_after_max_seconds", "max_raw_bytes", "acquirer_version", "user_agent"],
+      "properties": {
+        "provider": {"const": "overpass"},
+        "endpoint": {"type": "string", "pattern": "^https://"},
+        "raw_format": {"const": "osmxml"},
+        "server_timeout_seconds": {"const": 60},
+        "connect_timeout_seconds": {"const": 10},
+        "http_total_timeout_seconds": {"const": 120},
+        "max_retries": {"const": 2},
+        "backoff_seconds": {"const": [5, 15]},
+        "retry_after_max_seconds": {"const": 60},
+        "max_raw_bytes": {"type": "integer", "minimum": 1},
+        "acquirer_version": {"const": "phase2-overpass-v1"},
+        "user_agent": {"type": "string", "minLength": 1}
       }
     },
     "artifacts": {

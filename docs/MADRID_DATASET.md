@@ -3,7 +3,9 @@
 Este documento define la organización de los datos de Madrid. La infraestructura
 determinista del catálogo geométrico está implementada en Fase 1 y se documenta
 en [PHASE1_GEOGRAPHIC_CATALOG.md](PHASE1_GEOGRAPHIC_CATALOG.md). No se ha
-adquirido OSM ni generado el catálogo visual. El piloto utiliza la bounding box
+adquirido OSM ni generado el catálogo visual. La infraestructura de adquisición
+raw de Fase 2 está implementada y documentada en
+[PHASE2_OSM_SNAPSHOT.md](PHASE2_OSM_SNAPSHOT.md), todavía sin snapshot real. El piloto utiliza la bounding box
 fijada en D004; la extensión definitiva de Madrid continúa pendiente.
 
 ## 1. Separación de recursos

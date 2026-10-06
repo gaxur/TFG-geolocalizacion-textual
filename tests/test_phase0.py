@@ -150,6 +150,7 @@ class Phase0Tests(unittest.TestCase):
         config = load_region_config(ROOT / "config" / "madrid.yaml")
         self.assertEqual(config["region"]["name"], "madrid_pilot")
         self.assertIsNone(config["catalog"]["candidate_spacing_m"])
+        self.assertEqual(config["osm_acquisition"]["server_timeout_seconds"], 60)
 
     def test_bbox_invalid(self):
         config = json.loads((ROOT / "config" / "madrid.yaml").read_text(encoding="utf-8"))
