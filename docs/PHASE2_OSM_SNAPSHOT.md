@@ -2,10 +2,49 @@
 
 ## Estado
 
-La infraestructura de Fase 2 está **implementada y validada con fixtures
-locales**, pero no se ha llamado a Overpass, no se ha descargado OSM y no se ha
-creado ningún snapshot real. Las decisiones canónicas son D043-D048 de
-[DECISIONS.md](DECISIONS.md).
+La Fase 2 está **implementada y validada** con fixtures locales y con la primera
+adquisición real autorizada de la bbox D004. El snapshot raw permanece fuera de
+Git y está identificado por contenido. Las decisiones canónicas son D043-D048
+de [DECISIONS.md](DECISIONS.md).
+
+## Snapshot real de D004
+
+La primera adquisición válida con la consulta limitada de D048 terminó en un
+único intento HTTP 200:
+
+| Campo | Valor observado |
+|---|---|
+| `osm_snapshot_id` | `osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141` |
+| Raw SHA-256 | `f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141` |
+| Tamaño raw | 8.420.815 bytes |
+| Adquisición UTC | `2026-10-06T08:52:43.930134Z` |
+| Endpoint | `https://overpass-api.de/api/interpreter` |
+| Backend observado en el preflight | `gall.openstreetmap.de` |
+| Query SHA-256 | `11b8fe8f8b781c2fbceb1e24def956321ff141ffe1e5b09ffa14d0ff4df36145` |
+| Intentos / HTTP final | 1 / 200 |
+
+Conteos registrados:
+
+| Grupo | Conteos |
+|---|---|
+| Objetos | 25.537 nodes; 4.240 ways; 498 relations |
+| Selección | 23.019 `node_bbox`; 4.240 `way_bbox_intersection`; 498 `relation_context` |
+| Cierre de ways | 2.518 `added_way_nodes` |
+| Members resueltos | 380 node; 1.594 way; 2 relation |
+| Members no resueltos | 3.285 node; 10.167 way; 40 relation |
+
+Los 25.537 nodes son exactamente los 23.019 seleccionados por bbox más los
+2.518 añadidos para completar ways. Todos los `nd ref` de ways están resueltos.
+Los `unresolved_relation_members` no indican corrupción: son referencias
+esperables porque las 498 relations se conservan como contexto y
+`closure.relations = not_expanded`. No se afirma que esas relations estén
+completas.
+
+La validación confirmó XML y provenance válidas, conteos coincidentes,
+`sha256.txt` correcto, correspondencia entre `osm_snapshot_id` y SHA-256 raw,
+publicación atómica y ausencia de temporales o locks residuales. Un acceso
+posterior por `--snapshot-id`, sin habilitar red, produjo cache hit y conservó
+idénticos los hashes de `source.osm`, `provenance.json` y `sha256.txt`.
 
 ## Alcance aprobado
 
@@ -32,7 +71,7 @@ east: -3.6990
 west: -3.7090
 ```
 
-## Flujo previsto
+## Flujo implementado
 
 ```text
 configuración de adquisición versionada
@@ -66,7 +105,7 @@ La provenance separa los conteos seleccionados como `node_bbox`,
 añadidos para completar ways. El SHA-256 de la consulta corregida es
 `11b8fe8f8b781c2fbceb1e24def956321ff141ffe1e5b09ffa14d0ff4df36145`.
 
-## Almacenamiento previsto
+## Almacenamiento
 
 La organización conceptual fijada por D044-D048 es:
 
@@ -79,8 +118,8 @@ data/processed/osm/<osm_snapshot_id>/
   ... derivados posteriores ...
 ```
 
-El raw no se incorpora a Git. La provenance pequeña se evaluará por separado
-antes de versionarla. Ningún derivado sobrescribirá el raw.
+El raw y su provenance local no se incorporan a Git. Ningún derivado
+sobrescribirá el raw.
 
 ## Provenance mínima
 
@@ -122,11 +161,10 @@ configurable, timeouts, reintentos, formato de
 `osm_snapshot_id`, publicación atómica y validaciones. Este documento no duplica
 esos parámetros.
 
-Antes de una adquisición real todavía se deberá comprobar la política y
-disponibilidad vigentes del endpoint y obtener autorización de ejecución. La
+Antes de cualquier adquisición futura se deberá volver a comprobar la política
+y disponibilidad vigentes del endpoint y obtener autorización de ejecución. La
 publicación de provenance o derivados seguirá requiriendo la revisión ODbL de
-D045-D046. Estas comprobaciones operativas no reabren D048 ni autorizan por sí
-solas una llamada de red.
+D045-D046. El éxito de esta adquisición no autoriza nuevas llamadas de red.
 
 ## Materialización
 
@@ -135,10 +173,10 @@ solas una llamada de red.
 - `src/tfg_phase0/osm_snapshot.py` genera la consulta, valida OSM XML, aplica la
   política de reintentos, construye la provenance y publica snapshots
   inmutables.
-- `scripts/acquire_osm_snapshot.py` expone la adquisición, pero no se ha
-  ejecutado contra un endpoint real.
+- `scripts/acquire_osm_snapshot.py` expone la adquisición y validó una
+  adquisición real autorizada y un cache hit exclusivamente local.
 - `tests/fixtures/osm/valid.osm` y `tests/test_phase2_osm_snapshot.py` validan el
   flujo sin Internet mediante transporte inyectado.
 
-Los tests no invocan el transporte real. La primera adquisición continúa
+Los tests no invocan el transporte real. Cualquier nueva adquisición continúa
 requiriendo una autorización separada.

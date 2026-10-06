@@ -2,11 +2,13 @@
 
 Este documento define la organización de los datos de Madrid. La infraestructura
 determinista del catálogo geométrico está implementada en Fase 1 y se documenta
-en [PHASE1_GEOGRAPHIC_CATALOG.md](PHASE1_GEOGRAPHIC_CATALOG.md). No se ha
-adquirido OSM ni generado el catálogo visual. La infraestructura de adquisición
-raw de Fase 2 está implementada y documentada en
-[PHASE2_OSM_SNAPSHOT.md](PHASE2_OSM_SNAPSHOT.md), todavía sin snapshot real. El piloto utiliza la bounding box
-fijada en D004; la extensión definitiva de Madrid continúa pendiente.
+en [PHASE1_GEOGRAPHIC_CATALOG.md](PHASE1_GEOGRAPHIC_CATALOG.md). La Fase 2 ha
+adquirido y validado el primer snapshot OSM raw de D004, identificado como
+`osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141`;
+se documenta en [PHASE2_OSM_SNAPSHOT.md](PHASE2_OSM_SNAPSHOT.md) y permanece
+fuera de Git. Todavía no se ha generado el catálogo visual. El piloto utiliza
+la bounding box fijada en D004; la extensión definitiva de Madrid continúa
+pendiente.
 
 ## 1. Separación de recursos
 
@@ -74,6 +76,11 @@ del tamaño/área deben vivir en un wrapper propio.
 
 Los datos raw, procesados, imágenes, embeddings, grafos e índices se mantienen
 separados y no se incorporan al repositorio Git.
+
+El snapshot actual contiene 25.537 nodes, 4.240 ways y 498 relations. Los
+25.537 nodes se descomponen en 23.019 seleccionados por bbox y 2.518 añadidos
+para completar ways. Las relations son contexto directo no expandido; sus
+members ausentes se contabilizan y no implican corrupción del raw.
 
 ## 3. Flujo online
 

@@ -2146,8 +2146,9 @@ Antes de aceptar `source.osm` se comprobará:
 - latitud/longitud válidas en nodes;
 - conteos no vacíos de node, way y relation registrados en provenance;
 - cada `nd ref` de way resuelto por un node presente;
-- cada member de relation resuelto por un node, way o relation presente;
-- clausura estructural sin referencias ausentes.
+- cada member de relation con tipo, referencia positiva y role válidos;
+- todos los `nd ref` de ways resueltos; los members ausentes de relations
+  contextuales se contabilizan sin exigir clausura de relations.
 
 Estas comprobaciones distinguen validación sintáctica, estructura interna y
 completitud respecto a la consulta. No garantizan que una ejecución futura de la
@@ -2171,9 +2172,11 @@ por descargas idénticas.
 
 ### Pendiente
 
-Ninguno sobre estos parámetros. La implementación y cualquier adquisición real
-requieren una autorización de ejecución separada y deberán respetar la política
-de uso vigente del endpoint en ese momento.
+Ninguno sobre estos parámetros. La primera adquisición real autorizada validó
+D048 el `2026-10-06T08:52:43.930134Z`, en un intento HTTP 200, y produjo
+`osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141`.
+Este hecho operacional no crea una nueva decisión. Cualquier adquisición futura
+requiere otra autorización y deberá respetar la política vigente del endpoint.
 
 # Decisiones pendientes
 

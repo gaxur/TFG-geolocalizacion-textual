@@ -67,8 +67,9 @@ Los resultados y la limitación metodológica del protocolo oficial se resumen e
 La implementación del modelo geográfico y manifest del piloto se documenta en
 [docs/PHASE1_GEOGRAPHIC_CATALOG.md](docs/PHASE1_GEOGRAPHIC_CATALOG.md).
 La infraestructura offline para adquirir y congelar un snapshot OSM se describe
-en [docs/PHASE2_OSM_SNAPSHOT.md](docs/PHASE2_OSM_SNAPSHOT.md); todavía no se ha
-realizado ninguna adquisición real.
+en [docs/PHASE2_OSM_SNAPSHOT.md](docs/PHASE2_OSM_SNAPSHOT.md). La Fase 2 ya
+produjo y validó el primer snapshot real de la bbox D004; el raw permanece fuera
+de Git y las fases posteriores deberán referenciar su `osm_snapshot_id`.
 
 ## Organización y ejecución futura en DGX
 

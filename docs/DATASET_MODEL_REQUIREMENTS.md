@@ -20,8 +20,8 @@ oficial de GOTPR.
 | Componente | Viabilidad | Evidencia | Qué falta | Riesgo |
 | --- | --- | --- | --- | --- |
 | LLM como intérprete geográfico | VIABLE CON ADAPTACIÓN | D017, D026 y `schemas/llm_geo_query.schema.json` | Proveedor e implementación del adaptador | El LLM puede introducir restricciones no justificadas |
-| OpenStreetMap | CONFIRMADO | Datos y licencia documentados en OSM; infraestructura raw D043-D048 implementada | Ejecutar una adquisición autorizada y fijar el snapshot real | Etiquetas incompletas o inconsistentes |
-| Overpass API | CONFIRMADO | Cliente, caché, validación y retries probados offline | Revisar política vigente y autorizar la primera llamada real | Límites de carga o cobertura |
+| OpenStreetMap | CONFIRMADO | Infraestructura D043-D048 y snapshot raw real D004 validado: `osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141` | Preparar derivados en una fase posterior sin modificar el raw | Etiquetas incompletas o inconsistentes |
+| Overpass API | CONFIRMADO | Cliente, caché, validación y adquisición real HTTP 200 en un intento | Revisar política y disponibilidad antes de cada nueva adquisición | Límites de carga o cobertura |
 | Catálogo geográfico de Madrid | VIABLE CON ADAPTACIÓN | D001–D005, D012 y `docs/MADRID_DATASET.md` | Política de muestreo experimental; la bbox piloto ya está fijada | El catálogo puede no cubrir el lugar correcto |
 | Generación de imágenes OSM | VIABLE CON ADAPTACIÓN | `external/CVG-Text/download_osm_street.py:17-74` | Wrapper corregido y validación del recorte/área | Incompatibilidad de escala o formato |
 | Embeddings visuales | VIABLE CON ADAPTACIÓN | `external/CVG-Text/model_loader.py:27-215`; `evaluate.py:24-54` | Checkpoint fijado e índice persistente | Licencia o pesos no confirmados |
@@ -44,6 +44,15 @@ reproducción separada de NewYork-mixed OSM con los artefactos oficiales; véase
 [`CROSSTEXT2LOC_REPRODUCTION.md`](CROSSTEXT2LOC_REPRODUCTION.md). Esa reproducción
 no resuelve la generación de una galería compatible ni la transferencia a
 Madrid.
+
+La Fase 2 adquirió el primer snapshot vectorial OSM de D004 el
+`2026-10-06T08:52:43.930134Z`, con 8.420.815 bytes y SHA-256
+`f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141`.
+Contiene 23.019 nodes seleccionados por bbox y 2.518 nodes adicionales para
+completar 4.240 ways, además de 498 relations contextuales. Sus members no
+resueltos son consecuencia prevista de no expandir relations, no un fallo de
+integridad; todos los `nd ref` de ways sí están resueltos. Véase
+[`PHASE2_OSM_SNAPSHOT.md`](PHASE2_OSM_SNAPSHOT.md).
 
 | Repositorio | URL | Commit auditado |
 | --- | --- | --- |
