@@ -335,7 +335,7 @@ def _validate_osm_snapshot(document: Mapping[str, Any]) -> None:
         "schema_version", "osm_snapshot_id", "region_id", "provider", "endpoint",
         "acquired_at_utc", "bbox", "query", "query_sha256", "raw_format",
         "raw_size_bytes", "raw_sha256", "acquirer_version", "counts", "attempts",
-        "http", "license", "attribution", "selection",
+        "http", "license", "attribution", "selection", "closure",
     )
     _required(document, fields, context)
     _no_unknown(document, set(fields), context)
@@ -377,10 +377,34 @@ def _validate_osm_snapshot(document: Mapping[str, Any]) -> None:
     counts = document["counts"]
     if not isinstance(counts, Mapping):
         raise SchemaValidationError("counts debe ser un objeto")
-    _required(counts, ("node", "way", "relation"), "osm_snapshot.counts")
-    _no_unknown(counts, {"node", "way", "relation"}, "osm_snapshot.counts")
-    if any(isinstance(value, bool) or not isinstance(value, int) or value < 1 for value in counts.values()):
-        raise SchemaValidationError("todos los conteos OSM deben ser positivos")
+    count_fields = (
+        "node", "way", "relation", "resolved_relation_members",
+        "unresolved_relation_members", "selected_objects", "added_way_nodes",
+    )
+    _required(counts, count_fields, "osm_snapshot.counts")
+    _no_unknown(counts, set(count_fields), "osm_snapshot.counts")
+    for field in ("node", "way", "relation"):
+        value = counts[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise SchemaValidationError(f"osm_snapshot.counts.{field} debe ser positivo")
+    for field in ("resolved_relation_members", "unresolved_relation_members"):
+        value = counts[field]
+        if not isinstance(value, Mapping):
+            raise SchemaValidationError(f"osm_snapshot.counts.{field} debe ser un objeto")
+        _required(value, ("node", "way", "relation"), f"osm_snapshot.counts.{field}")
+        _no_unknown(value, {"node", "way", "relation"}, f"osm_snapshot.counts.{field}")
+        if any(isinstance(item, bool) or not isinstance(item, int) or item < 0 for item in value.values()):
+            raise SchemaValidationError(f"osm_snapshot.counts.{field} contiene un valor inválido")
+    selected = counts["selected_objects"]
+    selected_fields = ("node_bbox", "way_bbox_intersection", "relation_context")
+    if not isinstance(selected, Mapping):
+        raise SchemaValidationError("osm_snapshot.counts.selected_objects debe ser un objeto")
+    _required(selected, selected_fields, "osm_snapshot.counts.selected_objects")
+    _no_unknown(selected, set(selected_fields), "osm_snapshot.counts.selected_objects")
+    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in selected.values()):
+        raise SchemaValidationError("osm_snapshot.counts.selected_objects contiene un valor inválido")
+    if isinstance(counts["added_way_nodes"], bool) or not isinstance(counts["added_way_nodes"], int) or counts["added_way_nodes"] < 0:
+        raise SchemaValidationError("osm_snapshot.counts.added_way_nodes no es válido")
     http = document["http"]
     if not isinstance(http, Mapping):
         raise SchemaValidationError("http debe ser un objeto")
@@ -401,12 +425,21 @@ def _validate_osm_snapshot(document: Mapping[str, Any]) -> None:
     selection = document["selection"]
     if not isinstance(selection, Mapping):
         raise SchemaValidationError("selection debe ser un objeto")
-    _required(selection, ("seed", "closure"), "osm_snapshot.selection")
-    _no_unknown(selection, {"seed", "closure"}, "osm_snapshot.selection")
-    if selection["seed"] != "bbox filters for node, way and relation in D004":
-        raise SchemaValidationError("selection.seed no es válido")
-    if selection["closure"] != "downward recursive members added for structural completeness":
-        raise SchemaValidationError("selection.closure no es válido")
+    _required(selection, ("nodes", "ways", "relations"), "osm_snapshot.selection")
+    _no_unknown(selection, {"nodes", "ways", "relations"}, "osm_snapshot.selection")
+    expected_selection = {
+        "nodes": "bbox", "ways": "bbox_intersection",
+        "relations": "direct_parent_of_local_node_or_way",
+    }
+    if dict(selection) != expected_selection:
+        raise SchemaValidationError("selection no corresponde a D048")
+    closure = document["closure"]
+    if not isinstance(closure, Mapping):
+        raise SchemaValidationError("closure debe ser un objeto")
+    _required(closure, ("ways", "relations"), "osm_snapshot.closure")
+    _no_unknown(closure, {"ways", "relations"}, "osm_snapshot.closure")
+    if dict(closure) != {"ways": "all_referenced_nodes", "relations": "not_expanded"}:
+        raise SchemaValidationError("closure no corresponde a D048")
 
 
 def _validate_evaluation(document: Mapping[str, Any]) -> None:

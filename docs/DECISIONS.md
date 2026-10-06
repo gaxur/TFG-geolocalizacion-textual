@@ -2017,7 +2017,7 @@ El endpoint real se configurará y registrará en provenance, pero no formará
 parte de la identidad del snapshot: dos endpoints que devuelvan exactamente los
 mismos bytes producirán el mismo identificador.
 
-La consulta Overpass QL canónica para D004 será:
+La primera consulta aprobada fue:
 
 ```overpass
 [out:xml][timeout:60];
@@ -2033,21 +2033,67 @@ La consulta Overpass QL canónica para D004 será:
 out meta qt;
 ```
 
-`.seed` es el conjunto seleccionado por la semántica del filtro bbox de
-Overpass, no una intersección geométrica exacta calculada por el TFG. `>>`
-realiza clausura descendente recursiva: añade los miembros de relations, los
-miembros de relations anidadas y los nodos de ways necesarios para que las
-referencias devueltas sean resolubles. `out meta qt` conserva tags y metadata
-OSM, con orden quadtile. La provenance distinguirá:
+Su SHA-256 era
+`bb2c5f7beb208f9a898bede9f4eb890df12a4c490ffd000ccd527eb42f4d25e2`.
 
-- `seed`: objetos seleccionados por las tres cláusulas bbox para D004;
-- `closure`: objetos fuera o dentro de D004 añadidos exclusivamente por `>>`
-  para completar la estructura.
+Era semánticamente válida: `>>` calcula la clausura descendente transitiva y
+reflexiva, incluyendo subrelations y todos sus miembros. Sin embargo, una
+relation seleccionada por tocar D004 podía extender el resultado muy lejos del
+piloto. El primer intento real terminó en HTTP 429 y el segundo en HTTP 504,
+aunque el preflight del segundo anunciaba slots disponibles. Esto no demuestra
+que `>>` causara el 504, pero la expansión de relations grandes es un factor
+técnicamente plausible documentado por Overpass. Ningún intento produjo un
+snapshot válido. Por ello esta consulta queda **SUSTITUIDA antes del primer
+snapshot real**.
 
-La clausura no amplía la región conceptual del piloto. Un miembro añadido fuera
-de D004 no se convierte por ello en candidato ni en objeto semánticamente
-seleccionado. La consulta exacta y su SHA-256 se conservarán para explicar esta
-diferencia.
+La consulta canónica corregida es:
+
+```overpass
+[out:xml][timeout:60];
+(
+  node(40.4120,-3.7090,40.4200,-3.6990);
+  way(40.4120,-3.7090,40.4200,-3.6990);
+)->.local;
+(
+  .local;
+  node(w.local);
+  rel(bn.local);
+  rel(bw.local);
+);
+out meta qt;
+```
+
+El SHA-256 de los bytes UTF-8 exactos de la consulta corregida, incluido el
+salto de línea final, es
+`11b8fe8f8b781c2fbceb1e24def956321ff141ffe1e5b09ffa14d0ff4df36145`.
+
+`.local` contiene nodes seleccionados por bbox y ways cuya geometría intersecta
+D004 según Overpass. `node(w.local)` completa todos los `nd ref` de esos ways,
+incluidos nodes exteriores. `rel(bn.local)` y `rel(bw.local)` añaden relations
+que referencian directamente nodes o ways locales, pero no expanden sus members
+ni siguen subrelations. `out meta qt` conserva tags, referencias, roles y
+metadata OSM.
+
+La provenance declarará:
+
+```text
+selection.nodes = bbox
+selection.ways = bbox_intersection
+selection.relations = direct_parent_of_local_node_or_way
+closure.ways = all_referenced_nodes
+closure.relations = not_expanded
+```
+
+Todos los `nd ref` de ways deberán resolverse. Los members de relations deberán
+tener tipo, ref y role sintácticamente válidos; si el objeto referenciado no
+está presente, no invalidará el snapshot y se contabilizará por tipo en
+`unresolved_relation_members`. Una relation devuelta es contexto OSM relacionado
+con D004, no una promesa de clausura completa.
+
+Los conteos derivados distinguirán `selected_objects.node_bbox`,
+`selected_objects.way_bbox_intersection` y
+`selected_objects.relation_context`, además de `added_way_nodes`. No se
+atribuirá a una relation contextual la condición de objeto local.
 
 Fijar `[timeout:60]` como timeout del servidor Overpass. El cliente tendrá
 timeout de conexión de 10 segundos y timeout HTTP total de 120 segundos. Se

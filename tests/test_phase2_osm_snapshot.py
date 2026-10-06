@@ -70,11 +70,12 @@ class Phase2SnapshotTests(unittest.TestCase):
 (
   node(40.4120,-3.7090,40.4200,-3.6990);
   way(40.4120,-3.7090,40.4200,-3.6990);
-  relation(40.4120,-3.7090,40.4200,-3.6990);
-)->.seed;
+)->.local;
 (
-  .seed;
-  .seed >>;
+  .local;
+  node(w.local);
+  rel(bn.local);
+  rel(bw.local);
 );
 out meta qt;
 """
@@ -92,7 +93,17 @@ out meta qt;
         )
 
     def test_valid_xml_and_nested_relation_counts(self):
-        self.assertEqual(validate_osm_xml(self.raw, 1_000_000), {"node": 2, "way": 1, "relation": 2})
+        counts = validate_osm_xml(self.raw, 1_000_000, self.config["region"]["bbox"])
+        self.assertEqual(counts["node"], 2)
+        self.assertEqual(counts["way"], 1)
+        self.assertEqual(counts["relation"], 2)
+        self.assertEqual(
+            counts["selected_objects"],
+            {"node_bbox": 1, "way_bbox_intersection": 1, "relation_context": 2},
+        )
+        self.assertEqual(counts["added_way_nodes"], 1)
+        self.assertEqual(counts["resolved_relation_members"], {"node": 0, "way": 1, "relation": 1})
+        self.assertEqual(counts["unresolved_relation_members"], {"node": 1, "way": 1, "relation": 1})
 
     def test_rejects_truncated_html_remark_and_entities(self):
         invalid = (
@@ -104,7 +115,7 @@ out meta qt;
         for raw in invalid:
             with self.subTest(raw=raw[:30]):
                 with self.assertRaises(SnapshotValidationError):
-                    validate_osm_xml(raw, 1_000_000)
+                    validate_osm_xml(raw, 1_000_000, self.config["region"]["bbox"])
 
     def test_rejects_duplicate_ids_and_invalid_coordinates(self):
         duplicate = self.raw.replace(b'<node id="2"', b'<node id="1"')
@@ -112,18 +123,30 @@ out meta qt;
         not_finite = self.raw.replace(b'lat="40.4168"', b'lat="NaN"')
         for raw in (duplicate, invalid_coordinate, not_finite):
             with self.assertRaises(SnapshotValidationError):
-                validate_osm_xml(raw, 1_000_000)
+                validate_osm_xml(raw, 1_000_000, self.config["region"]["bbox"])
 
     def test_rejects_missing_way_and_relation_members(self):
-        missing_node = self.raw.replace(b'<node id="2" lat="40.4169" lon="-3.7037" version="1"/>\n', b"")
+        missing_node = self.raw.replace(b'<node id="2" lat="40.4210" lon="-3.7037" version="1"/>\n', b"")
         missing_way = self.raw.replace(b'<way id="10" version="1"><nd ref="1"/><nd ref="2"/><tag k="highway" v="service"/></way>\n', b"")
         for raw in (missing_node, missing_way):
             with self.assertRaises(SnapshotValidationError):
-                validate_osm_xml(raw, 1_000_000)
+                validate_osm_xml(raw, 1_000_000, self.config["region"]["bbox"])
+
+    def test_unresolved_relation_members_are_allowed(self):
+        counts = validate_osm_xml(self.raw, 1_000_000, self.config["region"]["bbox"])
+        self.assertEqual(counts["unresolved_relation_members"], {"node": 1, "way": 1, "relation": 1})
+
+    def test_relation_member_with_invalid_type_or_ref_fails(self):
+        invalid_type = self.raw.replace(b'type="way" ref="999"', b'type="area" ref="999"')
+        invalid_ref = self.raw.replace(b'type="way" ref="999"', b'type="way" ref="invalid"')
+        missing_role = self.raw.replace(b'type="way" ref="999" role="remote"', b'type="way" ref="999"')
+        for raw in (invalid_type, invalid_ref, missing_role):
+            with self.assertRaises(SnapshotValidationError):
+                validate_osm_xml(raw, 1_000_000, self.config["region"]["bbox"])
 
     def test_rejects_size_limit(self):
         with self.assertRaises(RawSizeLimitError):
-            validate_osm_xml(self.raw, len(self.raw) - 1)
+            validate_osm_xml(self.raw, len(self.raw) - 1, self.config["region"]["bbox"])
 
     def test_streaming_size_limit_removes_partial_file(self):
         config = copy.deepcopy(self.config["osm_acquisition"])
@@ -217,7 +240,7 @@ out meta qt;
                     )
 
     def test_provenance_is_valid_and_has_no_secrets(self):
-        counts = validate_osm_xml(self.raw, 1_000_000)
+        counts = validate_osm_xml(self.raw, 1_000_000, self.config["region"]["bbox"])
         provenance = build_snapshot_provenance(
             config=self.config, query=self.query, raw=self.raw, counts=counts,
             acquired_at=FIXED_NOW, attempts=1, http_status=200,
@@ -231,7 +254,7 @@ out meta qt;
             self.assertNotIn(forbidden, serialized)
 
     def test_provenance_rejects_secret_endpoint(self):
-        counts = validate_osm_xml(self.raw, 1_000_000)
+        counts = validate_osm_xml(self.raw, 1_000_000, self.config["region"]["bbox"])
         provenance = build_snapshot_provenance(
             config=self.config, query=self.query, raw=self.raw, counts=counts,
             acquired_at=FIXED_NOW, attempts=1, http_status=200,
@@ -242,7 +265,7 @@ out meta qt;
             validate_document(provenance, "osm_snapshot")
 
     def test_atomic_publish_cache_hit_and_corruption(self):
-        counts = validate_osm_xml(self.raw, 1_000_000)
+        counts = validate_osm_xml(self.raw, 1_000_000, self.config["region"]["bbox"])
         provenance = build_snapshot_provenance(
             config=self.config, query=self.query, raw=self.raw, counts=counts,
             acquired_at=FIXED_NOW, attempts=1, http_status=200,
@@ -269,7 +292,7 @@ out meta qt;
                 publish_snapshot(raw_part=second, snapshots_root=root, provenance=provenance)
 
     def test_publish_rejects_raw_provenance_mismatch(self):
-        counts = validate_osm_xml(self.raw, 1_000_000)
+        counts = validate_osm_xml(self.raw, 1_000_000, self.config["region"]["bbox"])
         provenance = build_snapshot_provenance(
             config=self.config, query=self.query, raw=self.raw, counts=counts,
             acquired_at=FIXED_NOW, attempts=1, http_status=200,

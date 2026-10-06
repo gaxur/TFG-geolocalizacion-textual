@@ -4,7 +4,7 @@
   "title": "OSM snapshot provenance",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "osm_snapshot_id", "region_id", "provider", "endpoint", "acquired_at_utc", "bbox", "query", "query_sha256", "raw_format", "raw_size_bytes", "raw_sha256", "acquirer_version", "counts", "attempts", "http", "license", "attribution", "selection"],
+  "required": ["schema_version", "osm_snapshot_id", "region_id", "provider", "endpoint", "acquired_at_utc", "bbox", "query", "query_sha256", "raw_format", "raw_size_bytes", "raw_sha256", "acquirer_version", "counts", "attempts", "http", "license", "attribution", "selection", "closure"],
   "properties": {
     "schema_version": {"const": "1.0"},
     "osm_snapshot_id": {"type": "string", "pattern": "^osm-madrid-pilot-osmxml-sha256-[0-9a-f]{64}$"},
@@ -29,11 +29,23 @@
     "acquirer_version": {"const": "phase2-overpass-v1"},
     "counts": {
       "type": "object", "additionalProperties": false,
-      "required": ["node", "way", "relation"],
+      "required": ["node", "way", "relation", "resolved_relation_members", "unresolved_relation_members", "selected_objects", "added_way_nodes"],
       "properties": {
         "node": {"type": "integer", "minimum": 1},
         "way": {"type": "integer", "minimum": 1},
-        "relation": {"type": "integer", "minimum": 1}
+        "relation": {"type": "integer", "minimum": 1},
+        "resolved_relation_members": {"$ref": "#/$defs/typeCounts"},
+        "unresolved_relation_members": {"$ref": "#/$defs/typeCounts"},
+        "selected_objects": {
+          "type": "object", "additionalProperties": false,
+          "required": ["node_bbox", "way_bbox_intersection", "relation_context"],
+          "properties": {
+            "node_bbox": {"type": "integer", "minimum": 0},
+            "way_bbox_intersection": {"type": "integer", "minimum": 0},
+            "relation_context": {"type": "integer", "minimum": 0}
+          }
+        },
+        "added_way_nodes": {"type": "integer", "minimum": 0}
       }
     },
     "attempts": {"type": "integer", "minimum": 1, "maximum": 3},
@@ -49,10 +61,30 @@
     "attribution": {"type": "string", "minLength": 1},
     "selection": {
       "type": "object", "additionalProperties": false,
-      "required": ["seed", "closure"],
+      "required": ["nodes", "ways", "relations"],
       "properties": {
-        "seed": {"const": "bbox filters for node, way and relation in D004"},
-        "closure": {"const": "downward recursive members added for structural completeness"}
+        "nodes": {"const": "bbox"},
+        "ways": {"const": "bbox_intersection"},
+        "relations": {"const": "direct_parent_of_local_node_or_way"}
+      }
+    },
+    "closure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ways", "relations"],
+      "properties": {
+        "ways": {"const": "all_referenced_nodes"},
+        "relations": {"const": "not_expanded"}
+      }
+    }
+  },
+  "$defs": {
+    "typeCounts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["node", "way", "relation"],
+      "properties": {
+        "node": {"type": "integer", "minimum": 0},
+        "way": {"type": "integer", "minimum": 0},
+        "relation": {"type": "integer", "minimum": 0}
       }
     }
   }

@@ -17,8 +17,11 @@ creado ningún snapshot real. Las decisiones canónicas son D043-D048 de
   voluminoso de Git.
 - D047 vincula catálogo y preselección al snapshot y excluye ground truth,
   imágenes, embeddings e índices de Fase 2.
-- D048 fija endpoint configurable, consulta, bordes, timeouts, reintentos,
-  identidad content-addressed, escritura atómica y validación.
+- D048 fija endpoint configurable, consulta limitada, bordes, timeouts,
+  reintentos, identidad content-addressed, escritura atómica y validación. La
+  consulta inicial con clausura `>>` quedó sustituida antes de existir un
+  snapshot real, después de intentos fallidos HTTP 429 y 504 que no demuestran
+  causalidad pero sí motivaron revisar su expansión.
 
 La bbox continúa siendo la definida en D004:
 
@@ -47,10 +50,21 @@ consultará Overpass durante cada petición de usuario.
 
 ## Contenido raw
 
-La adquisición debe preservar inicialmente nodes, ways, relations, members y
-tags necesarios para reconstruir geometrías completas. No aplicará un
-vocabulario semántico ni filtrará categorías por su utilidad prevista. La
-normalización y los filtros se diseñarán en fases posteriores.
+La adquisición preserva nodes y ways locales, completa todos los nodes de esos
+ways y conserva como contexto las relations que los referencian directamente.
+No expande todos los members de relations ni subrelations; las referencias
+ausentes son válidas y se contabilizan por tipo. No aplica un vocabulario
+semántico ni filtra categorías por su utilidad prevista.
+
+Los `nd ref` de ways siguen siendo obligatoriamente resolubles. Para relations,
+los members conservan tipo, referencia y role; los objetos presentes se cuentan
+como resueltos y los ausentes como `unresolved_relation_members` separados por
+`node`, `way` y `relation`.
+
+La provenance separa los conteos seleccionados como `node_bbox`,
+`way_bbox_intersection` y `relation_context`, además de los nodes exteriores
+añadidos para completar ways. El SHA-256 de la consulta corregida es
+`11b8fe8f8b781c2fbceb1e24def956321ff141ffe1e5b09ffa14d0ff4df36145`.
 
 ## Almacenamiento previsto
 
@@ -102,8 +116,9 @@ D007 permanece pendiente y no se modifica.
 
 ## Operación fijada
 
-D048 es la referencia canónica para la consulta Overpass QL exacta, semántica
-`seed`/`closure`, endpoint configurable, timeouts, reintentos, formato de
+D048 es la referencia canónica para la consulta Overpass QL exacta, selección
+`local`, completitud de ways, contexto parcial de relations, endpoint
+configurable, timeouts, reintentos, formato de
 `osm_snapshot_id`, publicación atómica y validaciones. Este documento no duplica
 esos parámetros.
 

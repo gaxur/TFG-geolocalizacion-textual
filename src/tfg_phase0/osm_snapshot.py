@@ -76,11 +76,12 @@ def build_overpass_query(bbox: Mapping[str, float], server_timeout_seconds: int)
         "(\n"
         f"  node({area});\n"
         f"  way({area});\n"
-        f"  relation({area});\n"
-        ")->.seed;\n"
+        ")->.local;\n"
         "(\n"
-        "  .seed;\n"
-        "  .seed >>;\n"
+        "  .local;\n"
+        "  node(w.local);\n"
+        "  rel(bn.local);\n"
+        "  rel(bw.local);\n"
         ");\n"
         "out meta qt;\n"
     )
@@ -130,7 +131,13 @@ def _safe_xml_bytes(raw: bytes) -> None:
         raise SnapshotValidationError("DOCTYPE y entidades XML no están permitidos")
 
 
-def validate_osm_xml(raw: bytes, max_raw_bytes: int) -> dict[str, int]:
+def _inside_bbox(latitude: float, longitude: float, bbox: Mapping[str, float]) -> bool:
+    return bbox["south"] <= latitude <= bbox["north"] and bbox["west"] <= longitude <= bbox["east"]
+
+
+def validate_osm_xml(
+    raw: bytes, max_raw_bytes: int, bbox: Mapping[str, float] | None = None
+) -> dict[str, Any]:
     """Valida sintaxis, estructura y clausura de referencias de un OSM XML."""
     if len(raw) > max_raw_bytes:
         raise RawSizeLimitError("el raw supera max_raw_bytes")
@@ -165,7 +172,7 @@ def validate_osm_xml(raw: bytes, max_raw_bytes: int) -> dict[str, int]:
                 if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
                     raise SnapshotValidationError("coordenadas node fuera de rango")
 
-    counts = {kind: len(values) for kind, values in elements.items()}
+    counts: dict[str, Any] = {kind: len(values) for kind, values in elements.items()}
     if any(value < 1 for value in counts.values()):
         raise SnapshotValidationError("el snapshot debe contener node, way y relation")
     for way in elements["way"].values():
@@ -176,15 +183,50 @@ def validate_osm_xml(raw: bytes, max_raw_bytes: int) -> dict[str, int]:
                 raise SnapshotValidationError("nd ref no es entero") from error
             if reference not in elements["node"]:
                 raise SnapshotValidationError(f"nd ref ausente: {reference}")
+    unresolved = {"node": 0, "way": 0, "relation": 0}
+    resolved = {"node": 0, "way": 0, "relation": 0}
     for relation in elements["relation"].values():
         for member in relation.findall("member"):
             kind = member.attrib.get("type")
+            role = member.attrib.get("role")
+            if kind not in elements or role is None:
+                raise SnapshotValidationError("member de relation sin type/role válido")
             try:
                 reference = int(member.attrib["ref"])
             except (KeyError, ValueError) as error:
                 raise SnapshotValidationError("member ref no es entero") from error
-            if kind not in elements or reference not in elements[kind]:
-                raise SnapshotValidationError(f"member ausente: {kind}/{reference}")
+            if reference <= 0:
+                raise SnapshotValidationError("member ref debe ser positivo")
+            if reference in elements[kind]:
+                resolved[kind] += 1
+            else:
+                unresolved[kind] += 1
+    counts["resolved_relation_members"] = resolved
+    counts["unresolved_relation_members"] = unresolved
+    if bbox is not None:
+        local_nodes = sum(
+            _inside_bbox(float(node.attrib["lat"]), float(node.attrib["lon"]), bbox)
+            for node in elements["node"].values()
+        )
+        nodes_referenced_by_ways = {
+            int(nd.attrib["ref"])
+            for way in elements["way"].values()
+            for nd in way.findall("nd")
+        }
+        counts["selected_objects"] = {
+            "node_bbox": local_nodes,
+            "way_bbox_intersection": counts["way"],
+            "relation_context": counts["relation"],
+        }
+        counts["added_way_nodes"] = sum(
+            reference in elements["node"]
+            and not _inside_bbox(
+                float(elements["node"][reference].attrib["lat"]),
+                float(elements["node"][reference].attrib["lon"]),
+                bbox,
+            )
+            for reference in nodes_referenced_by_ways
+        )
     return counts
 
 
@@ -333,8 +375,13 @@ def build_snapshot_provenance(
         "license": "ODbL-1.0",
         "attribution": OSM_ATTRIBUTION,
         "selection": {
-            "seed": "bbox filters for node, way and relation in D004",
-            "closure": "downward recursive members added for structural completeness",
+            "nodes": "bbox",
+            "ways": "bbox_intersection",
+            "relations": "direct_parent_of_local_node_or_way",
+        },
+        "closure": {
+            "ways": "all_referenced_nodes",
+            "relations": "not_expanded",
         },
     }
     validate_document(document, "osm_snapshot")
@@ -365,7 +412,7 @@ def _validate_existing(snapshot_dir: Path, expected_hash: str) -> bool:
     if sha256_bytes(provenance["query"].encode("utf-8")) != provenance["query_sha256"]:
         raise SnapshotConflictError("hash de consulta existente inconsistente")
     try:
-        counts = validate_osm_xml(raw, len(raw))
+        counts = validate_osm_xml(raw, len(raw), provenance["bbox"])
     except SnapshotValidationError as error:
         raise SnapshotConflictError("raw existente estructuralmente inválido") from error
     if counts != provenance["counts"]:
@@ -392,7 +439,7 @@ def publish_snapshot(
         raise SnapshotConflictError("raw temporal no corresponde a la provenance")
     if snapshot_hash_from_id(provenance["osm_snapshot_id"]) != actual_hash:
         raise SnapshotConflictError("osm_snapshot_id no corresponde al raw temporal")
-    if validate_osm_xml(raw, len(raw)) != provenance["counts"]:
+    if validate_osm_xml(raw, len(raw), provenance["bbox"]) != provenance["counts"]:
         raise SnapshotConflictError("conteos de provenance no corresponden al raw temporal")
     snapshot_name = provenance["osm_snapshot_id"]
     final_dir = snapshots_root / snapshot_name
@@ -458,7 +505,9 @@ def acquire_snapshot(
             acquisition, query, part, transport=transport, sleep=sleep, now=now
         )
         raw = part.read_bytes()
-        counts = validate_osm_xml(raw, acquisition["max_raw_bytes"])
+        counts = validate_osm_xml(
+            raw, acquisition["max_raw_bytes"], config["region"]["bbox"]
+        )
         provenance = build_snapshot_provenance(
             config=config, query=query, raw=raw, counts=counts,
             acquired_at=now(), attempts=attempts, http_status=status,
