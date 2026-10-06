@@ -58,6 +58,12 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D040 | Conservar un único monorepo del TFG sin reorganizar material existente | ACEPTADA | Repositorio |
 | D041 | Obtener CVG-Text por script en revisión fija y excluir los clones externos de Git | ACEPTADA | Dependencias externas |
 | D042 | Preparar la reproducción NewYork-mixed OSM solo para inferencia, con pesos congelados | ACEPTADA | CrossText2Loc |
+| D043 | Usar Overpass como fuente primaria controlada del snapshot OSM piloto | ACEPTADA | OSM / adquisición |
+| D044 | Conservar cada snapshot como OSM XML raw, inmutable y no sobrescribible | ACEPTADA | OSM / datos raw |
+| D045 | Registrar integridad y provenance reproducible de cada snapshot OSM | ACEPTADA | OSM / provenance |
+| D046 | Separar raw, derivados, imágenes, embeddings e índices; excluir raw voluminoso de Git | ACEPTADA | OSM / almacenamiento |
+| D047 | Vincular catálogo y preselección al snapshot; excluir GT, imágenes e índices de Fase 2 | ACEPTADA | OSM / alcance Fase 2 |
+| D048 | Fijar endpoint, consulta, bordes, identidad, reintentos y validación del snapshot | ACEPTADA | OSM / operación |
 
 ## D001 — Identidad del candidato
 
@@ -1771,6 +1777,358 @@ perfil OSM de una galería nueva sigue pendiente de D007. La evaluación oficial
 utiliza 100 vecinos centrados con el ground truth; en Madrid no se usará la
 coordenada real para construir la galería de búsqueda.
 
+## D043 — Fuente primaria y uso offline del snapshot OSM piloto
+
+**Estado:** ACEPTADA
+**Componente:** OSM / adquisición
+**Fecha:** 2026-10-06
+**Origen:** aprobación expresa del responsable del TFG para la Fase 2.
+
+### Contexto
+
+La bbox D004 es pequeña y necesita una adquisición vectorial controlada. D019
+ya exige que el catálogo y la preselección ordinaria trabajen contra un snapshot
+OSM local y versionado, evitando depender del estado cambiante de un servicio
+remoto durante cada consulta.
+
+### Decisión / propuesta
+
+Usar Overpass como fuente primaria para una adquisición controlada del piloto
+D004. Overpass se utilizará para obtener el snapshot, no como dependencia
+obligatoria en tiempo de consulta. Después de adquirirlo, las etapas ordinarias
+del pipeline trabajarán sobre la copia local identificada.
+
+La adquisición no utilizará ground truth, descripciones de evaluación ni
+resultados de modelos. Su ámbito será exclusivamente la bbox configurada del
+piloto.
+
+### Justificación
+
+La extensión reducida del piloto permite una consulta acotada y facilita
+conservar exactamente la respuesta usada. Separar adquisición y consulta evita
+que cambios de OSM, límites de servicio o fallos de red alteren un experimento.
+
+### Consecuencias
+
+La implementación deberá permitir cache hit sin red y registrar el endpoint y
+la consulta exacta. Geofabrik permanece como alternativa futura si se necesita
+un extracto regional fechado o una reconstrucción histórica más fuerte.
+
+### Dependencias
+
+D004, D012 y D019.
+
+### Pendiente
+
+Ninguno sobre la fuente primaria y el uso offline. Los parámetros operativos se
+fijan en D048.
+
+## D044 — Formato y ciclo de vida del snapshot OSM raw
+
+**Estado:** ACEPTADA
+**Componente:** OSM / datos raw
+**Fecha:** 2026-10-06
+**Origen:** aprobación expresa del responsable del TFG para la Fase 2.
+
+### Contexto
+
+El raw debe conservar la semántica propia de OSM antes de aplicar decisiones de
+normalización, extracción de geometrías o vocabulario semántico.
+
+### Decisión / propuesta
+
+Conservar la respuesta primaria en OSM XML (`.osm`). La adquisición inicial
+preservará los objetos, miembros y tags necesarios para reconstruir nodes, ways
+y relations sin introducir filtrado semántico prematuro. Los filtros de
+conceptos y atributos pertenecen al procesamiento posterior, no al raw.
+
+Cada snapshot será inmutable. Nunca se sobrescribirá uno existente: una nueva
+adquisición o estado de OSM producirá otro snapshot identificable. El fichero
+raw no se normalizará ni modificará in place.
+
+### Justificación
+
+OSM XML conserva IDs, versiones, timestamps, tags, members y estructura de los
+objetos. La inmutabilidad permite verificar resultados y regenerar derivados
+sin depender de una nueva descarga.
+
+### Consecuencias
+
+Las respuestas procesadas, recortes normalizados o índices no se tratarán como
+raw. El tratamiento exacto de elementos que atraviesan la bbox deberá quedar
+expresado por la consulta D048 y validarse con fixtures.
+
+### Alternativas consideradas
+
+- JSON de Overpass como raw canónico.
+- GeoJSON como único artefacto de entrada.
+- Sobrescribir un fichero fijo en cada actualización.
+
+JSON puede reconsiderarse si aporta una ventaja comprobable; GeoJSON se
+descarta como único raw porque ya implica transformación y puede perder
+semántica OSM. La sobrescritura se descarta por falta de trazabilidad.
+
+### Dependencias
+
+D004 y D043.
+
+## D045 — Integridad y provenance del snapshot OSM
+
+**Estado:** ACEPTADA
+**Componente:** OSM / provenance
+**Fecha:** 2026-10-06
+**Origen:** aprobación expresa del responsable del TFG para la Fase 2.
+
+### Contexto
+
+Una fecha o un nombre de archivo no bastan para demostrar qué respuesta se usó
+ni para detectar descargas truncadas o cambios de contenido.
+
+### Decisión / propuesta
+
+Registrar para cada snapshot, como mínimo:
+
+- fuente y endpoint;
+- fecha y hora UTC de adquisición;
+- bbox y consulta exactas;
+- formato raw;
+- tamaño en bytes y SHA-256;
+- versión del mecanismo o código de adquisición;
+- conteos de nodes, ways y relations;
+- licencia y atribución ODbL;
+- resultado de la adquisición y metadatos necesarios para repetirla.
+
+El identificador y los metadatos no incluirán secretos. El hash se calculará
+sobre el raw exacto persistido después de una escritura atómica y validación
+estructural.
+
+### Justificación
+
+El hash identifica el contenido realmente utilizado; la consulta y el endpoint
+explican cómo se obtuvo; los conteos ayudan a detectar respuestas vacías o
+incompletas.
+
+### Consecuencias
+
+La provenance pequeña podrá revisarse para versionado, pero su presencia no
+autoriza por sí sola la redistribución del raw. El formato del
+`osm_snapshot_id` se fija en D048.
+
+### Dependencias
+
+D012, D019, D043 y D044.
+
+## D046 — Separación de artefactos OSM y política de Git
+
+**Estado:** ACEPTADA
+**Componente:** OSM / almacenamiento
+**Fecha:** 2026-10-06
+**Origen:** aprobación expresa del responsable del TFG para la Fase 2.
+
+### Decisión / propuesta
+
+Mantener físicamente separados:
+
+```text
+raw OSM
+→ derivados OSM
+→ imágenes OSM
+→ embeddings
+→ índices
+```
+
+El raw será inmutable y los derivados regenerables conservarán la referencia y
+hash de su snapshot de origen. Los datos raw voluminosos no se versionarán en
+Git. La metadata o provenance pequeña solo se versionará después de revisar su
+contenido, licencia y ausencia de datos privados o secretos.
+
+### Justificación
+
+La separación evita confundir datos adquiridos con transformaciones propias,
+permite invalidar derivados cuando cambia el snapshot y reduce el riesgo de
+incorporar datos externos o resultados voluminosos al repositorio.
+
+### Consecuencias
+
+Fase 2 solo podrá crear raw y metadata de adquisición. Las imágenes,
+representaciones e índices pertenecen a fases posteriores.
+
+### Dependencias
+
+D006, D012, D019, D040, D043, D044 y D045.
+
+## D047 — Relación del snapshot con el catálogo y límites de Fase 2
+
+**Estado:** ACEPTADA
+**Componente:** OSM / alcance Fase 2
+**Fecha:** 2026-10-06
+**Origen:** aprobación expresa del responsable del TFG para la Fase 2.
+
+### Decisión / propuesta
+
+El catálogo, sus derivados y la futura preselección deberán poder referenciar
+inequívocamente el `osm_snapshot_id` utilizado. La adquisición y construcción
+del snapshot no usarán ground truth.
+
+Fase 2 no generará imágenes OSM, tiles, embeddings, índices, vocabularios de
+preselección ni consultas de usuario. El índice geoespacial y la preselección se
+posponen. D007 permanece pendiente y no se considera resuelta por adquirir datos
+vectoriales OSM.
+
+### Justificación
+
+Un snapshot vectorial no determina el footprint, estilo, zoom o
+preprocesamiento visual requerido por CrossText2Loc. Separar estas etapas evita
+atribuir a Fase 2 decisiones metodológicas todavía abiertas.
+
+### Consecuencias
+
+`osm_snapshot_id` permanecerá `null` en manifests que no se hayan vinculado a
+una adquisición concreta. Una vinculación futura deberá comprobar el ID y hash,
+no inferirlos por ruta o fecha.
+
+### Dependencias
+
+D007, D012, D019, D027, D032 y D046.
+
+## D048 — Parámetros operativos de adquisición OSM
+
+**Estado:** ACEPTADA
+**Componente:** OSM / operación
+**Fecha:** 2026-10-06
+**Origen:** aprobación expresa del responsable del TFG para cerrar el diseño de
+Fase 2 antes de implementar o adquirir datos.
+
+### Contexto
+
+Las decisiones de fuente, formato, inmutabilidad y provenance están aceptadas.
+Falta fijar de forma canónica la operación exacta para que endpoint, consulta,
+bordes, identidad, reintentos y validación no queden implícitos en código.
+
+### Decisión / propuesta
+
+Usar por defecto el endpoint configurable:
+
+```text
+https://overpass-api.de/api/interpreter
+```
+
+El endpoint real se configurará y registrará en provenance, pero no formará
+parte de la identidad del snapshot: dos endpoints que devuelvan exactamente los
+mismos bytes producirán el mismo identificador.
+
+La consulta Overpass QL canónica para D004 será:
+
+```overpass
+[out:xml][timeout:60];
+(
+  node(40.4120,-3.7090,40.4200,-3.6990);
+  way(40.4120,-3.7090,40.4200,-3.6990);
+  relation(40.4120,-3.7090,40.4200,-3.6990);
+)->.seed;
+(
+  .seed;
+  .seed >>;
+);
+out meta qt;
+```
+
+`.seed` es el conjunto seleccionado por la semántica del filtro bbox de
+Overpass, no una intersección geométrica exacta calculada por el TFG. `>>`
+realiza clausura descendente recursiva: añade los miembros de relations, los
+miembros de relations anidadas y los nodos de ways necesarios para que las
+referencias devueltas sean resolubles. `out meta qt` conserva tags y metadata
+OSM, con orden quadtile. La provenance distinguirá:
+
+- `seed`: objetos seleccionados por las tres cláusulas bbox para D004;
+- `closure`: objetos fuera o dentro de D004 añadidos exclusivamente por `>>`
+  para completar la estructura.
+
+La clausura no amplía la región conceptual del piloto. Un miembro añadido fuera
+de D004 no se convierte por ello en candidato ni en objeto semánticamente
+seleccionado. La consulta exacta y su SHA-256 se conservarán para explicar esta
+diferencia.
+
+Fijar `[timeout:60]` como timeout del servidor Overpass. El cliente tendrá
+timeout de conexión de 10 segundos y timeout HTTP total de 120 segundos. Se
+permitirán como máximo dos reintentos después del intento inicial, es decir,
+tres intentos totales. Solo se reintentará ante timeout, fallo de conexión, HTTP
+429, 502, 503 o 504. El backoff será 5 segundos antes del segundo intento y 15
+segundos antes del tercero; si existe `Retry-After` válido, se respetará con un
+máximo de 60 segundos. No se reintentará un error sintáctico o HTTP 4xx distinto
+de 429.
+
+El identificador será content-addressed:
+
+```text
+osm-madrid-pilot-osmxml-sha256-<SHA256_RAW_COMPLETO>
+```
+
+Participan en la identidad el nombre estable de la región, el formato raw y el
+SHA-256 completo de `source.osm`. Fecha UTC, endpoint, consulta, hash de la
+consulta, versión del adquirente, respuesta HTTP y número de intento son metadata
+de adquisición, no identidad. Dos adquisiciones byte a byte idénticas tendrán el
+mismo ID aunque cambien la hora o el endpoint; cualquier diferencia de bytes
+producirá otro ID.
+
+La publicación seguirá este procedimiento en el mismo filesystem:
+
+1. crear un directorio temporal único y abrir `source.osm.part` sin sobrescribir;
+2. descargar en streaming, limitar tamaño y sincronizar el fichero;
+3. validar XML y estructura; rechazar respuestas de error o incompletas;
+4. calcular tamaño y SHA-256 sobre el raw exacto;
+5. construir y validar `provenance.json` en el directorio temporal;
+6. sincronizar ficheros y directorio;
+7. publicar el directorio temporal mediante una operación atómica
+   **no-replace** al directorio final cuyo nombre es `osm_snapshot_id`.
+
+Un fallo de red, interrupción o validación dejará como máximo un temporal que no
+se tratará como snapshot y podrá limpiarse de forma explícita en otra ejecución.
+La implementación deberá usar una primitiva no-replace o un lock exclusivo con
+recomprobación para impedir sustituciones y carreras entre procesos. Si el
+destino final ya existe y su raw tiene el SHA-256 esperado, se considera cache
+hit y no se sobrescribe. Si el directorio existe pero falta un artefacto, no
+valida o su hash difiere del ID, se clasifica como conflicto/corrupción y se
+detiene sin reparar ni sobrescribir automáticamente.
+
+Antes de aceptar `source.osm` se comprobará:
+
+- tamaño mayor que cero y dentro del límite configurado;
+- XML bien formado, sin entidades externas, con raíz `osm` y versión compatible;
+- ausencia de elementos `remark` o respuestas HTML/error de Overpass;
+- IDs enteros positivos y no duplicados por tipo;
+- latitud/longitud válidas en nodes;
+- conteos no vacíos de node, way y relation registrados en provenance;
+- cada `nd ref` de way resuelto por un node presente;
+- cada member de relation resuelto por un node, way o relation presente;
+- clausura estructural sin referencias ausentes.
+
+Estas comprobaciones distinguen validación sintáctica, estructura interna y
+completitud respecto a la consulta. No garantizan que una ejecución futura de la
+misma consulta devuelva el mismo estado OSM, ni aplican semántica CrossText2Loc.
+
+### Reproducibilidad
+
+El artefacto congelado es reproducible byte a byte mediante su raw y SHA-256, y
+los experimentos posteriores pueden referenciar exactamente su
+`osm_snapshot_id`. La adquisición online solo es repetible como procedimiento:
+la misma consulta en otra fecha puede devolver contenido distinto y, por tanto,
+otro ID. Conservar raw, consulta, endpoint, UTC, versión del adquirente y
+provenance permite auditar ambas dimensiones sin confundirlas.
+
+### Justificación
+
+Estos parámetros limitan la carga sobre el servicio, evitan snapshots ambiguos
+y permiten detectar truncamiento, referencias ausentes y conflictos de caché.
+Separar identidad de contenido y metadata temporal evita duplicar identidades
+por descargas idénticas.
+
+### Pendiente
+
+Ninguno sobre estos parámetros. La implementación y cualquier adquisición real
+requieren una autorización de ejecución separada y deberán respetar la política
+de uso vigente del endpoint en ese momento.
+
 # Decisiones pendientes
 
 Esta sección es una vista operativa. Cuando un pendiente se resuelva, se
@@ -1784,6 +2142,13 @@ decisión.
 | Cerrar el perfil compatible de CrossText2Loc | Sin él no se deben generar imágenes ni embeddings definitivos | Autores y verificación local | No bloquea el diseño; sí la generación definitiva | D007 |
 | Confirmar el checkpoint OSM propuesto | Determina si el peso oficial es la opción razonable para Madrid | Autores y experimento | No bloquea el diseño; sí la evaluación definitiva | D013 |
 | Concretar únicamente los parámetros experimentales del dataset y evaluación | Fija tamaño, captura y análisis sin convertir hipótesis en hechos | Nosotros y experimento | Sí antes de generar el test final | D029–D031 |
+
+## OSM / Fase 2
+
+| Qué hay que decidir | Por qué importa | Quién lo resuelve | ¿Bloquea Fase 2? | Decisión |
+|---|---|---|---|---|
+| Revisar la política vigente y disponibilidad del endpoint antes de una adquisición real | Los límites del servicio pueden cambiar aunque el diseño esté fijado | Responsable del TFG y ejecución | No para implementar; sí antes de llamar a red | D043, D048 |
+| Revisar qué metadata pequeña puede publicarse bajo ODbL | Evita redistribuir datos o derivados sin revisar obligaciones | Responsable del TFG | No para una adquisición local; sí para publicar | D045-D046 |
 
 ## CrossText2Loc
 
