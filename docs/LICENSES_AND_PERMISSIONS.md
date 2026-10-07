@@ -1,6 +1,6 @@
 # Licencias y permisos de software y datos
 
-## Matriz de auditoría (actualizada: 2 de octubre de 2026)
+## Matriz de auditoría (actualizada: 6 de octubre de 2026)
 
 Esta matriz distingue usar, modificar, almacenar, generar derivados, publicar
 y redistribuir. Una URL pública o un checkpoint descargable no implica que
@@ -9,6 +9,7 @@ todas esas acciones estén autorizadas.
 | Recurso | Fuente oficial | Uso | Licencia | Datos/pesos | Redistribución | Estado | Acción pendiente |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Datos OSM | [OpenStreetMap](https://www.openstreetmap.org/copyright) | Catálogo, filtros y derivados geográficos | ODbL 1.0, con atribución | Almacenables; registrar snapshot y procedencia | Condicionada por ODbL y tipo de obra/base derivada | PERMITIDO CON CONDICIONES | Revisar obligaciones del artefacto concreto publicado. |
+| `osm-polygon-features` | [Repositorio upstream](https://github.com/tyrasd/osm-polygon-features) | Reglas offline para interpretar closed ways en F3 | CC0-1.0 | Copia exacta de `polygon-features.json` v0.9.2 permitida | Permitida por CC0-1.0 | PERMITIDO | Conservar commit, hash, licencia y procedencia; no presentar la tabla como norma oficial de OSM. |
 | Overpass API | [Overpass](https://wiki.openstreetmap.org/wiki/Overpass_API) | Adquisición/adaptación de OSM | Datos devueltos bajo ODbL; servicio sujeto a política de uso | Cache local razonable y reproducible | Datos según ODbL; no se redistribuye el servicio | PERMITIDO CON CONDICIONES | Respetar límites del endpoint y atribuir OSM. |
 | Wikidata | [Wikidata](https://www.wikidata.org/wiki/Wikidata:Copyright) | Enriquecimiento opcional | CC0 para datos estructurados | Almacenables; revisar fuentes enlazadas | Posible para CC0 | PERMITIDO CON CONDICIONES | Mantener procedencia y revisar contenido externo. |
 | Código GOTPR | [GitHub](https://github.com/donghwijung/GOTPR) | Extensión de retrieval por grafos | MIT | No cubre automáticamente pesos/datasets | Sí para código, conservando aviso MIT | PERMITIDO CON CONDICIONES | Auditar cada artefacto no incluido en MIT. |
@@ -36,7 +37,8 @@ Fuentes oficiales consultadas: [OSM Copyright](https://www.openstreetmap.org/cop
 [GOTPR](https://github.com/donghwijung/GOTPR),
 [GeoBridge](https://github.com/MiliLab/GeoBridge),
 [GeoLoc](https://huggingface.co/datasets/Son12s/GeoLoc) y
-[OpenAerialMap](https://openaerialmap.org/legal/). La tabla no constituye asesoramiento
+[OpenAerialMap](https://openaerialmap.org/legal/), y
+[`osm-polygon-features`](https://github.com/tyrasd/osm-polygon-features). La tabla no constituye asesoramiento
 jurídico; las condiciones aplicables a una cuenta o recurso concreto deben
 confirmarse antes de publicar.
 
@@ -46,7 +48,8 @@ el raw continuará fuera de Git y la publicación de provenance o derivados se
 revisará según ODbL.
 
 **Proyecto:** localización geográfica a partir de descripciones textuales en Madrid  
-**Fecha de revisión:** 2 de octubre de 2026  
+**Fecha de revisión:** 6 de octubre de 2026
+
 **Estado:** guía de cumplimiento para el desarrollo y la memoria del TFG
 
 Este documento registra las condiciones observadas en los repositorios y fuentes que se prevé utilizar. No sustituye una revisión jurídica ni una autorización escrita de los titulares de derechos. La fecha es relevante porque los autores pueden añadir o modificar una licencia posteriormente.
@@ -149,6 +152,32 @@ En la memoria y en cualquier aplicación o material publicado debe aparecer, com
 > © OpenStreetMap contributors. Datos disponibles bajo la Open Database License (ODbL). https://www.openstreetmap.org/copyright
 
 También deben conservarse la fecha de descarga, la consulta o área utilizada, la versión o fuente de los datos y cualquier transformación aplicada. Las teselas raster, estilos cartográficos, imágenes satelitales y servicios de terceros pueden tener condiciones adicionales a las de los datos OSM.
+
+## Reglas `osm-polygon-features`
+
+La política D049 utiliza una copia exacta de
+[`osm-polygon-features`](https://github.com/tyrasd/osm-polygon-features) con la
+siguiente procedencia:
+
+```text
+release: v0.9.2
+commit: 069a46416629ddbe84390c7a3ccc600fe73ee706
+file: polygon-features.json
+size: 2753 bytes
+sha256: cf81018ba820557c59c2c27de7ea6b314009abed040cd11249e94ed1a3a10583
+license: CC0-1.0
+```
+
+El repositorio y `package.json` de esa revisión declaran CC0-1.0 y no se
+observó una licencia diferente para el fichero de reglas. La copia se conserva
+sin modificar junto con el texto de licencia y una nota de procedencia en
+`third_party/osm-polygon-features/v0.9.2/`. CC0 no exige atribución, pero el TFG
+mantiene autor, fuente, versión, commit y hash por trazabilidad científica.
+
+Esta licencia corresponde a la tabla de reglas, no a los datos cartográficos.
+El snapshot y los datos OSM continúan bajo ODbL 1.0 y mantienen su atribución y
+sus condiciones propias. La documentación de OSM Wiki consultada durante la
+auditoría no forma parte del recurso ejecutable de F3 ni se copia en él.
 
 ## Checkpoints, datasets e imágenes
 

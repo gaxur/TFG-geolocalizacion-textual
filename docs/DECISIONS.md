@@ -64,6 +64,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D046 | Separar raw, derivados, imágenes, embeddings e índices; excluir raw voluminoso de Git | ACEPTADA | OSM / almacenamiento |
 | D047 | Vincular catálogo y preselección al snapshot; excluir GT, imágenes e índices de Fase 2 | ACEPTADA | OSM / alcance Fase 2 |
 | D048 | Fijar endpoint, consulta, bordes, identidad, reintentos y validación del snapshot | ACEPTADA | OSM / operación |
+| D049 | Aplicar una política versionada para interpretar la geometría de OSM ways | ACEPTADA | OSM / catálogo geométrico F3 |
 
 ## D001 — Identidad del candidato
 
@@ -2177,6 +2178,109 @@ D048 el `2026-10-06T08:52:43.930134Z`, en un intento HTTP 200, y produjo
 `osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141`.
 Este hecho operacional no crea una nueva decisión. Cualquier adquisición futura
 requiere otra autorización y deberá respetar la política vigente del endpoint.
+
+## D049 — Política versionada de interpretación geométrica de OSM ways
+
+**Estado:** ACEPTADA
+
+**Componente:** OSM / catálogo geométrico F3
+
+**Fecha:** 2026-10-06
+
+**Origen:** Auditoría de `osm-polygon-features` y aprobación expresa del
+responsable del TFG.
+
+### Contexto
+
+D022 exige asociar los objetos OSM mediante su geometría real, pero un way cuyo
+primer y último node coinciden no representa necesariamente un área. Puede ser
+un Polygon, una línea cerrada o un caso ambiguo. F2 conserva todos los `nd ref`
+de los ways, mientras que sus relations son contexto no expandido.
+
+### Decisión
+
+F3 aplicará la política determinista `way_is_area-v1`. La fuente de reglas será
+una copia exacta e inmutable de:
+
+```text
+repository: https://github.com/tyrasd/osm-polygon-features
+release: v0.9.2
+commit: 069a46416629ddbe84390c7a3ccc600fe73ee706
+file: polygon-features.json
+size: 2753 bytes
+sha256: cf81018ba820557c59c2c27de7ea6b314009abed040cd11249e94ed1a3a10583
+license: CC0-1.0
+```
+
+La copia se conservará sin modificar junto con su licencia. F3 verificará su
+SHA-256 y la consumirá offline, sin descargar reglas ni consultar servicios
+externos durante la ejecución.
+
+La clasificación seguirá estas reglas:
+
+1. Validar las referencias y la estructura del way.
+2. `area=no` produce `line`.
+3. `area=yes` declara intención areal; en un way abierto produce
+   `invalid_area` y en un closed way exige construir y validar un Polygon.
+4. Un way abierto sin `area=yes` produce `line`.
+5. Un closed way sin `area=*` se evalúa contra la tabla fijada.
+6. `polygon=all` produce voto `area` para un valor distinto de `no`.
+7. `polygon=whitelist` produce voto `area` para un valor incluido y voto
+   `line` para un valor no incluido y distinto de `no`.
+8. `polygon=blacklist` produce voto `line` para un valor excluido y voto
+   `area` para el resto de valores distintos de `no`.
+9. Una clave no incluida en la tabla no produce voto.
+10. Solo votos `area` producen intención areal; solo votos `line` producen
+    `line`; la ausencia de votos produce `unknown_closed_way`.
+11. La coexistencia de votos `area` y `line` produce `unknown_closed_way` con
+    conflicto explícito. El orden de los tags nunca resuelve conflictos.
+
+Toda intención areal requiere un Polygon cerrado, válido, no vacío y con área
+positiva. Si falla alguna condición, el resultado será `invalid_area`. F3 v1 no
+aplicará `buffer(0)`, `make_valid`, simplificación ni fallback automático.
+`unknown_closed_way` e `invalid_area` no producirán asociaciones geométricas
+base.
+
+F3 no construirá geometrías de las relations parciales de F2 ni heredará sus
+tags o semántica a los member ways. Un member sin tags continuará siendo
+`unknown_closed_way`, aunque su role sea `outer` o `inner`.
+
+### Limitación metodológica
+
+`osm-polygon-features` v0.9.2 es una heurística comunitaria histórica congelada,
+no una norma oficial de OpenStreetMap, una definición universal de áreas ni una
+representación necesariamente actual de toda su semántica. La release es de
+2016, su mantenimiento actual es limitado, la tabla es incompleta y algunas
+reglas, como `barrier=wall`, fueron cuestionadas posteriormente en upstream.
+
+La resolución conservadora de conflictos es una adaptación propia del TFG. No
+se corregirá silenciosamente la tabla upstream. Una versión futura de la tabla
+o de la política podrá producir clasificaciones y asociaciones distintas y
+exigirá otra versión del derivado.
+
+### Justificación
+
+La política evita equiparar cierre topológico con semántica areal, conserva la
+trazabilidad hasta una fuente pública fijada y permite regenerar el derivado sin
+red. Tratar la ausencia y los conflictos como desconocidos evita convertir una
+tabla incompleta en una clasificación exhaustiva.
+
+### Consecuencias
+
+La implementación deberá conservar el resultado y la razón de clasificación,
+validar la geometría con la dependencia geométrica que se adopte y registrar en
+provenance la versión `way_is_area-v1`, el commit y el hash de la tabla. Cambiar
+la fuente o cualquiera de estas reglas invalida el derivado previo.
+
+### Dependencias
+
+D002, D018, D019, D022 y D043-D048.
+
+### Pendiente
+
+Ninguno sobre la política `way_is_area-v1`. El contrato global de F3 se
+estudiará por separado antes de implementarlo, sin asignarle todavía una nueva
+decisión.
 
 # Decisiones pendientes
 

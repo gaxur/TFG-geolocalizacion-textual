@@ -82,6 +82,62 @@ El snapshot actual contiene 25.537 nodes, 4.240 ways y 498 relations. Los
 para completar ways. Las relations son contexto directo no expandido; sus
 members ausentes se contabilizan y no implican corrupción del raw.
 
+### Asociación geométrica propuesta para Fase 3
+
+El siguiente diagrama describe la arquitectura propuesta, todavía no
+implementada, para vincular de forma reproducible el manifest geométrico de
+Fase 1 con la evidencia del snapshot OSM local de Fase 2. F3 no consulta
+Overpass, no modifica el manifest F1 y registra el vínculo entre ambos inputs
+en su propia provenance:
+
+```mermaid
+flowchart TD
+    F1[Manifest F1<br/>candidate_id y celdas]
+    F2[Snapshot F2<br/>OSM XML + provenance]
+
+    V1[Validar manifest e identidad]
+    V2[Validar snapshot, hash y closure]
+    P[Parsear objetos OSM]
+    C[Proyectar WGS84 a EPSG:25830]
+    G[Construir geometrías<br/>Point / LineString / Polygon]
+    A[Clasificar ways con D049<br/>closed way no implica Polygon]
+    I[Índice espacial STRtree]
+    X[Intersección exacta<br/>muchos a muchos]
+    R[Propagar contexto de relations<br/>solo members presentes]
+    O1[osm_objects.jsonl]
+    O2[candidate_osm_associations.jsonl]
+    O3[relation_context.jsonl]
+    PR[provenance.json + hashes]
+
+    F1 --> V1
+    F2 --> V2
+    V2 --> P
+    P --> C
+    C --> G
+    P --> A
+    A --> G
+    G --> I
+    V1 --> X
+    I --> X
+    X --> O2
+    P --> O1
+    X --> R
+    P --> R
+    R --> O3
+    V1 --> PR
+    V2 --> PR
+    O1 --> PR
+    O2 --> PR
+    O3 --> PR
+```
+
+D049 fija `way_is_area-v1` y la copia versionada de
+`osm-polygon-features` utilizada para distinguir áreas, líneas y closed ways
+ambiguos. Los `unknown_closed_way` y las áreas inválidas no producen
+asociaciones geométricas base. Las relations incompletas de F2 no reciben
+geometría propia ni transmiten automáticamente sus tags o semántica a los
+member ways.
+
 ## 3. Flujo online
 
 ```text

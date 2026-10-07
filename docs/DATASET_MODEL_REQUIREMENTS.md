@@ -54,6 +54,12 @@ resueltos son consecuencia prevista de no expandir relations, no un fallo de
 integridad; todos los `nd ref` de ways sí están resueltos. Véase
 [`PHASE2_OSM_SNAPSHOT.md`](PHASE2_OSM_SNAPSHOT.md).
 
+La política geométrica D049 está aceptada y fija `way_is_area-v1` junto con una
+copia exacta y versionada de `osm-polygon-features` v0.9.2. Esta decisión evita
+interpretar automáticamente todo closed way como Polygon. La Fase 3 continúa
+sin implementar; la aceptación de la política no implica que existan todavía
+geometrías procesadas ni asociaciones `candidate_id`–OSM.
+
 | Repositorio | URL | Commit auditado |
 | --- | --- | --- |
 | CVG-Text / CrossText2Loc | <https://github.com/yejy53/CVG-Text> | `6910d2747a94fbe985309bde60cd4732bcbbf50f` |
