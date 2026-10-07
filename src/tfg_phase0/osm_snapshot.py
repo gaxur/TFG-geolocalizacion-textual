@@ -388,13 +388,14 @@ def build_snapshot_provenance(
     return document
 
 
-def _validate_existing(snapshot_dir: Path, expected_hash: str) -> bool:
+def _validate_existing_content(
+    snapshot_dir: Path, expected_hash: str, raw: bytes
+) -> dict[str, Any]:
     source = snapshot_dir / "source.osm"
     provenance_path = snapshot_dir / "provenance.json"
     checksum_path = snapshot_dir / "sha256.txt"
     if not source.is_file() or not provenance_path.is_file() or not checksum_path.is_file():
         raise SnapshotConflictError("snapshot existente incompleto")
-    raw = source.read_bytes()
     actual = sha256_bytes(raw)
     if actual != expected_hash or checksum_path.read_text(encoding="ascii").strip() != expected_hash:
         raise SnapshotConflictError("snapshot existente con hash inconsistente")
@@ -417,7 +418,30 @@ def _validate_existing(snapshot_dir: Path, expected_hash: str) -> bool:
         raise SnapshotConflictError("raw existente estructuralmente inválido") from error
     if counts != provenance["counts"]:
         raise SnapshotConflictError("conteos de provenance inconsistentes")
+    return provenance
+
+
+def _validate_existing(snapshot_dir: Path, expected_hash: str) -> bool:
+    source = snapshot_dir / "source.osm"
+    if not source.is_file():
+        raise SnapshotConflictError("snapshot existente incompleto")
+    _validate_existing_content(snapshot_dir, expected_hash, source.read_bytes())
     return True
+
+
+def validate_local_snapshot(snapshot_dir: str | Path) -> tuple[dict[str, Any], bytes]:
+    """Valida un snapshot F2 local y devuelve los mismos bytes comprobados."""
+    path = Path(snapshot_dir)
+    try:
+        expected_hash = snapshot_hash_from_id(path.name)
+    except ValueError as error:
+        raise SnapshotConflictError("el directorio no tiene un osm_snapshot_id válido") from error
+    source = path / "source.osm"
+    if not source.is_file():
+        raise SnapshotConflictError("snapshot existente incompleto")
+    raw = source.read_bytes()
+    provenance = _validate_existing_content(path, expected_hash, raw)
+    return provenance, raw
 
 
 def _fsync_directory(path: Path) -> None:
