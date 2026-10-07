@@ -60,6 +60,12 @@ interpretar automáticamente todo closed way como Polygon. La Fase 3 continúa
 sin implementar; la aceptación de la política no implica que existan todavía
 geometrías procesadas ni asociaciones `candidate_id`–OSM.
 
+D050 acepta el contrato global del dataset derivado F3. Sus inputs, outputs,
+identidad, predicados, serialización, provenance y publicación se detallan en
+[`PHASE3_GEOMETRIC_ASSOCIATIONS.md`](PHASE3_GEOMETRIC_ASSOCIATIONS.md). La
+versión exacta de Shapely/GEOS se fijará mediante un preflight separado antes de
+implementar geometría.
+
 | Repositorio | URL | Commit auditado |
 | --- | --- | --- |
 | CVG-Text / CrossText2Loc | <https://github.com/yejy53/CVG-Text> | `6910d2747a94fbe985309bde60cd4732bcbbf50f` |

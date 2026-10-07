@@ -65,6 +65,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D047 | Vincular catálogo y preselección al snapshot; excluir GT, imágenes e índices de Fase 2 | ACEPTADA | OSM / alcance Fase 2 |
 | D048 | Fijar endpoint, consulta, bordes, identidad, reintentos y validación del snapshot | ACEPTADA | OSM / operación |
 | D049 | Aplicar una política versionada para interpretar la geometría de OSM ways | ACEPTADA | OSM / catálogo geométrico F3 |
+| D050 | Fijar el contrato del dataset de asociaciones geométricas F3 | ACEPTADA | OSM / catálogo geométrico F3 |
 
 ## D001 — Identidad del candidato
 
@@ -2281,6 +2282,139 @@ D002, D018, D019, D022 y D043-D048.
 Ninguno sobre la política `way_is_area-v1`. El contrato global de F3 se
 estudiará por separado antes de implementarlo, sin asignarle todavía una nueva
 decisión.
+
+## D050 — Contrato del dataset de asociaciones geométricas F3
+
+**Estado:** ACEPTADA
+
+**Componente:** OSM / catálogo geométrico F3
+
+**Fecha:** 2026-10-07
+
+**Origen:** Diseño del contrato global de Fase 3 y aprobación expresa del
+responsable del TFG.
+
+### Contexto
+
+F1 produce un manifest geométrico materializado de `candidate_id` y F2 un
+snapshot OSM local, inmutable y validado. D022 fija la correspondencia
+geométrica métrica y D049 la interpretación de los OSM ways. Falta definir el
+dataset derivado que vinculará ambos inputs sin modificarlos ni incorporar
+preselección semántica.
+
+### Decisión
+
+F3 será un dataset derivado, reproducible e inmutable. Consumirá un manifest F1
+ya materializado y exclusivamente un snapshot F2 local validado. Comprobará sus
+schemas, identidades, hashes, regiones, bbox, CRS, conteos y políticas de
+clausura. No regenerará ni modificará F1, no adquirirá ni modificará F2 y no
+utilizará red.
+
+La identidad OSM será `(osm_type, osm_id)` y `osm_ref` se derivará como
+`<osm_type>/<osm_id>`. Los nodes `node_bbox` serán Point asociables. Los
+`added_way_node` se conservarán para reconstrucción y trazabilidad, pero no
+producirán asociaciones Point directas.
+
+Los ways usarán su geometría completa y D049/`way_is_area-v1`: `line` se
+representará como LineString y `area` como Polygon. `unknown_closed_way`,
+`invalid_area` e `invalid_way_geometry` no producirán asociaciones. No se usarán
+centroides ni reparaciones automáticas.
+
+Las celdas se reconstruirán en EPSG:25830 desde `center_easting_m`,
+`center_northing_m` y `cell_size_m` de F1. Las coordenadas OSM se proyectarán
+mediante la misma transformación usada por F1. Predicados y distancias se
+calcularán en EPSG:25830.
+
+La asociación base será muchos-a-muchos y existirá si
+`osm_geometry.intersects(candidate_cell)` es verdadero. No habrá nearest-only,
+ganador, desempate, buffer, radio, scoring ni semántica de consulta. La dirección
+formal de los predicados será `osm_geometry <predicate> candidate_cell`. Cada
+asociación registrará `intersects`, `contains`, `within`, `crosses`, `touches`,
+`overlaps`, `boundary_contact_only` y `center_distance_m`. En F3 v1,
+`boundary_contact_only == touches`; la distancia se medirá desde el centro F1
+hasta la geometría OSM completa.
+
+Las relations no recibirán geometría, no se reconstruirán como multipolygons,
+no se completarán con red y no transmitirán tags o semántica a sus members. El
+contexto se propagará un solo nivel desde members presentes directamente
+asociados. `relation_context.jsonl` solo contendrá relations con al menos uno de
+esos members; las restantes se contabilizarán en provenance.
+
+El dataset canónico será:
+
+```text
+data/processed/osm/<osm_snapshot_id>/<f3_dataset_id>/
+  osm_objects.jsonl
+  candidate_osm_associations.jsonl
+  relation_context.jsonl
+  provenance.json
+  sha256.txt
+```
+
+No se enriquecerá el manifest F1. SQLite y los índices persistentes solo podrán
+ser derivados regenerables, no fuentes canónicas.
+
+Shapely 2.x y GEOS serán la única capa geométrica nueva y STRtree el índice
+espacial temporal. El índice solo acelerará la búsqueda: sus resultados se
+deduplicarán y ordenarán por identidad OSM antes de evaluar predicados y nunca
+determinarán el orden del output. Antes de implementar geometría se realizará un
+preflight para Python 3.12/Linux `aarch64` y se fijarán versiones exactas de
+Shapely y GEOS.
+
+Los JSONL usarán UTF-8 sin BOM, claves ordenadas, formato compacto,
+`allow_nan=false`, orden de filas explícito y newline final. Las magnitudes
+métricas se redondearán a seis decimales y `-0.0` se normalizará a `0.0`. El
+bundle canónico no incluirá un timestamp de ejecución variable.
+
+`f3_dataset_id` será content-addressed a partir del manifest F1 exacto, su
+`manifest_id`, el snapshot ID y hash F2, la configuración canónica, D049 y el
+hash de sus reglas, el CRS y la transformación, las políticas geométricas, el
+código generador relevante, las versiones exactas de Python, Shapely y GEOS y
+la versión de serialización. No participarán rutas absolutas, hostname, usuario,
+timestamp, duración, orden de STRtree, número de cores, `platform_system` ni
+`platform_machine`. Los dos últimos se registrarán únicamente en
+`provenance.software`.
+
+El contrato exige determinismo para una identidad algorítmica fijada, pero no
+promete igualdad byte a byte universal entre plataformas. Cualquier divergencia
+con los mismos inputs, reglas y software deberá ser visible en los hashes de
+outputs y la provenance e investigarse como cuestión de reproducibilidad.
+
+La generación usará un directorio temporal, validará outputs y hashes y
+publicará de forma atómica sin sobrescribir. Un ID existente y válido será cache
+hit; un ID existente incompleto o inconsistente producirá un error.
+
+### Fuera de alcance
+
+F3 no generará candidatos, consultará Overpass, interpretará lenguaje natural,
+aplicará vocabularios de consulta, radios, buffers, fallback, scoring o
+restricciones hard/soft. Tampoco usará ground truth, generará imágenes,
+embeddings o scene graphs ni ejecutará CrossText2Loc o GOTPR.
+
+### Justificación
+
+El contrato separa los datos fuente de un derivado regenerable, materializa
+D022 y D049 sin introducir semántica de consulta y permite auditar exactamente
+qué inputs, reglas y software produjeron cada asociación. Excluir la plataforma
+física de la identidad evita fragmentarla sin ocultar posibles diferencias,
+porque sistema y arquitectura permanecen registrados en provenance.
+
+### Consecuencias
+
+Cada combinación de manifest, snapshot, reglas y software algorítmico producirá
+un dataset identificable. Los manifests de 25 m y 50 m podrán generar datasets
+F3 separados sin resolver D003. Los parámetros de D021 permanecerán fuera de
+F3. La publicación de los derivados deberá revisarse conforme a ODbL.
+
+### Dependencias
+
+D001-D005, D012, D019, D022 y D043-D049.
+
+### Pendiente
+
+Fijar mediante preflight la versión exacta de Shapely y GEOS compatible con
+Python 3.12/Linux `aarch64` antes de implementar la geometría. D003 y D021
+continúan pendientes de experimento.
 
 # Decisiones pendientes
 
