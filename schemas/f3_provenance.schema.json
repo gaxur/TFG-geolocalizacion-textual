@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f3_provenance.schema.json",
+  "title": "F3 geometric associations provenance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "f3_dataset_id", "generator_version", "contract_version", "inputs", "geometry", "software", "serialization", "counts"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "f3_dataset_id": {"type": "string", "pattern": "^f3-madrid-pilot-associations-sha256-[0-9a-f]{64}$"},
+    "generator_version": {"const": "phase3-geometric-associations-v1"},
+    "contract_version": {"const": "f3-associations-v1"},
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalog", "osm", "rules", "config"],
+      "properties": {
+        "catalog": {"$ref": "#/$defs/catalogInput"},
+        "osm": {"$ref": "#/$defs/osmInput"},
+        "rules": {"$ref": "#/$defs/rulesInput"},
+        "config": {"$ref": "#/$defs/configInput"}
+      }
+    },
+    "geometry": {"$ref": "#/$defs/geometry"},
+    "software": {"$ref": "#/$defs/software"},
+    "serialization": {"$ref": "#/$defs/serialization"},
+    "counts": {"$ref": "#/$defs/counts"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "logicalPath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?![A-Za-z]:[\\\\/]).+$"},
+    "typeCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node", "way", "relation"],
+      "properties": {
+        "node": {"type": "integer", "minimum": 0},
+        "way": {"type": "integer", "minimum": 0},
+        "relation": {"type": "integer", "minimum": 0}
+      }
+    },
+    "catalogInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logical_path", "size_bytes", "sha256", "schema_version", "manifest_id", "region_id", "catalog_version", "spacing_m", "cell_size_m", "source_crs", "projected_crs", "grid_hash", "generator_version"],
+      "properties": {
+        "logical_path": {"$ref": "#/$defs/logicalPath"},
+        "size_bytes": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "schema_version": {"const": "1.0"},
+        "manifest_id": {"type": "string", "minLength": 1},
+        "region_id": {"const": "madrid_pilot"},
+        "catalog_version": {"type": "string", "minLength": 1},
+        "spacing_m": {"type": "integer", "minimum": 1},
+        "cell_size_m": {"type": "integer", "minimum": 1},
+        "source_crs": {"const": "EPSG:4326"},
+        "projected_crs": {"const": "EPSG:25830"},
+        "grid_hash": {"type": "string", "pattern": "^[0-9a-f]{12}$"},
+        "generator_version": {"const": "phase1-grid-v1"}
+      }
+    },
+    "osmInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logical_path", "provenance_logical_path", "osm_snapshot_id", "raw_sha256", "raw_size_bytes", "schema_version", "region_id", "selection", "closure"],
+      "properties": {
+        "logical_path": {"$ref": "#/$defs/logicalPath"},
+        "provenance_logical_path": {"$ref": "#/$defs/logicalPath"},
+        "osm_snapshot_id": {"type": "string", "pattern": "^osm-madrid-pilot-osmxml-sha256-[0-9a-f]{64}$"},
+        "raw_sha256": {"$ref": "#/$defs/sha256"},
+        "raw_size_bytes": {"type": "integer", "minimum": 1},
+        "schema_version": {"const": "1.0"},
+        "region_id": {"const": "madrid_pilot"},
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nodes", "ways", "relations"],
+          "properties": {
+            "nodes": {"const": "bbox"},
+            "ways": {"const": "bbox_intersection"},
+            "relations": {"const": "direct_parent_of_local_node_or_way"}
+          }
+        },
+        "closure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ways", "relations"],
+          "properties": {
+            "ways": {"const": "all_referenced_nodes"},
+            "relations": {"const": "not_expanded"}
+          }
+        }
+      }
+    },
+    "rulesInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "policy", "repository", "release", "commit", "file", "size_bytes", "sha256", "license"],
+      "properties": {
+        "decision": {"const": "D049"},
+        "policy": {"const": "way_is_area-v1"},
+        "repository": {"const": "https://github.com/tyrasd/osm-polygon-features"},
+        "release": {"const": "v0.9.2"},
+        "commit": {"const": "069a46416629ddbe84390c7a3ccc600fe73ee706"},
+        "file": {"const": "polygon-features.json"},
+        "size_bytes": {"const": 2753},
+        "sha256": {"const": "cf81018ba820557c59c2c27de7ea6b314009abed040cd11249e94ed1a3a10583"},
+        "license": {"const": "CC0-1.0"}
+      }
+    },
+    "configInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logical_path", "schema_version", "file_sha256", "canonical_sha256"],
+      "properties": {
+        "logical_path": {"$ref": "#/$defs/logicalPath"},
+        "schema_version": {"const": "1.0"},
+        "file_sha256": {"$ref": "#/$defs/sha256"},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_crs", "projected_crs", "transform_name", "transform_version", "transform_source_sha256", "association_predicate", "predicate_direction", "boundary_contact_policy", "relation_policy", "invalid_geometry_policy", "direct_node_policy"],
+      "properties": {
+        "source_crs": {"const": "EPSG:4326"},
+        "projected_crs": {"const": "EPSG:25830"},
+        "transform_name": {"const": "tfg_phase0.crs.wgs84_to_epsg25830"},
+        "transform_version": {"const": "phase1-crs-v1"},
+        "transform_source_sha256": {"$ref": "#/$defs/sha256"},
+        "association_predicate": {"const": "intersects"},
+        "predicate_direction": {"const": "osm_geometry_to_candidate_cell"},
+        "boundary_contact_policy": {"const": "touches"},
+        "relation_policy": {"const": "present_associated_members_one_hop"},
+        "invalid_geometry_policy": {"const": "reject_without_repair"},
+        "direct_node_policy": {"const": "node_bbox_only"}
+      }
+    },
+    "software": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generator_source_sha256", "python_implementation", "python_version", "shapely_version", "geos_version", "platform_system", "platform_machine"],
+      "properties": {
+        "generator_source_sha256": {"$ref": "#/$defs/sha256"},
+        "python_implementation": {"type": "string", "minLength": 1},
+        "python_version": {"type": "string", "minLength": 1},
+        "shapely_version": {"type": "string", "minLength": 1},
+        "geos_version": {"type": "string", "minLength": 1},
+        "platform_system": {"type": "string", "minLength": 1},
+        "platform_machine": {"type": "string", "minLength": 1}
+      }
+    },
+    "serialization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "encoding", "ensure_ascii", "allow_nan", "separators", "key_order", "row_order", "metric_rounding_digits", "negative_zero_policy", "final_newline"],
+      "properties": {
+        "version": {"const": "f3-jsonl-v1"},
+        "encoding": {"const": "UTF-8"},
+        "ensure_ascii": {"const": false},
+        "allow_nan": {"const": false},
+        "separators": {"const": [",", ":"]},
+        "key_order": {"const": "lexicographic"},
+        "row_order": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["osm_objects", "associations", "relations", "members", "candidate_ids"],
+          "properties": {
+            "osm_objects": {"const": "osm_type_node_way_then_osm_id_numeric"},
+            "associations": {"const": "candidate_id_then_osm_type_node_way_then_osm_id_numeric"},
+            "relations": {"const": "relation_id_numeric"},
+            "members": {"const": "member_type_node_way_relation_then_member_id_numeric_then_role"},
+            "candidate_ids": {"const": "lexicographic_unique"}
+          }
+        },
+        "metric_rounding_digits": {"const": 6},
+        "negative_zero_policy": {"const": "normalize_to_positive_zero"},
+        "final_newline": {"const": true}
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_objects", "objects_by_type", "objects_by_source_role", "objects_by_geometry_role", "objects_by_geometry_status", "associations", "boundary_contact_only", "multi_cell_objects", "unknown_closed_way", "invalid_area", "invalid_way_geometry", "relations_input", "relations_emitted", "relations_without_associated_members", "present_relation_members", "unresolved_relation_members"],
+      "properties": {
+        "input_objects": {"$ref": "#/$defs/typeCounts"},
+        "objects_by_type": {"$ref": "#/$defs/nonNegativeCounts"},
+        "objects_by_source_role": {"$ref": "#/$defs/nonNegativeCounts"},
+        "objects_by_geometry_role": {"$ref": "#/$defs/nonNegativeCounts"},
+        "objects_by_geometry_status": {"$ref": "#/$defs/nonNegativeCounts"},
+        "associations": {"type": "integer", "minimum": 0},
+        "boundary_contact_only": {"type": "integer", "minimum": 0},
+        "multi_cell_objects": {"type": "integer", "minimum": 0},
+        "unknown_closed_way": {"type": "integer", "minimum": 0},
+        "invalid_area": {"type": "integer", "minimum": 0},
+        "invalid_way_geometry": {"type": "integer", "minimum": 0},
+        "relations_input": {"type": "integer", "minimum": 0},
+        "relations_emitted": {"type": "integer", "minimum": 0},
+        "relations_without_associated_members": {"type": "integer", "minimum": 0},
+        "present_relation_members": {"$ref": "#/$defs/typeCounts"},
+        "unresolved_relation_members": {"$ref": "#/$defs/typeCounts"}
+      }
+    },
+    "nonNegativeCounts": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    }
+  }
+}

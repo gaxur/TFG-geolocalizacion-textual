@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f3_association.schema.json",
+  "title": "F3 candidate OSM association row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["candidate_id", "osm_type", "osm_id", "osm_ref", "geometry_role", "intersects", "contains", "within", "crosses", "touches", "overlaps", "boundary_contact_only", "center_distance_m"],
+  "properties": {
+    "candidate_id": {"type": "string", "minLength": 1},
+    "osm_type": {"enum": ["node", "way"]},
+    "osm_id": {"type": "integer", "minimum": 1},
+    "osm_ref": {"type": "string", "pattern": "^(node|way)/[1-9][0-9]*$"},
+    "geometry_role": {"enum": ["point", "line", "area"]},
+    "intersects": {"const": true},
+    "contains": {"type": "boolean"},
+    "within": {"type": "boolean"},
+    "crosses": {"type": "boolean"},
+    "touches": {"type": "boolean"},
+    "overlaps": {"type": "boolean"},
+    "boundary_contact_only": {"type": "boolean"},
+    "center_distance_m": {"type": "number", "minimum": 0}
+  }
+}

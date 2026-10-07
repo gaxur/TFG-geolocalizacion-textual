@@ -1,0 +1,4 @@
+[
+  {"candidate_id":"candidate-001","osm_type":"node","osm_id":1,"osm_ref":"node/1","geometry_role":"point","intersects":true,"contains":false,"within":true,"crosses":false,"touches":true,"overlaps":false,"boundary_contact_only":true,"center_distance_m":0.0},
+  {"candidate_id":"candidate-001","osm_type":"way","osm_id":10,"osm_ref":"way/10","geometry_role":"line","intersects":true,"contains":false,"within":false,"crosses":true,"touches":false,"overlaps":false,"boundary_contact_only":false,"center_distance_m":12.345678}
+]

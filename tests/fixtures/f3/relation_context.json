@@ -1,0 +1,12 @@
+{
+  "relation_id": 100,
+  "relation_ref": "relation/100",
+  "tags": {"name": "Ruta sintética", "type": "route"},
+  "closure_status": "not_expanded",
+  "member_count": 3,
+  "present_member_counts": {"node": 1, "way": 1, "relation": 0},
+  "unresolved_member_counts": {"node": 0, "way": 0, "relation": 1},
+  "associated_members": [
+    {"member_type": "way", "member_id": 10, "member_ref": "way/10", "role": "", "candidate_ids": ["candidate-001", "candidate-002"]}
+  ]
+}

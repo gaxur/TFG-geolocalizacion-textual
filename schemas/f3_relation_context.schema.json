@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f3_relation_context.schema.json",
+  "title": "F3 partial relation context row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["relation_id", "relation_ref", "tags", "closure_status", "member_count", "present_member_counts", "unresolved_member_counts", "associated_members"],
+  "properties": {
+    "relation_id": {"type": "integer", "minimum": 1},
+    "relation_ref": {"type": "string", "pattern": "^relation/[1-9][0-9]*$"},
+    "tags": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "closure_status": {"const": "not_expanded"},
+    "member_count": {"type": "integer", "minimum": 0},
+    "present_member_counts": {"$ref": "#/$defs/typeCounts"},
+    "unresolved_member_counts": {"$ref": "#/$defs/typeCounts"},
+    "associated_members": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/associatedMember"}
+    }
+  },
+  "$defs": {
+    "typeCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node", "way", "relation"],
+      "properties": {
+        "node": {"type": "integer", "minimum": 0},
+        "way": {"type": "integer", "minimum": 0},
+        "relation": {"type": "integer", "minimum": 0}
+      }
+    },
+    "associatedMember": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["member_type", "member_id", "member_ref", "role", "candidate_ids"],
+      "properties": {
+        "member_type": {"enum": ["node", "way"]},
+        "member_id": {"type": "integer", "minimum": 1},
+        "member_ref": {"type": "string", "pattern": "^(node|way)/[1-9][0-9]*$"},
+        "role": {"type": "string"},
+        "candidate_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f3_osm_object.schema.json",
+  "title": "F3 OSM object row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["osm_type", "osm_id", "osm_ref", "tags", "source_role", "geometry_role", "geometry_status", "geometry_reason", "metric_bbox"],
+  "properties": {
+    "osm_type": {"enum": ["node", "way"]},
+    "osm_id": {"type": "integer", "minimum": 1},
+    "osm_ref": {"type": "string", "pattern": "^(node|way)/[1-9][0-9]*$"},
+    "tags": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "source_role": {"enum": ["node_bbox", "added_way_node", "way_bbox_intersection"]},
+    "geometry_role": {"enum": ["point", "line", "area", "none"]},
+    "geometry_status": {"enum": ["valid", "not_associable", "invalid"]},
+    "geometry_reason": {
+      "type": ["string", "null"],
+      "enum": [
+        null,
+        "added_way_node_direct_association_forbidden",
+        "unknown_closed_way_no_votes",
+        "unknown_closed_way_conflict",
+        "unknown_closed_way_unrecognized_area_value",
+        "invalid_area_open_way",
+        "invalid_area_empty",
+        "invalid_area_non_positive",
+        "invalid_area_invalid_polygon",
+        "invalid_way_geometry_missing_node",
+        "invalid_way_geometry_too_few_positions",
+        "invalid_way_geometry_non_finite_coordinate"
+      ]
+    },
+    "is_closed": {"type": "boolean"},
+    "metric_bbox": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min_easting_m", "min_northing_m", "max_easting_m", "max_northing_m"],
+          "properties": {
+            "min_easting_m": {"type": "number"},
+            "min_northing_m": {"type": "number"},
+            "max_easting_m": {"type": "number"},
+            "max_northing_m": {"type": "number"}
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"osm_type": {"const": "node"}}, "required": ["osm_type"]},
+      "then": {"not": {"required": ["is_closed"]}}
+    },
+    {
+      "if": {"properties": {"osm_type": {"const": "way"}}, "required": ["osm_type"]},
+      "then": {"required": ["is_closed"]}
+    },
+    {
+      "if": {"properties": {"geometry_status": {"const": "valid"}}, "required": ["geometry_status"]},
+      "then": {
+        "properties": {
+          "geometry_role": {"enum": ["point", "line", "area"]},
+          "geometry_reason": {"type": "null"},
+          "metric_bbox": {"not": {"type": "null"}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"geometry_status": {"enum": ["not_associable", "invalid"]}}, "required": ["geometry_status"]},
+      "then": {"properties": {"geometry_reason": {"type": "string"}}}
+    }
+  ]
+}

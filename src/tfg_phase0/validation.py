@@ -8,9 +8,12 @@ núcleo libre de dependencias externas.
 from __future__ import annotations
 
 from collections.abc import Mapping
+import math
 import re
 import urllib.parse
 from typing import Any
+
+from .f3_contracts import F3_GEOMETRY_REASONS, F3_INVALID_REASONS, F3_NOT_ASSOCIABLE_REASONS
 
 
 class SchemaValidationError(ValueError):
@@ -442,6 +445,417 @@ def _validate_osm_snapshot(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("closure no corresponde a D048")
 
 
+def _string_map(value: Any, context: str) -> None:
+    if not isinstance(value, Mapping) or any(
+        not isinstance(key, str) or not isinstance(item, str)
+        for key, item in value.items()
+    ):
+        raise SchemaValidationError(f"{context} debe mapear strings a strings")
+
+
+def _positive_id(value: Any, field: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise SchemaValidationError(f"{field} debe ser un entero positivo")
+
+
+def _non_negative_integer(value: Any, field: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise SchemaValidationError(f"{field} debe ser un entero no negativo")
+
+
+def _finite_number(value: Any, field: str, *, minimum: float | None = None) -> None:
+    _number(value, field, minimum=minimum)
+    if not math.isfinite(value):
+        raise SchemaValidationError(f"{field} debe ser finito")
+
+
+def _sha256(value: Any, field: str) -> None:
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise SchemaValidationError(f"{field} debe ser SHA-256")
+
+
+def _logical_path(value: Any, field: str) -> None:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value.startswith("/")
+        or re.match(r"^[A-Za-z]:[\\/]", value)
+    ):
+        raise SchemaValidationError(f"{field} debe ser un path lógico relativo")
+
+
+def _validate_metric_bbox(value: Any) -> None:
+    if value is None:
+        return
+    if not isinstance(value, Mapping):
+        raise SchemaValidationError("metric_bbox debe ser un objeto o null")
+    fields = ("min_easting_m", "min_northing_m", "max_easting_m", "max_northing_m")
+    _required(value, fields, "metric_bbox")
+    _no_unknown(value, set(fields), "metric_bbox")
+    for field in fields:
+        _finite_number(value[field], f"metric_bbox.{field}")
+    if value["min_easting_m"] > value["max_easting_m"] or value["min_northing_m"] > value["max_northing_m"]:
+        raise SchemaValidationError("metric_bbox contiene límites invertidos")
+
+
+def _validate_f3_osm_object(document: Mapping[str, Any]) -> None:
+    context = "f3_osm_object"
+    fields = (
+        "osm_type", "osm_id", "osm_ref", "tags", "source_role",
+        "geometry_role", "geometry_status", "geometry_reason", "metric_bbox",
+    )
+    _required(document, fields, context)
+    _no_unknown(document, set(fields) | {"is_closed"}, context)
+    osm_type = document["osm_type"]
+    if osm_type not in {"node", "way"}:
+        raise SchemaValidationError("f3_osm_object.osm_type no válido")
+    _positive_id(document["osm_id"], "f3_osm_object.osm_id")
+    if document["osm_ref"] != f"{osm_type}/{document['osm_id']}":
+        raise SchemaValidationError("f3_osm_object.osm_ref no corresponde a su identidad")
+    _string_map(document["tags"], "f3_osm_object.tags")
+    source_role = document["source_role"]
+    expected_roles = {
+        "node": {"node_bbox", "added_way_node"},
+        "way": {"way_bbox_intersection"},
+    }
+    if source_role not in expected_roles[osm_type]:
+        raise SchemaValidationError("f3_osm_object.source_role no corresponde al tipo")
+    role = document["geometry_role"]
+    status = document["geometry_status"]
+    reason = document["geometry_reason"]
+    if role not in {"point", "line", "area", "none"}:
+        raise SchemaValidationError("f3_osm_object.geometry_role no válido")
+    if status not in {"valid", "not_associable", "invalid"}:
+        raise SchemaValidationError("f3_osm_object.geometry_status no válido")
+    if status == "valid" and (role == "none" or reason is not None):
+        raise SchemaValidationError("un objeto válido requiere geometría y razón null")
+    if status == "valid" and document["metric_bbox"] is None:
+        raise SchemaValidationError("un objeto válido requiere metric_bbox")
+    if status != "valid" and reason not in F3_GEOMETRY_REASONS:
+        raise SchemaValidationError("un objeto no válido o no asociable requiere una razón conocida")
+    if status == "not_associable" and reason not in F3_NOT_ASSOCIABLE_REASONS:
+        raise SchemaValidationError("geometry_reason no corresponde a not_associable")
+    if status == "invalid" and reason not in F3_INVALID_REASONS:
+        raise SchemaValidationError("geometry_reason no corresponde a invalid")
+    if osm_type == "node":
+        if "is_closed" in document:
+            raise SchemaValidationError("is_closed no está permitido para nodes")
+        if role != "point":
+            raise SchemaValidationError("un node debe tener geometry_role point")
+        if source_role == "node_bbox" and status != "valid":
+            raise SchemaValidationError("un node_bbox debe ser válido")
+        if source_role == "added_way_node" and (
+            status != "not_associable"
+            or reason != "added_way_node_direct_association_forbidden"
+        ):
+            raise SchemaValidationError("un added_way_node no puede asociarse directamente")
+    else:
+        if not isinstance(document.get("is_closed"), bool):
+            raise SchemaValidationError("is_closed es obligatorio para ways")
+        if status == "valid" and role not in {"line", "area"}:
+            raise SchemaValidationError("un way válido debe ser line o area")
+        if status != "valid" and role != "none":
+            raise SchemaValidationError("un way no asociable o inválido debe usar geometry_role none")
+        if status == "not_associable" and not reason.startswith("unknown_closed_way_"):
+            raise SchemaValidationError("un way no asociable debe ser unknown_closed_way")
+        if status == "not_associable" and document["is_closed"] is not True:
+            raise SchemaValidationError("unknown_closed_way requiere un way cerrado")
+        if reason == "invalid_area_open_way" and document["is_closed"] is not False:
+            raise SchemaValidationError("invalid_area_open_way requiere un way abierto")
+        if reason in {"invalid_area_empty", "invalid_area_non_positive", "invalid_area_invalid_polygon"} and document["is_closed"] is not True:
+            raise SchemaValidationError("la razón invalid_area requiere un way cerrado")
+    _validate_metric_bbox(document["metric_bbox"])
+
+
+def _validate_f3_association(document: Mapping[str, Any]) -> None:
+    context = "f3_association"
+    fields = (
+        "candidate_id", "osm_type", "osm_id", "osm_ref", "geometry_role",
+        "intersects", "contains", "within", "crosses", "touches", "overlaps",
+        "boundary_contact_only", "center_distance_m",
+    )
+    _required(document, fields, context)
+    _no_unknown(document, set(fields), context)
+    if not isinstance(document["candidate_id"], str) or not document["candidate_id"]:
+        raise SchemaValidationError("f3_association.candidate_id debe ser texto no vacío")
+    osm_type = document["osm_type"]
+    if osm_type not in {"node", "way"}:
+        raise SchemaValidationError("f3_association.osm_type no válido")
+    _positive_id(document["osm_id"], "f3_association.osm_id")
+    if document["osm_ref"] != f"{osm_type}/{document['osm_id']}":
+        raise SchemaValidationError("f3_association.osm_ref no corresponde a su identidad")
+    role = document["geometry_role"]
+    if role not in {"point", "line", "area"}:
+        raise SchemaValidationError("f3_association.geometry_role no válido")
+    if (osm_type == "node" and role != "point") or (osm_type == "way" and role == "point"):
+        raise SchemaValidationError("f3_association.geometry_role no corresponde al tipo")
+    for field in ("intersects", "contains", "within", "crosses", "touches", "overlaps", "boundary_contact_only"):
+        if not isinstance(document[field], bool):
+            raise SchemaValidationError(f"f3_association.{field} debe ser booleano")
+    if document["intersects"] is not True:
+        raise SchemaValidationError("una asociación F3 debe cumplir intersects=true")
+    if document["boundary_contact_only"] != document["touches"]:
+        raise SchemaValidationError("boundary_contact_only debe ser igual a touches en F3 v1")
+    _finite_number(document["center_distance_m"], "f3_association.center_distance_m", minimum=0)
+
+
+def _validate_type_counts(value: Any, context: str) -> None:
+    if not isinstance(value, Mapping):
+        raise SchemaValidationError(f"{context} debe ser un objeto")
+    _required(value, ("node", "way", "relation"), context)
+    _no_unknown(value, {"node", "way", "relation"}, context)
+    for key, count in value.items():
+        _non_negative_integer(count, f"{context}.{key}")
+
+
+def _validate_f3_relation_context(document: Mapping[str, Any]) -> None:
+    context = "f3_relation_context"
+    fields = (
+        "relation_id", "relation_ref", "tags", "closure_status", "member_count",
+        "present_member_counts", "unresolved_member_counts", "associated_members",
+    )
+    _required(document, fields, context)
+    _no_unknown(document, set(fields), context)
+    _positive_id(document["relation_id"], "f3_relation_context.relation_id")
+    if document["relation_ref"] != f"relation/{document['relation_id']}":
+        raise SchemaValidationError("f3_relation_context.relation_ref no corresponde a su identidad")
+    _string_map(document["tags"], "f3_relation_context.tags")
+    if document["closure_status"] != "not_expanded":
+        raise SchemaValidationError("f3_relation_context.closure_status no válido")
+    _non_negative_integer(document["member_count"], "f3_relation_context.member_count")
+    _validate_type_counts(document["present_member_counts"], "present_member_counts")
+    _validate_type_counts(document["unresolved_member_counts"], "unresolved_member_counts")
+    total = sum(document["present_member_counts"].values()) + sum(document["unresolved_member_counts"].values())
+    if total != document["member_count"]:
+        raise SchemaValidationError("member_count no coincide con members presentes y ausentes")
+    members = document["associated_members"]
+    if not isinstance(members, list) or not members:
+        raise SchemaValidationError("associated_members debe ser una lista no vacía")
+    seen_members = set()
+    associated_counts = {"node": 0, "way": 0, "relation": 0}
+    for member in members:
+        member_fields = ("member_type", "member_id", "member_ref", "role", "candidate_ids")
+        if not isinstance(member, Mapping):
+            raise SchemaValidationError("cada associated_member debe ser un objeto")
+        _required(member, member_fields, "associated_member")
+        _no_unknown(member, set(member_fields), "associated_member")
+        member_type = member["member_type"]
+        if member_type not in {"node", "way"}:
+            raise SchemaValidationError("associated_member.member_type no válido")
+        _positive_id(member["member_id"], "associated_member.member_id")
+        if member["member_ref"] != f"{member_type}/{member['member_id']}":
+            raise SchemaValidationError("associated_member.member_ref no corresponde a su identidad")
+        if not isinstance(member["role"], str):
+            raise SchemaValidationError("associated_member.role debe ser texto")
+        identity = (member_type, member["member_id"], member["role"])
+        if identity in seen_members:
+            raise SchemaValidationError("associated_members contiene un member duplicado")
+        seen_members.add(identity)
+        associated_counts[member_type] += 1
+        candidates = member["candidate_ids"]
+        if not isinstance(candidates, list) or not candidates or any(not isinstance(item, str) or not item for item in candidates):
+            raise SchemaValidationError("candidate_ids debe contener strings no vacíos")
+        if len(candidates) != len(set(candidates)):
+            raise SchemaValidationError("candidate_ids no puede contener duplicados")
+    for member_type in ("node", "way"):
+        if associated_counts[member_type] > document["present_member_counts"][member_type]:
+            raise SchemaValidationError(
+                f"associated_members de tipo {member_type} supera present_member_counts"
+            )
+
+
+def _validate_f3_provenance(document: Mapping[str, Any]) -> None:
+    context = "f3_provenance"
+    fields = (
+        "schema_version", "f3_dataset_id", "generator_version", "contract_version",
+        "inputs", "geometry", "software", "serialization", "counts",
+    )
+    _required(document, fields, context)
+    _no_unknown(document, set(fields), context)
+    _version(document, context)
+    if not isinstance(document["f3_dataset_id"], str) or not re.fullmatch(r"f3-madrid-pilot-associations-sha256-[0-9a-f]{64}", document["f3_dataset_id"]):
+        raise SchemaValidationError("f3_dataset_id no es válido")
+    if document["generator_version"] != "phase3-geometric-associations-v1" or document["contract_version"] != "f3-associations-v1":
+        raise SchemaValidationError("versiones F3 no soportadas")
+    top_level_fields = {
+        "inputs": {"catalog", "osm", "rules", "config"},
+        "geometry": {
+            "source_crs", "projected_crs", "transform_name", "transform_version",
+            "transform_source_sha256", "association_predicate", "predicate_direction",
+            "boundary_contact_policy", "relation_policy", "invalid_geometry_policy",
+            "direct_node_policy",
+        },
+        "software": {
+            "generator_source_sha256", "python_implementation", "python_version",
+            "shapely_version", "geos_version", "platform_system", "platform_machine",
+        },
+        "serialization": {
+            "version", "encoding", "ensure_ascii", "allow_nan", "separators",
+            "key_order", "row_order", "metric_rounding_digits",
+            "negative_zero_policy", "final_newline",
+        },
+    }
+    for field, expected in top_level_fields.items():
+        value = document[field]
+        if not isinstance(value, Mapping):
+            raise SchemaValidationError(f"f3_provenance.{field} debe ser un objeto")
+        _required(value, tuple(expected), f"f3_provenance.{field}")
+        _no_unknown(value, expected, f"f3_provenance.{field}")
+
+    inputs = document["inputs"]
+    catalog = inputs["catalog"]
+    catalog_fields = {
+        "logical_path", "size_bytes", "sha256", "schema_version", "manifest_id",
+        "region_id", "catalog_version", "spacing_m", "cell_size_m", "source_crs",
+        "projected_crs", "grid_hash", "generator_version",
+    }
+    if not isinstance(catalog, Mapping):
+        raise SchemaValidationError("f3_provenance.inputs.catalog debe ser un objeto")
+    _required(catalog, tuple(catalog_fields), "f3_provenance.inputs.catalog")
+    _no_unknown(catalog, catalog_fields, "f3_provenance.inputs.catalog")
+    _logical_path(catalog["logical_path"], "f3_provenance.inputs.catalog.logical_path")
+    _non_negative_integer(catalog["size_bytes"], "f3_provenance.inputs.catalog.size_bytes")
+    if catalog["size_bytes"] == 0:
+        raise SchemaValidationError("catalog.size_bytes debe ser positivo")
+    _sha256(catalog["sha256"], "f3_provenance.inputs.catalog.sha256")
+    if catalog["schema_version"] != "1.0" or catalog["region_id"] != "madrid_pilot":
+        raise SchemaValidationError("schema o región del catálogo F3 no válidos")
+    for field in ("manifest_id", "catalog_version"):
+        if not isinstance(catalog[field], str) or not catalog[field]:
+            raise SchemaValidationError(f"catalog.{field} debe ser texto no vacío")
+    for field in ("spacing_m", "cell_size_m"):
+        _positive_id(catalog[field], f"catalog.{field}")
+    if catalog["source_crs"] != "EPSG:4326" or catalog["projected_crs"] != "EPSG:25830":
+        raise SchemaValidationError("CRS del catálogo F3 no válidos")
+    if not isinstance(catalog["grid_hash"], str) or not re.fullmatch(r"[0-9a-f]{12}", catalog["grid_hash"]):
+        raise SchemaValidationError("catalog.grid_hash no válido")
+    if catalog["generator_version"] != "phase1-grid-v1":
+        raise SchemaValidationError("catalog.generator_version no soportado")
+
+    osm = inputs["osm"]
+    osm_fields = {
+        "logical_path", "provenance_logical_path", "osm_snapshot_id", "raw_sha256",
+        "raw_size_bytes", "schema_version", "region_id", "selection", "closure",
+    }
+    if not isinstance(osm, Mapping):
+        raise SchemaValidationError("f3_provenance.inputs.osm debe ser un objeto")
+    _required(osm, tuple(osm_fields), "f3_provenance.inputs.osm")
+    _no_unknown(osm, osm_fields, "f3_provenance.inputs.osm")
+    for field in ("logical_path", "provenance_logical_path"):
+        _logical_path(osm[field], f"f3_provenance.inputs.osm.{field}")
+    if not isinstance(osm["osm_snapshot_id"], str) or not re.fullmatch(r"osm-madrid-pilot-osmxml-sha256-[0-9a-f]{64}", osm["osm_snapshot_id"]):
+        raise SchemaValidationError("inputs.osm.osm_snapshot_id no válido")
+    _sha256(osm["raw_sha256"], "f3_provenance.inputs.osm.raw_sha256")
+    if not osm["osm_snapshot_id"].endswith(osm["raw_sha256"]):
+        raise SchemaValidationError("osm_snapshot_id no corresponde a raw_sha256")
+    _positive_id(osm["raw_size_bytes"], "f3_provenance.inputs.osm.raw_size_bytes")
+    if osm["schema_version"] != "1.0" or osm["region_id"] != "madrid_pilot":
+        raise SchemaValidationError("schema o región del snapshot F3 no válidos")
+    if osm["selection"] != {
+        "nodes": "bbox", "ways": "bbox_intersection",
+        "relations": "direct_parent_of_local_node_or_way",
+    }:
+        raise SchemaValidationError("inputs.osm.selection no corresponde a D048")
+    if osm["closure"] != {"ways": "all_referenced_nodes", "relations": "not_expanded"}:
+        raise SchemaValidationError("inputs.osm.closure no corresponde a D048")
+
+    rules = inputs["rules"]
+    expected_rules = {
+        "decision": "D049",
+        "policy": "way_is_area-v1",
+        "repository": "https://github.com/tyrasd/osm-polygon-features",
+        "release": "v0.9.2",
+        "commit": "069a46416629ddbe84390c7a3ccc600fe73ee706",
+        "file": "polygon-features.json",
+        "size_bytes": 2753,
+        "sha256": "cf81018ba820557c59c2c27de7ea6b314009abed040cd11249e94ed1a3a10583",
+        "license": "CC0-1.0",
+    }
+    if not isinstance(rules, Mapping) or dict(rules) != expected_rules:
+        raise SchemaValidationError("inputs.rules no corresponde a D049")
+
+    config = inputs["config"]
+    config_fields = {"logical_path", "schema_version", "file_sha256", "canonical_sha256"}
+    if not isinstance(config, Mapping):
+        raise SchemaValidationError("f3_provenance.inputs.config debe ser un objeto")
+    _required(config, tuple(config_fields), "f3_provenance.inputs.config")
+    _no_unknown(config, config_fields, "f3_provenance.inputs.config")
+    _logical_path(config["logical_path"], "f3_provenance.inputs.config.logical_path")
+    if config["schema_version"] != "1.0":
+        raise SchemaValidationError("inputs.config.schema_version no válido")
+    for field in ("file_sha256", "canonical_sha256"):
+        _sha256(config[field], f"f3_provenance.inputs.config.{field}")
+
+    geometry = document["geometry"]
+    expected_geometry = {
+        "source_crs": "EPSG:4326",
+        "projected_crs": "EPSG:25830",
+        "transform_name": "tfg_phase0.crs.wgs84_to_epsg25830",
+        "transform_version": "phase1-crs-v1",
+        "association_predicate": "intersects",
+        "predicate_direction": "osm_geometry_to_candidate_cell",
+        "boundary_contact_policy": "touches",
+        "relation_policy": "present_associated_members_one_hop",
+        "invalid_geometry_policy": "reject_without_repair",
+        "direct_node_policy": "node_bbox_only",
+    }
+    if any(geometry[field] != value for field, value in expected_geometry.items()):
+        raise SchemaValidationError("f3_provenance.geometry no corresponde a D050")
+    _sha256(geometry["transform_source_sha256"], "geometry.transform_source_sha256")
+
+    software = document["software"]
+    for field in ("python_implementation", "python_version", "shapely_version", "geos_version", "platform_system", "platform_machine"):
+        if not isinstance(software[field], str) or not software[field]:
+            raise SchemaValidationError(f"f3_provenance.software.{field} debe ser texto no vacío")
+    _sha256(software["generator_source_sha256"], "f3_provenance.software.generator_source_sha256")
+
+    serialization = document["serialization"]
+    expected_serialization = {
+        "version": "f3-jsonl-v1",
+        "encoding": "UTF-8",
+        "ensure_ascii": False,
+        "allow_nan": False,
+        "separators": [",", ":"],
+        "key_order": "lexicographic",
+        "metric_rounding_digits": 6,
+        "negative_zero_policy": "normalize_to_positive_zero",
+        "final_newline": True,
+    }
+    if any(serialization[field] != value for field, value in expected_serialization.items()):
+        raise SchemaValidationError("f3_provenance.serialization no corresponde a D050")
+    expected_row_order = {
+        "osm_objects": "osm_type_node_way_then_osm_id_numeric",
+        "associations": "candidate_id_then_osm_type_node_way_then_osm_id_numeric",
+        "relations": "relation_id_numeric",
+        "members": "member_type_node_way_relation_then_member_id_numeric_then_role",
+        "candidate_ids": "lexicographic_unique",
+    }
+    if serialization["row_order"] != expected_row_order:
+        raise SchemaValidationError("f3_provenance.serialization.row_order no válido")
+
+    counts = document["counts"]
+    if not isinstance(counts, Mapping):
+        raise SchemaValidationError("f3_provenance.counts debe ser un objeto")
+    count_fields = {
+        "input_objects", "objects_by_type", "objects_by_source_role",
+        "objects_by_geometry_role", "objects_by_geometry_status", "associations",
+        "boundary_contact_only", "multi_cell_objects", "unknown_closed_way",
+        "invalid_area", "invalid_way_geometry", "relations_input",
+        "relations_emitted", "relations_without_associated_members",
+        "present_relation_members", "unresolved_relation_members",
+    }
+    _required(counts, tuple(count_fields), "f3_provenance.counts")
+    _no_unknown(counts, count_fields, "f3_provenance.counts")
+    for field, value in counts.items():
+        if field in {"input_objects", "present_relation_members", "unresolved_relation_members"}:
+            _validate_type_counts(value, f"f3_provenance.counts.{field}")
+        elif isinstance(value, Mapping):
+            for key, count in value.items():
+                _non_negative_integer(count, f"f3_provenance.counts.{field}.{key}")
+        else:
+            _non_negative_integer(value, f"f3_provenance.counts.{field}")
+
+
 def _validate_evaluation(document: Mapping[str, Any]) -> None:
     context = "evaluation_example"
     required = ("schema_version", "sample_id", "location_id", "split", "description", "search_scope", "ground_truth", "provenance", "reproducibility", "quality")
@@ -475,6 +889,10 @@ def validate_document(document: Any, schema_name: str) -> None:
         "evaluation_example": _validate_evaluation,
         "manifest": _validate_manifest,
         "osm_snapshot": _validate_osm_snapshot,
+        "f3_osm_object": _validate_f3_osm_object,
+        "f3_association": _validate_f3_association,
+        "f3_relation_context": _validate_f3_relation_context,
+        "f3_provenance": _validate_f3_provenance,
         "experiment_parameters": _validate_experiment,
     }
     try:
