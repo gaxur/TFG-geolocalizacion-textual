@@ -1,8 +1,8 @@
-"""Validaciones básicas de los contratos de Fase 0.
+"""Validaciones comunes de los contratos JSON del proyecto.
 
 No pretende sustituir a un validador JSON Schema completo. Comprueba los
-campos y restricciones necesarias para los contratos iniciales y mantiene el
-núcleo libre de dependencias externas.
+campos y restricciones necesarias para los contratos y mantiene el núcleo
+libre de dependencias externas.
 """
 
 from __future__ import annotations

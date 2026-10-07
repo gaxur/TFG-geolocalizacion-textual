@@ -387,6 +387,39 @@ schemas/f3_provenance.schema.json
 Los schemas validarán filas y provenance; un validador de dataset comprobará
 unicidad, referencias cruzadas, conteos, orden y hashes.
 
+### Validación manual en Python
+
+Las invariantes estructurales que no quedan expresadas completamente mediante
+JSON Schema se comprueban en `src/tfg_phase0/validation.py`. Los contratos F3 se
+validan mediante `validate_document` y los nombres `f3_osm_object`,
+`f3_association`, `f3_relation_context` y `f3_provenance`.
+
+El validador manual comprueba:
+
+- igualdad exacta de `osm_ref` con el tipo y el ID;
+- compatibilidad de `source_role` con node o way;
+- matriz exacta entre estado, rol y razón geométrica;
+- tratamiento exacto de `added_way_node`;
+- cierre obligatorio de `unknown_closed_way`;
+- cierre compatible con cada razón `invalid_area`;
+- bbox métrica finita y no invertida;
+- `boundary_contact_only == touches`;
+- distancia finita, rechazando NaN e infinitos;
+- igualdad exacta de las referencias de relations y members;
+- ausencia de members asociados duplicados;
+- suma de conteos igual a `member_count`;
+- associated members respaldados por el conteo presente de su tipo;
+- `osm_snapshot_id` coherente con `raw_sha256`;
+- paths lógicos relativos;
+- reglas D049 exactas;
+- políticas geométricas D050 exactas;
+- serialización D050 exacta;
+- conteos de provenance no negativos.
+
+Estas comprobaciones son estructurales. F3.1 no valida todavía la existencia
+real de candidatos u objetos, la geometría, los predicados, las distancias ni
+el orden global de las filas JSONL.
+
 ## Publicación atómica
 
 La generación seguirá esta secuencia:
