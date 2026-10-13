@@ -1,0 +1,34 @@
+% Diagrama propio: las flechas discontinuas indican integración pendiente.
+\begin{figure}[htbp]
+\centering
+\shorthandoff{>}
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  >={Stealth[length=2mm]},
+  box/.style={draw=tfgblue,rounded corners=2pt,align=center,minimum height=10mm,text width=34mm,font=\small},
+  done/.style={box,fill=tfgpale},
+  part/.style={box,fill=tfgblue!9},
+  future/.style={box,dashed},
+  flow/.style={->,thick},later/.style={->,dashed,thick},
+  node distance=9mm and 8mm]
+  \node[done] (f1) {F1: celdas y\\manifest geométrico};
+  \node[done,right=of f1] (f2) {F2: snapshot\\OSM validado};
+  \node[part,right=of f2] (f3) {F3: contratos y\\entradas verificadas};
+  \node[future,right=of f3] (gal) {Galería de mapas\\y embeddings};
+  \node[future,below=21mm of f1] (txt) {Texto y región\\declarada};
+  \node[future,right=of txt] (llm) {LLM y preselección\\geográfica};
+  \node[future,right=of llm] (retr) {CrossText2Loc / GOTPR\\sobre candidatos};
+  \node[future,right=of retr] (out) {Verificación / diálogo\\y Top-K};
+  \draw[flow] (f1.north) -- ++(0,7mm) -| (f3.north);
+  \draw[flow] (f2) -- (f3);
+  \draw[later] (f3) -- (gal);
+  \draw[later] (txt) -- (llm);
+  \draw[later] (llm) -- (retr);
+  \draw[later] (retr) -- (out);
+  \draw[later] (f3.south) -- (llm.north);
+  \draw[later] (gal.south) -- (retr.north);
+  \node[font=\small,anchor=west] at ([yshift=-12mm]txt.south west) {Sólido: fase realizada; azul claro: realización parcial; discontinuo: integración pendiente.};
+\end{tikzpicture}}
+\caption{Arquitectura del piloto de Madrid y frontera de implementación. La reproducción oficial de Nueva York es un experimento independiente y no se conecta aquí como recuperador de Madrid. Elaboración propia.}
+\label{fig:arquitectura}
+\end{figure}

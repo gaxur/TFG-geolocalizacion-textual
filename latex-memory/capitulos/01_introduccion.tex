@@ -1,15 +1,50 @@
 \chapter{Introducción}
 \label{cap:introduccion}
-% TODO: redactar a partir del trabajo realmente realizado y las fuentes verificadas.
-\section{Objetivo y alcance}
-% TODO: completar esta sección.
-\section{Contexto y motivación}
-% TODO: completar esta sección.
-\section{Metodología de trabajo}
-% TODO: completar esta sección.
-\section{Organización de la memoria}
-% TODO: completar esta sección.
-\section{Uso de herramientas de inteligencia artificial}
-% TODO: declarar el uso real y remitir al registro del anexo con
-% \cref{anx:uso-ia}. Incluye la asistencia en la preparación de esta plantilla.
 
+\section{Contexto y motivación}
+\label{sec:motivacion}
+La localización de una persona no siempre puede determinarse a partir de una dirección conocida o de un sistema de posicionamiento como el GPS. En determinadas situaciones, una persona puede describir su entorno mediante elementos que observa, como una plaza, un parque, determinados edificios o la disposición de varias calles, sin conocer su ubicación exacta. La identificación de un lugar a partir de estas descripciones en lenguaje natural constituye un problema de geolocalización que requiere interpretar las referencias espaciales y relacionarlas con información geográfica.
+
+Esta tarea presenta diversas dificultades. Las descripciones pueden ser incompletas, ambiguas o contener elementos comunes a numerosas ubicaciones. Asimismo, determinadas relaciones espaciales, como la posición relativa de los objetos, pueden depender de la orientación del observador. A estas limitaciones se añade que las bases de datos cartográficas, como OpenStreetMap, representan principalmente objetos geográficos mediante geometrías y atributos, pero no siempre contienen información visual detallada sobre características como los colores, los materiales o la apariencia de las fachadas.
+
+Los avances en el procesamiento de información geográfica de OpenStreetMap (OSM) y en los métodos de recuperación de ubicaciones a partir de descripciones textuales han abierto nuevas posibilidades para abordar este problema mediante fuentes de datos y modelos existentes \cite{khellaf2025spot,ye2025crosstext,jung2025gotpr}. No obstante, identificar una celda geográfica compatible con una descripción no implica determinar con exactitud la posición del observador. Del mismo modo, los resultados obtenidos por un modelo en una determinada región geográfica no garantizan un rendimiento equivalente al aplicarlo en un entorno diferente.
+
+En este contexto, el presente Trabajo Fin de Grado tiene como motivación establecer una base geográfica y experimental que permita estudiar la recuperación de ubicaciones a partir del lenguaje natural. Para ello, se plantea la preparación de datos cartográficos y la definición de procedimientos de evaluación, delimitando claramente el alcance del sistema y diferenciando los resultados experimentales obtenidos de las funcionalidades todavía pendientes de desarrollo.
+\section{Objetivos y alcance}
+\label{sec:objetivos}
+El objetivo general es desarrollar y evaluar progresivamente una prueba de concepto que reciba una descripción y una región aproximada y devuelva un Top-K de ubicaciones candidatas, con coordenadas representativas y evidencias sobre su selección. Madrid constituye la región objetivo; la caja D004, de aproximadamente \(0{,}75\,\mathrm{km}^2\), es un piloto para validar la preparación de datos y no fija la extensión final. El sistema previsto combina interpretación estructurada, información OSM y recuperación con pesos preentrenados fijos. La comparación de CrossText2Loc y GOTPR se mantiene como objetivo condicionado por la compatibilidad de sus entradas; fotografías, VLM y diálogo corresponden a etapas posteriores.
+
+Los objetivos específicos que articulan la memoria son: definir una unidad candidata y contratos de datos trazables; generar un catálogo geométrico independiente del ground truth; adquirir y congelar una fuente OSM reproducible; comprobar la ejecución de un recuperador preentrenado; y diseñar una evaluación de Madrid que no utilice la respuesta real para formar la galería. El avance actual satisface partes diferenciadas de esos objetivos: existen contratos F0, generación F1, un snapshot F2 y la frontera de entrada F3, además de una reproducción oficial de CrossText2Loc sobre Nueva York. Todavía no existe un recorrido de inferencia de extremo a extremo para Madrid. La \cref{tab:requisitos} precisa esta frontera sin confundir una interfaz simulada con una aplicación operativa.
+
+Nueva York solo se emplea aquí para reproducir una evaluación publicada con el checkpoint y los datos originales. La futura transferencia a Madrid será otro experimento, con una galería fijada antes de la consulta y sin seleccionar candidatos a partir de la coordenada verdadera. Tampoco se promete localización de tipo GPS ni se interpretarán puntuaciones de similitud como probabilidades calibradas.
+
+\section{Método de trabajo y planificación}
+\label{sec:metodo}
+El desarrollo sigue hitos verificables en lugar de incorporar todos los modelos a la vez. Primero se identificaron trabajos relacionados y dependencias de formatos y permisos; después se establecieron decisiones y contratos versionados. Una reproducción controlada con los datos originales de Nueva York aisló el riesgo de ejecución del modelo de los problemas de construir una galería nueva. En paralelo se implementaron la cuadrícula F1 y la adquisición F2 del piloto; a continuación se fijaron las reglas geométricas D049--D050 y se programaron los contratos y verificaciones de entradas F3. La evolución y las fechas sustentadas por la documentación se resumen en \cref{tab:hitos}. No se infieren dedicaciones horarias a partir del historial del repositorio.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Hitos acreditados y continuación prevista. Fechas según los registros técnicos del proyecto.}
+\label{tab:hitos}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{2.7cm}X >{\raggedright\arraybackslash}p{2.7cm}@{}}
+\toprule
+Referencia temporal & Hito & Estado \\
+\midrule
+Septiembre--octubre de 2026 & Alcance, decisiones y contratos de F0; prototipo de interfaz independiente. & Documentado / implementado parcialmente. \\
+5 de octubre de 2026 & Evaluación oficial NewYork-mixed OSM en NVIDIA GB10. & Reproducida. \\
+6 de octubre de 2026 & Primer snapshot real de la caja D004, con raw y provenance validados. & Adquirido y validado. \\
+7 de octubre de 2026 & Política D049, contrato D050 y módulos de contratos y carga de F3. & Diseño aceptado; implementación parcial. \\
+Fase posterior & Derivado F3 completo, galería visual y experimentos pareados en Madrid. & Pendiente. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+La secuencia responde a dependencias metodológicas: antes de interpretar la reducción de candidatos como una mejora debe comprobarse su cobertura; antes de comparar modelos es preciso fijar qué representa un candidato; y antes de extrapolar resultados deben separarse el protocolo oficial, que usa información de ground truth, y una consulta real. Permanecen abiertos, entre otros, la granularidad definitiva (D003), el perfil raster OSM (D007), la correspondencia de escenas GOTPR (D011) y las condiciones de reutilización de ciertos artefactos (D016). Esas cuestiones condicionan la planificación futura, no invalidan las fases independientes ya desarrolladas.
+
+\section{Organización de la memoria}
+\label{sec:organizacion}
+El \cref{cap:estado-arte} presenta los fundamentos y trabajos relacionados; el \cref{cap:analisis} formula el escenario, los requisitos y las restricciones. El \cref{cap:diseno} distingue arquitectura objetivo y componentes disponibles, mientras que el \cref{cap:implementacion} documenta únicamente el desarrollo y la validación técnica observables. En el \cref{cap:evaluacion} se separa la reproducción de Nueva York del protocolo todavía pendiente de Madrid; el \cref{cap:conclusiones} valora las aportaciones acreditadas y sus límites. Los anexos reúnen datos de reproducción, terminología y registro de asistencia mediante herramientas de IA.
+
+\section{Uso de herramientas de inteligencia artificial}
+\label{sec:uso-ia}
+La elaboración de esta versión de la memoria ha contado con asistencia de un agente de IA para analizar documentación, proponer estructura, contrastar referencias y preparar texto LaTeX. Las afirmaciones técnicas se han vinculado a archivos del proyecto o a fuentes bibliográficas identificables; la responsabilidad de revisar el contenido, la información personal y la declaración institucional corresponde al autor. El anexo~\ref{anx:uso-ia} contiene el registro de esta intervención y los datos de uso anteriores que aún requieren confirmación. La asistencia de redacción no equivale a la ejecución de experimentos ni altera las decisiones pendientes del TFG.

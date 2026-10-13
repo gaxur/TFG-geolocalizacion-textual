@@ -354,6 +354,14 @@ La preparación cartográfica se realizará offline para la zona piloto y se reu
 
 CrossText2Loc recupera imágenes de mapa; GOTPR recupera grafos y puede reducir la búsqueda mediante su mecanismo de extracción de candidatos. Un filtro geográfico previo inspirado en SPOT es una etapa distinta y deberá compararse con la búsqueda sin ese filtro. No es obligatorio ejecutar SPOT ni Milvus en todas las configuraciones. El filtro externo no debe confundirse con la candidate extraction interna de GOTPR.
 
+Las opciones de implementación se separan por tipo de datos: STRtree es el
+índice temporal aceptado para las asociaciones geométricas de F3 (D050); HNSW
+queda como alternativa experimental para acelerar la recuperación de embeddings
+de CrossText2Loc solo si el ranking exhaustivo resulta insuficiente. Su
+implementación posible, restricciones y criterios de evaluación se describen en
+[INDEXING_OPTIONS.md](INDEXING_OPTIONS.md). HNSW no está aprobado ni forma parte
+del MVP actual.
+
 Se mantendrá un identificador común y una correspondencia entre candidato, coordenadas, imagen y grafo cuando proceda. Se registrarán diferencias de cobertura o de soporte espacial: compartir identificador no basta para garantizar una comparación justa. Las coordenadas se resuelven desde los metadatos del candidato recuperado; estos recuperadores no deben presentarse como regresores de una coordenada continua nueva.
 
 ### 9.2. Contratos mínimos y decisiones pendientes

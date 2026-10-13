@@ -9,7 +9,9 @@
 % Numeración arábiga continua, sin reinicios; portada contada, cifra oculta.
 \input{preliminares/portada}
 \input{preliminares/resumen}
-\input{preliminares/agradecimientos}
+\ifagradecimientos
+  \input{preliminares/agradecimientos}
+\fi
 \tableofcontents
 \listoffigures
 \listoftables

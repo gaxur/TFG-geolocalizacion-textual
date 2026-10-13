@@ -1,8 +1,8 @@
 # Infraestructura LaTeX para el TFG — EINA / Unizar
 
-Proyecto modular en español, sin contenido real de la memoria. Los datos desconocidos están marcados como TODO. El correo institucional no se usa para inferir identidad y no se necesita para compilar.
+Proyecto modular en español con una versión progresiva de la memoria: siete capítulos redactados, fuentes verificadas y una distinción explícita entre resultados observados, trabajo parcial y diseño. Los datos personales pendientes siguen marcados como TODO. El correo institucional no se usa para inferir identidad y no se necesita para compilar.
 
-**Estado:** revisión estática realizada; compilación y ejecución de Biber pendientes por ausencia de herramientas locales. No se ha instalado software. Véase [VALIDACION.md](VALIDACION.md).
+**Estado:** compilación de la memoria con pdfLaTeX, latexmk y Biber comprobada el 8 de octubre de 2026; véase [VALIDACION.md](VALIDACION.md). La tipología de TFG y los metadatos académicos siguen pendientes de confirmación.
 
 ## Organización
 
@@ -41,7 +41,7 @@ TFG/
     └── portada_unizar_original.tex
 ```
 
-`main.tex` monta los preliminares, índices, capítulos, bibliografía y anexos. `config.tex` contiene paquetes y diseño. Los capítulos contienen solo títulos y comentarios TODO. Los ejemplos se concentran en el último anexo y son eliminables mediante una opción. No se ha elegido ni modificado el alcance científico del TFG.
+`main.tex` monta los preliminares, índices, capítulos, bibliografía y anexos. `config.tex` contiene paquetes y diseño, incluido TikZ. Los capítulos 01--07 desarrollan el alcance documentado en el repositorio; los ejemplos de plantilla siguen en un archivo separado y están desactivados. Las tres figuras nuevas, trazadas con TikZ, residen en `imagenes/` como fuentes `.tex`.
 
 `recursos/modelos_latex.zip` se conserva en el equipo actual como referencia,
 pero los ZIP no se versionan en el monorepo: después de clonar, su procedencia
@@ -78,10 +78,10 @@ latexmk --version
 
 ## Compilar localmente
 
-Ejecuta siempre desde la carpeta `TFG`, de modo que las rutas relativas se resuelvan igual que en Overleaf:
+Ejecuta siempre desde la carpeta `latex-memory/`, de modo que las rutas relativas se resuelvan igual que en Overleaf:
 
 ```powershell
-cd TFG
+cd latex-memory
 latexmk -pdf main.tex
 ```
 
@@ -122,7 +122,7 @@ Completa en [metadata.tex](metadata.tex): título castellano, título inglés, n
 Escapa caracteres reservados en textos: `\&`, `\%`, `\_`, `\#`. Usa `\url{...}` para direcciones. Mantén títulos y nombres como texto sencillo para que también sirvan en los metadatos PDF. Revisa visualmente la portada si los nombres o títulos ocupan varias líneas.
 
 - `\agradecimientosfalse`: no incluye agradecimientos. Cambia a `\agradecimientostrue` cuando quieras redactarlos.
-- `\ejemplostrue`: incluye el anexo de demostración y sus citas ficticias. Cambia a `\ejemplosfalse` para retirarlo; elimina además las entradas ficticias del `.bib` antes de la entrega y añade fuentes reales citadas.
+- `\ejemplosfalse`: mantiene fuera de la memoria el anexo de demostración. Las entradas ficticias ya se han sustituido por fuentes reales. No habilitar ejemplos antes de entregar.
 
 Redacta el resumen y abstract en [preliminares/resumen.tex](preliminares/resumen.tex); las palabras clave se obtienen de los metadatos. Se colocan en la misma página bilingüe con ambos títulos. Los agradecimientos opcionales tienen su propio archivo.
 
@@ -153,9 +153,9 @@ Para añadir un anexo, crea otro `.tex` con `\chapter{Título}` y `\label{anx:no
 
 Añade entradas verificadas a [bibliografia.bib](bibliografia.bib), con claves únicas. Cita mediante `\cite{clave}`. Para artículos utiliza `@article`, `author`, `title`, `journaltitle`, `date` y los campos reales disponibles; para libros, `@book` y `publisher`; para recursos web, `@online`, `url` y `urldate`. No inventes datos bibliográficos faltantes. Solo se imprimen entradas citadas, salvo que añadas `\nocite{clave}` expresamente.
 
-Las dos referencias iniciales están marcadas como EJEMPLO en título, autor y nota; no son fuentes académicas reales. Puedes desactivar los ejemplos sin borrar el archivo `.bib`; una bibliografía vacía puede generar un aviso hasta que cites fuentes reales.
+La bibliografía actual contiene publicaciones científicas cotejadas con ACL Anthology, CVF Open Access y la ficha original de GOTPR/TOL, además de fuentes separadas de software y datos. La identificación editorial de *Turning Generators into Retrievers* sigue pendiente y no figura como entrada bibliográfica.
 
-Define acrónimos en [anexos/anexo_b.tex](anexos/anexo_b.tex) con `\acro{SIGLA}{desarrollo}`. Usa `\ac{SIGLA}`: la primera aparición se expande y las siguientes muestran la sigla. `\acs` fuerza la sigla y `\acl` la forma larga. La lista solo imprime términos utilizados, después de las pasadas de LaTeX, sin herramientas externas.
+El anexo B contiene ahora una lista comentada de los términos empleados en el documento. El paquete `acronym` permanece disponible para incorporar, si se desea, primeras menciones automáticas mediante `\acro{SIGLA}{desarrollo}` y `\ac{SIGLA}`; esa convención no se aplica aún a la lista manual del anexo.
 
 Los fragmentos de código usan `listings`, con captions, numeración y mapeo de caracteres españoles. Consulta [anexos/ejemplos.tex](anexos/ejemplos.tex) para figura, tabla, ecuación, cita, referencia cruzada, código, acrónimo, URL y nota al pie. Para ficheros externos usa `\lstinputlisting[language=Python,caption={Descripción},label={lst:archivo}]{recursos/archivo.py}` después de crear el archivo.
 
@@ -167,4 +167,4 @@ Completa la sección correspondiente de la introducción y [anexos/anexo_c.tex](
 
 [.gitignore](.gitignore) excluye auxiliares como `.aux`, `.bbl`, `.bcf`, `.blg`, `.fdb_latexmk`, `.fls`, `.log`, `.out`, `.run.xml`, `.synctex.gz`, `.toc`, listas e índices, y el PDF generado `main.pdf`. Conserva `.tex`, `.bib`, `latexmkrc`, imágenes, PDFs fuente y recursos institucionales.
 
-Antes de entregar: busca TODO y EJEMPLO, retira las demostraciones, completa metadatos y resúmenes, comprueba la portada, compila hasta resolver referencias y revisa el PDF completo. Revisa `main.log` y `main.blg`: no deben quedar citas o referencias indefinidas, peticiones de Biber ni cajas desbordadas. Un aviso `Overfull` requiere revisar el elemento afectado; no ocultes los avisos con tolerancias globales. Confirma la normativa enlazada y la tipología del trabajo con tu dirección.
+Antes de entregar: revisa los comentarios PENDIENTE, confirma datos personales y académicos, actualiza resultados de Madrid únicamente si existen, revisa portada y PDF, y ejecuta `latexmk -pdf main.tex` de nuevo. Revisa `main.log` y `main.blg`: no deben quedar citas o referencias indefinidas, peticiones de Biber ni cajas desbordadas. Confirma la normativa enlazada y la tipología del trabajo con tu dirección.

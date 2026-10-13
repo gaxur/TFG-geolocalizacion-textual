@@ -1,10 +1,104 @@
-\chapter{Estado del arte}
+\chapter{Fundamentos y estado del arte}
 \label{cap:estado-arte}
-% TODO: redactar a partir del trabajo realmente realizado y las fuentes verificadas.
-\section{Antecedentes}
-% TODO: completar esta sección.
-\section{Comparación de enfoques}
-% TODO: completar esta sección.
-\section{Síntesis}
-% TODO: completar esta sección.
 
+\section{Búsqueda de lugares y estimación de posiciones}
+\label{sec:fundamentos-tarea}
+% PENDIENTE: recuperación multimodal, embeddings y ranking Top-K; evitar repetir la explicación específica de CLIP en sec:fundamentos-clip.
+
+\section{OpenStreetMap, geometría y coordenadas}
+\label{sec:fundamentos-osm}
+% PENDIENTE: objetos OSM, geometrías, CRS, cuadrículas y distinción entre catálogo de referencia y dataset de evaluación.
+
+\section{Procesamiento del lenguaje natural de descripciones geográficas}
+\label{sec:fundamentos-pln}
+
+\subsection{Extracción de entidades, atributos y relaciones espaciales}
+\label{sec:pln-extraccion}
+% PENDIENTE: fundamentos de interpretación textual; no describir aquí una implementación de LLM todavía inexistente.
+
+\subsection{Representación estructurada de la consulta}
+\label{sec:pln-consulta}
+% PENDIENTE: concepto de intención geográfica; reservar el contrato concreto y las reglas OSM para análisis y diseño.
+Un modelo de lenguaje de gran tamaño (LLM) podría interpretar la descripción libre para identificar una zona declarada, objetos, atributos y relaciones espaciales, y expresar las pistas utilizables en una consulta estructurada. Esta posibilidad sigue un planteamiento relacionado con la búsqueda geográfica en lenguaje natural \cite{khellaf2025spot}; no implica pedir al LLM que adivine coordenadas. El proyecto dispone de un esquema para esa intención geográfica, pero todavía no ha integrado un proveedor ni ejecuta esta etapa. La descripción original seguiría siendo la entrada textual del recuperador.
+
+\section{Del lenguaje natural a las consultas geográficas: SPOT}
+\label{sec:arte-spot}
+
+\section{CrossText2Loc: texto e imagen cartográfica}
+\label{sec:arte-cross}
+
+\subsection{CLIP y su papel en CrossText2Loc}
+\label{sec:fundamentos-clip}
+CLIP (\emph{Contrastive Language--Image Pre-training}) aprende a situar textos e imágenes en un espacio de representación comparable mediante dos codificadores: uno transforma la descripción en un vector y el otro hace lo mismo con la imagen. En el entrenamiento contrastivo, las representaciones de las parejas correspondientes se acercan relativamente a las de las parejas no correspondientes \cite{radford2021clip}.
+
+\paragraph{Objetivo de entrenamiento contrastivo.}
+Considérese un lote de \(N\) parejas emparejadas \((I_i,T_i)\), donde \(I_i\) es una imagen y \(T_i\) su texto asociado. Los codificadores visual \(f_\theta\) y textual \(g_\phi\) producen vectores que se normalizan a norma \(L_2\):
+\begin{align}
+  \mathbf{v}_i &= \frac{f_\theta(I_i)}{\lVert f_\theta(I_i)\rVert_2},
+  &
+  \mathbf{t}_i &= \frac{g_\phi(T_i)}{\lVert g_\phi(T_i)\rVert_2}.
+  \label{eq:clip-normalizacion}
+\end{align}
+La similitud entre todas las imágenes y todos los textos del lote se expresa mediante una matriz de logits escalada por una temperatura aprendible \(\tau>0\) (equivalentemente, por su inversa positiva):
+\begin{equation}
+  s_{ij}=\frac{\mathbf{v}_i^{\mathsf T}\mathbf{t}_j}{\tau}.
+  \label{eq:clip-logits}
+\end{equation}
+Con los pares positivos colocados en la diagonal, el objetivo combina la clasificación imagen--texto y texto--imagen:
+\begin{align}
+  \mathcal{L}_{I\to T}
+  &=-\frac{1}{N}\sum_{i=1}^{N}
+    \log\frac{\exp(s_{ii})}{\sum_{j=1}^{N}\exp(s_{ij})},
+  \\
+  \mathcal{L}_{T\to I}
+  &=-\frac{1}{N}\sum_{i=1}^{N}
+    \log\frac{\exp(s_{ii})}{\sum_{j=1}^{N}\exp(s_{ji})},
+  \\
+  \mathcal{L}_{\mathrm{CLIP}}
+  &=\frac{1}{2}\left(\mathcal{L}_{I\to T}+\mathcal{L}_{T\to I}\right).
+  \label{eq:clip-perdida}
+\end{align}
+Así, para cada ejemplo, el entrenamiento intenta asignar mayor similitud al texto y la imagen emparejados que a los demás elementos del lote, tratados por el objetivo como negativos. La matriz compara todos los textos con todas las imágenes: su diagonal identifica las parejas positivas, pero no implica que ya tengan alta similitud antes de entrenar.
+
+Estas ecuaciones resumen el objetivo contrastivo de CLIP y explican cómo se aprenden sus representaciones. En este TFG no se ejecuta ese entrenamiento: se carga el checkpoint publicado con sus pesos congelados, sin retropropagación ni ajuste fino.
+
+\paragraph{Recuperación en inferencia.}
+Para una descripción de consulta \(q\) y una galería de \(M\) imágenes candidatas \(I_j\), se calculan los embeddings normalizados \(\hat{\mathbf{t}}(q)\) y \(\hat{\mathbf{v}}(I_j)\). La puntuación utilizada para ordenar cada candidato es el producto escalar. Si \(I_{(k)}\) denota el candidato que ocupa la posición \(k\) al ordenar esas puntuaciones de mayor a menor, se obtiene:
+\begin{equation}
+  r_j=\hat{\mathbf{t}}(q)^{\mathsf T}\hat{\mathbf{v}}(I_j)
+      =\cos\!\left(\hat{\mathbf{t}}(q),\hat{\mathbf{v}}(I_j)\right),
+  \qquad
+  \operatorname{TopK}(q)=\left(I_{(1)},\ldots,I_{(K)}\right).
+  \label{eq:clip-topk}
+\end{equation}
+El Top-K está formado por los candidatos asociados a las \(K\) puntuaciones mayores: \(r_{(1)}\geq r_{(2)}\geq\cdots\geq r_{(K)}\), donde los paréntesis indican el orden descendente. Por tanto, el ranking se obtiene por comparación exhaustiva de la consulta con los embeddings de la galería habilitada. Un factor de escala positivo aplicado a todas las similitudes no cambia su orden. La puntuación expresa similitud relativa, no una probabilidad calibrada de que la ubicación sea correcta. En la reproducción oficial de Nueva York, esta ordenación se aplica después de seleccionar 100 vecinos con la coordenada verdadera; en Madrid esa información no participará en la selección de candidatos (\cref{fig:clip-recuperacion}).
+
+\input{imagenes/clip_recuperacion.tex}
+
+CrossText2Loc toma esta idea como base para comparar una descripción del entorno con imágenes cartográficas de OpenStreetMap (OSM) o con imágenes satelitales \cite{ye2025crosstext}. La configuración OSM reproducida en este TFG emplea CLIP ViT-L/14@336 y amplía el contexto del codificador textual hasta 300 tokens para procesar descripciones largas; el evaluador codifica texto e imágenes, normaliza sus vectores y calcula las similitudes. Se trata del modelo y del checkpoint utilizados en la reproducción de Nueva York, no de un entrenamiento propio ni de una inferencia ya integrada con el catálogo de Madrid.
+
+En el sistema previsto para Madrid, cada imagen OSM compatible se asociaría previamente a una celda candidata. CLIP contribuiría a \emph{ordenar} las imágenes comparándolas con el texto; el identificador y la coordenada representativa se recuperarían después de los metadatos del catálogo. Por tanto, CLIP no interpreta directamente los objetos vectoriales de OSM, no genera coordenadas nuevas ni decide por sí solo qué candidatos entran en la galería. La \cref{fig:clip-recuperacion} separa estas funciones. La reproducción disponible tampoco demuestra aún cómo funcionará este mecanismo con imágenes preparadas para Madrid: el protocolo oficial de Nueva York selecciona primero 100 vecinos mediante la posición real de la consulta.
+
+\subsection{Vision Transformer en el codificador visual}
+\label{sec:fundamentos-vit}
+Un \emph{Vision Transformer} (ViT) representa una imagen como una secuencia de parches. Cada parche se transforma en un vector con información posicional y las capas de atención combinan información de diferentes regiones de la imagen para obtener una representación visual \cite{dosovitskiy2021vit}. En el esquema de la \cref{fig:clip-recuperacion}, esta operación pertenece al codificador de imágenes: el modelo no procesa directamente las geometrías vectoriales de OSM ni calcula coordenadas a partir de ellas.
+
+La configuración de CrossText2Loc reproducida en este TFG carga el codificador visual de CLIP \texttt{ViT-L/14@336px}, donde \texttt{L/14} identifica la variante y el tamaño de parche, y \texttt{336px} la resolución de entrada del modelo \cite{ye2025crosstext,cvg:codigo}. Por ello, para comparar nuevos mapas OSM habría que preparar imágenes raster compatibles con el preprocesamiento de ese codificador; el perfil geográfico efectivo de dichas imágenes para Madrid continúa sin confirmar. La ampliación a 300 tokens descrita anteriormente afecta al codificador \emph{textual}, no convierte al ViT en un modelo de lenguaje ni implica entrenar de nuevo los pesos utilizados en la reproducción.
+
+\subsection{CrossText2Loc y CVG-Text}
+\label{sec:arte-cross-cvg-text}
+% PENDIENTE: modelo y dataset publicados, EPE y ERM opcional. Diferenciar el artículo de la reproducción propia; no reiterar sec:fundamentos-clip ni anticipar la evaluación de Madrid.
+
+\section{GOTPR y la representación relacional}
+\label{sec:arte-gotpr}
+GOTPR representa las descripciones y el entorno cartográfico mediante grafos de escena y recupera candidatos comparando esas representaciones \cite{jung2025gotpr}. La revisión de su repositorio confirma que incluye extracción de candidatos con Milvus sobre embeddings de grafos \cite{gotpr:codigo}. Este mecanismo pertenece a GOTPR: no es la búsqueda de imágenes de CrossText2Loc ni una operación sobre geometrías espaciales. La asociación de sus escenas con los candidatos del catálogo de Madrid continúa pendiente.
+
+\section{Localización fina, diálogo y otras vistas}
+\label{sec:arte-alternativas}
+Una descripción inicial puede ser insuficiente para distinguir varias ubicaciones. DialogueVPR estudia la recuperación interactiva y propone seleccionar preguntas discriminativas a partir de los candidatos disponibles \cite{song2026dialogue}. En una posible ampliación del TFG, un LLM podría formular preguntas sustentadas en diferencias comprobables y procesar las respuestas; inspirarse en esa idea no supone haber integrado DialogueVPR ni adoptar o entrenar su componente DQ-pilot.
+
+Por otra parte, un modelo de visión y lenguaje (VLM) podría contrastar una descripción con fotografías próximas a los candidatos para examinar detalles visibles que no consten en el mapa, como materiales o elementos de una fachada. Una imagen OSM renderizada no proporciona esa evidencia fotográfica, y la ausencia de un detalle en una fotografía no prueba su ausencia en el lugar. Esta verificación sigue condicionada a la disponibilidad, orientación y condiciones de uso de las imágenes, así como a la selección del modelo; no se ha implementado ni evaluado en Madrid. El posible refinamiento métrico de una posición sería una tarea distinta de esta comprobación visual.
+
+\section{Comparación crítica y posición del trabajo}
+\label{sec:comparacion-arte}
+% PENDIENTE: comparar entradas, representaciones y límites de los enfoques; reservar las decisiones propias para el capítulo 4.

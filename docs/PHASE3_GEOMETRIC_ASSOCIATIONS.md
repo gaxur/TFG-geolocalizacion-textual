@@ -161,6 +161,10 @@ con PROJ.
 
 ## Shapely, GEOS y STRtree
 
+Esta sección define la implementación espacial aceptada por D050. Para el
+contraste con índices vectoriales opcionales y la referencia ilustrativa de
+integración, véase [INDEXING_OPTIONS.md](INDEXING_OPTIONS.md).
+
 Shapely 2.x y GEOS serán la única capa geométrica nueva. Deben aportar Point,
 LineString, Polygon, validación, predicados, distancia y STRtree. No se
 introducirán inicialmente GeoPandas, `rtree`, PyArrow, Parquet ni `pyproj`.

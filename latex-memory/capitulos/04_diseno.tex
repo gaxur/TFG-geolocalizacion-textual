@@ -1,10 +1,32 @@
-\chapter{Diseño}
+\chapter{Diseño de la solución}
 \label{cap:diseno}
-% TODO: redactar a partir del trabajo realmente realizado y las fuentes verificadas.
-\section{Arquitectura}
-% TODO: completar esta sección.
-\section{Componentes e interfaces}
-% TODO: completar esta sección.
-\section{Decisiones de diseño}
-% TODO: completar esta sección.
 
+\section{Arquitectura y fronteras de implementación}
+\label{sec:arquitectura}
+
+\section{Preparación offline: contratos, catálogo y datos OSM}
+\label{sec:diseno-offline}
+El contrato del derivado F3 (D050) prevé relacionar las celdas del catálogo F1 con los objetos del snapshot OSM F2. Para no comparar cada celda con todas las geometrías, propone construir temporalmente un \emph{STRtree} (\emph{Sort-Tile-Recursive Tree}) de Shapely con las geometrías OSM asociables. Este índice espacial organiza sus cajas envolventes y permite obtener rápidamente aquellas cuyos sobres podrían solaparse con el de una celda. El solapamiento de cajas es solo una primera selección: la asociación proyectada exige después comprobar la intersección de las geometrías completas y calcular los predicados y distancias correspondientes en EPSG:25830 \cite{shapely:strtree}.
+
+La misma estructura puede acelerar búsquedas de objetos próximos o la identificación de geometrías que cumplen otras relaciones espaciales, pero sus resultados dependen del predicado y de la distancia empleados. F3 se ha definido para asociaciones por \emph{intersección}, no para aplicar radios semánticos ni puntuar consultas de usuarios; tales reglas corresponderían a una preselección posterior. STRtree no es la fuente canónica del dataset: D050 prevé un índice temporal cuyos resultados se deduplican y ordenan antes de persistir las asociaciones. Todavía no se ha implementado esa construcción geométrica ni se ha elegido un índice espacial para la consulta en línea.
+
+\section{Consulta y preselección proyectadas}
+\label{sec:consulta}
+Una futura consulta estructurada podría utilizar las asociaciones entre objetos OSM y celdas para restringir los \texttt{candidate\_id} según las pistas espaciales disponibles, sin usar la ubicación real de la respuesta. Así, el filtrado geográfico se apoyaría en el procesamiento geométrico previo, pero no equivaldría a buscar embeddings: una celda próxima a un objeto cumple una condición espacial que por sí sola no expresa compatibilidad visual con la descripción. La política concreta de radios, relajación y consultas al índice local sigue pendiente de implementación y evaluación.
+
+\section{Variantes de recuperación y etapas posteriores}
+\label{sec:recuperadores}
+Tras una eventual preselección espacial, CrossText2Loc podría comparar la descripción con embeddings de imágenes OSM asociadas a los candidatos. Sus codificadores se basan en CLIP, pero la entrada, el preprocesamiento y los pesos del checkpoint de CrossText2Loc deben ser coherentes tanto al codificar la galería como al codificar el texto. Para una galería pequeña, la comparación exhaustiva de vectores normalizados constituye una referencia directa. Si el catálogo creciera y el coste de esa comparación lo justificase, Milvus admite índices vectoriales como HNSW (\emph{Hierarchical Navigable Small World}), que aproxima la búsqueda de vecinos próximos en el espacio de embeddings y podría acelerar la recuperación Top-K \cite{malkov2018hnsw,milvus:proyecto}. HNSW \emph{no} indexa geometrías ni sustituye al filtrado espacial mediante STRtree; su carácter aproximado obliga a comparar cobertura, latencia y recursos frente a la búsqueda exhaustiva antes de adoptarlo.
+
+\subsection{Selección del checkpoint para la transferencia a Madrid}
+\label{subsec:checkpoint-madrid}
+Para estudiar la transferencia a Madrid se ha seleccionado el checkpoint de CrossText2Loc para OSM entrenado con datos de Nueva York, \path{long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth}. Entre los checkpoints OSM publicados para Nueva York, Brisbane y Tokio, Nueva York se considera la referencia inicial más próxima al escenario madrileño por su carácter urbano y por compartir el uso del alfabeto latino. Esta semejanza es un criterio práctico de selección del TFG, no una propiedad que garantice la transferencia: compartir alfabeto no elimina la diferencia entre idiomas ni demuestra que las descripciones en español se comporten como las del dominio de origen.
+
+La elección tampoco se justifica como una predicción de rendimiento en Madrid. El artículo informa para Nueva York, Brisbane y Tokio resultados R@1 de 59,08, 46,08 y 34,33, respectivamente, en sus propias evaluaciones OSM \cite{ye2025crosstext}. Cabe destacar que estas cifras describen los resultados publicados en cada ciudad y no son una comparación de transferencia total a Madrid. Por tanto, la hipótesis de que el checkpoint de Nueva York sea el más adecuado para Madrid deberá comprobarse con una evaluación madrileña independiente y sin utilizar la posición real para seleccionar candidatos.
+
+Se utilizarán los pesos publicados en ese archivo sin modificarlos: no se entrenará ni se hará fine-tuning. El archivo empleado en la reproducción tiene el hash SHA-256 \path{d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d}. La reproducción de Nueva York verifica la carga e inferencia con esos pesos, pero no valida por sí misma su rendimiento en Madrid; el resto de detalles de reproducibilidad se presenta en el capítulo de implementación.
+
+Esta opción no es una decisión de despliegue del TFG: no existe un índice Milvus/HNSW propio para imágenes de Madrid ni embeddings visuales definitivos del catálogo. El código externo de GOTPR sí contiene una extracción de candidatos con Milvus, pero indexa \emph{embeddings de grafos de escena}, no los embeddings de imágenes de CrossText2Loc, y no fija explícitamente el tipo HNSW. Si se llegase a incorporar indexación vectorial a la variante CrossText2Loc, habría que conservar la correspondencia entre vector y \texttt{candidate\_id}, restringir la búsqueda a la galería permitida y resolver las coordenadas desde el manifest. Solo entonces un ranking por similitud podría proporcionar candidatos geográficos a etapas posteriores de verificación.
+
+\section{Justificación y alternativas}
+\label{sec:alternativas}

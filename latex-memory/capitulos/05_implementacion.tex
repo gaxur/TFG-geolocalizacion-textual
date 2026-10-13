@@ -1,10 +1,25 @@
-\chapter{Implementación}
+\chapter{Desarrollo y validación técnica}
 \label{cap:implementacion}
-% TODO: redactar a partir del trabajo realmente realizado y las fuentes verificadas.
-\section{Entorno de desarrollo}
-% TODO: completar esta sección.
-\section{Desarrollo de componentes}
-% TODO: completar esta sección.
-\section{Integración}
-% TODO: completar esta sección.
 
+\section{Organización del trabajo y entorno}
+\label{sec:entorno}
+
+\section{F0: contratos y procedencia}
+\label{sec:implementacion-f0}
+
+\section{F1: catálogo geométrico reproducible}
+\label{sec:implementacion-f1}
+
+\section{F2: adquisición y congelación de OpenStreetMap}
+\label{sec:implementacion-f2}
+
+\section{F3: contratos y frontera verificada, sin derivado geométrico}
+\label{sec:implementacion-f3}
+La implementación actual de F3 comprende esquemas, validación estructural y carga verificada de los inputs F1/F2 y de las reglas D049. El módulo \texttt{f3\_inputs.py} inventaría objetos y referencias OSM sin construir sus geometrías; por ello todavía no se han materializado asociaciones celda--objeto ni una preselección espacial basada en ellas.
+
+\section{Inferencia reproducida y prototipo de interacción}
+\label{sec:implementacion-modelo}
+La reproducción oficial de Nueva York codifica imágenes y textos con el checkpoint OSM de CrossText2Loc, normaliza sus representaciones y obtiene las similitudes mediante producto matricial, de acuerdo con la formulación de la \cref{eq:clip-topk}. El proyecto todavía no dispone de una galería madrileña de embeddings visuales y, por tanto, no ha ejecutado la recuperación sobre candidatos de Madrid.
+
+\section{Incidencias y alcance de las pruebas}
+\label{sec:validacion-tecnica}

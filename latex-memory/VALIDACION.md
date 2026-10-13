@@ -1,35 +1,15 @@
-# Validación de la infraestructura
+# Validación de la memoria LaTeX
 
-Fecha: 25 de septiembre de 2026.
+Fecha de revisión: 8 de octubre de 2026.
 
-## Revisión estática
+## Compilación observada
 
-- Revisados los 17 archivos LaTeX activos: estructura, paquetes, opciones y contenido inicial.
-- Comprobadas 17 rutas de `input`, `include` y `addbibresource`: todos los destinos existen.
-- Comprobadas 15 etiquetas únicas, cuatro referencias cruzadas activas y dos claves citadas existentes en el `.bib`.
-- Comprobado el equilibrio básico de llaves y entornos. Esto no equivale a interpretar TeX.
-- Comprobados los enlaces relativos de los documentos Markdown.
-- Comprobado que los capítulos contienen únicamente estructura y comentarios TODO.
-- Verificados por comparación binaria el logotipo y la fuente de portada conservada frente al ZIP oficial.
-- Verificados los interruptores de agradecimientos y ejemplos por inspección del código.
-- Las modificaciones se limitan a `TFG/`. No se ha cambiado la definición del proyecto ni se han incorporado credenciales.
+Desde `latex-memory/` se ejecutó `latexmk -pdf main.tex` con pdfLaTeX de MiKTeX, latexmk 4.88 y Biber 2.22. Tras resolver la interacción entre TikZ y las abreviaturas activas del español de Babel y corregir el desbordamiento de identificadores largos, se completó la compilación hasta obtener `main.pdf` (35 páginas en esta versión). Una ejecución posterior de `latexmk -pdf -silent main.tex` confirmó la estabilización de referencias.
 
-## Compilación pendiente
+`main.blg` registra 11 claves citadas, lectura de `bibliografia.bib` y escritura de `main.bbl`, sin advertencias de Biber. El último `main.log` no muestra advertencias, referencias indefinidas ni cajas overfull/underfull. Los índices incluyen siete capítulos, bibliografía y anexos A--C; el anexo ficticio está desactivado con `\ejemplosfalse` y las citas ficticias no forman parte de `bibliografia.bib`.
 
-Los comandos `pdflatex --version`, `biber --version` y `latexmk --version` fallan con «comando no reconocido». Tampoco se encontraron instalaciones en las ubicaciones habituales de TeX Live y MiKTeX comprobadas. No se ha instalado software global ni una distribución portátil.
+## Alcance de la comprobación
 
-Por ello, **no se ha generado `main.pdf`, no se ha ejecutado Biber y no se puede certificar la ausencia de errores o avisos de compilación**. La revisión visual de portada, paginación, índices y tipografía también queda pendiente. No se ha subido el proyecto a una cuenta de Overleaf.
+La compilación acredita la integración técnica de los `.tex`, figuras TikZ, tablas y bibliografía; no comprueba por sí misma hechos científicos, ejecución de las pruebas Python ni validez final de las conclusiones. Antes de la entrega deben confirmarse autor, dirección, departamento, curso y fecha en `metadata.tex`, tipología aplicable, texto inglés del título y uso previo de IA. Es necesario volver a revisar visualmente la portada y la maquetación final una vez completados esos metadatos y se añadan resultados futuros.
 
-## Verificación reproducible con LaTeX disponible
-
-Desde `TFG/`, ejecutar:
-
-```powershell
-latexmk -pdf main.tex
-```
-
-Comprobar en `main.blg` que Biber leyó `bibliografia.bib` y escribió `main.bbl`. Revisar en el PDF las dos entradas EJEMPLO, las cuatro referencias cruzadas, los índices y el acrónimo. Revisar `main.log` hasta que no queden citas o referencias indefinidas, peticiones de nuevas pasadas ni desbordamientos importantes.
-
-Probar después `\agradecimientostrue` y `\ejemplosfalse` en `metadata.tex`, recompilando desde cero. Sin ejemplos ni fuentes reales citadas, el aviso de bibliografía vacía es esperable. Volver a las opciones deseadas para seguir redactando.
-
-Las instrucciones de instalación, compilación manual con Biber y uso en Overleaf están en [README.md](README.md). Esta validación pendiente no se presenta como una compilación satisfactoria.
+El registro original del 25 de septiembre de 2026 describía una revisión estática anterior y declaraba la compilación pendiente; la compilación de esta versión supersede aquella observación sin modificar los documentos técnicos del TFG.

@@ -1,0 +1,145 @@
+% Esquemas conceptuales, no una representación exhaustiva de CrossText2Loc.
+\begin{figure}[htbp]
+\centering
+\shorthandoff{>}
+\tikzset{
+  cliptexto/.style={draw=tfgblue,fill=tfgblue!9,rounded corners=2pt,
+    align=center,text width=24mm,minimum height=17mm,font=\small},
+  clipimagen/.style={draw=tfgteal,fill=tfgteal!12,rounded corners=2pt,
+    align=center,text width=24mm,minimum height=17mm,font=\small},
+  clipencoder/.style={draw=tfgblue,fill=tfgpale,rounded corners=2pt,
+    align=center,text width=23mm,minimum height=14mm,font=\small},
+  clipvector/.style={minimum width=24mm,minimum height=17mm,inner sep=0pt},
+  clipproceso/.style={draw=tfgblue,fill=tfgpale,rounded corners=2pt,
+    align=center,text width=22mm,minimum height=15mm,font=\small}}
+
+\begin{tikzpicture}[>={Stealth[length=2mm]},node distance=13mm and 8mm]
+  \node[anchor=west,font=\small\bfseries,text=tfgink] (training) at (0,0)
+    {(a) Entrenamiento contrastivo de CLIP: pares texto--imagen del lote};
+
+  \node[cliptexto,anchor=north west] (texts)
+    at ([yshift=-7mm]training.west) {Descripciones\\$t_1,t_2,\ldots,t_N$};
+  \node[clipencoder,fill=tfgblue!11,right=8mm of texts] (textenc)
+    {Codificador\\textual};
+  \node[clipvector,right=8mm of textenc] (textvec) {};
+  \node[clipimagen,below=14mm of texts] (images)
+    {Imágenes\\$i_1,i_2,\ldots,i_N$};
+  \node[clipencoder,fill=tfgteal!14,right=8mm of images] (imageenc)
+    {Codificador\\visual};
+  \node[clipvector,right=8mm of imageenc] (imagevec) {};
+
+  \draw[->,thick] (texts.east) -- (textenc.west);
+  \draw[->,thick] (textenc.east) -- (textvec.west);
+  \draw[->,thick] (images.east) -- (imageenc.west);
+  \draw[->,thick] (imageenc.east) -- (imagevec.west);
+  \node[font=\footnotesize,below=1mm of textvec] {$T_1,T_2,\ldots,T_N$};
+  \node[font=\footnotesize,below=1mm of imagevec] {$I_1,I_2,\ldots,I_N$};
+  \begin{scope}[shift={(textvec.south west)}]
+    \foreach \r in {0,1,2} {
+      \foreach \c in {0,1,2,3,4,5} {
+        \filldraw[draw=tfgblue!65,fill=tfgblue!23]
+          ({2mm+3.3mm*\c},{2mm+3.5mm*\r}) rectangle ++(2.5mm,2.5mm);
+      }
+    }
+  \end{scope}
+  \begin{scope}[shift={(imagevec.south west)}]
+    \foreach \r in {0,1,2} {
+      \foreach \c in {0,1,2,3,4,5} {
+        \filldraw[draw=tfgteal!75,fill=tfgteal!28]
+          ({2mm+3.3mm*\c},{2mm+3.5mm*\r}) rectangle ++(2.5mm,2.5mm);
+      }
+    }
+  \end{scope}
+
+  \node[draw=tfgblue!70,minimum width=24mm,minimum height=24mm,
+    inner sep=0pt,right=12mm of textvec,yshift=-15.5mm] (grid) {};
+  \begin{scope}[shift={(grid.south west)}]
+    \foreach \r in {0,1,2} {
+      \foreach \c in {0,1,2} {
+        \fill[tfgpale] ({8mm*\c},{8mm*\r}) rectangle ++(8mm,8mm);
+      }
+    }
+    \fill[tfgaccent!48] (0mm,16mm) rectangle (8mm,24mm);
+    \fill[tfgaccent!48] (8mm,8mm) rectangle (16mm,16mm);
+    \fill[tfgaccent!48] (16mm,0mm) rectangle (24mm,8mm);
+    \foreach \r in {0,1,2} {
+      \foreach \c in {0,1,2} {
+        \draw[tfgblue!70] ({8mm*\c},{8mm*\r}) rectangle ++(8mm,8mm);
+      }
+    }
+  \end{scope}
+  \node[font=\small\bfseries,above=9mm of grid] {Matriz de similitud};
+  \node[font=\footnotesize] at ([xshift=4mm,yshift=2.5mm]grid.north west) {$T_1$};
+  \node[font=\footnotesize] at ([xshift=12mm,yshift=2.5mm]grid.north west) {$T_2$};
+  \node[font=\footnotesize] at ([xshift=20mm,yshift=2.5mm]grid.north west) {$T_N$};
+  \node[font=\footnotesize,anchor=west] at ([xshift=2mm,yshift=-4mm]grid.north east) {$I_1$};
+  \node[font=\footnotesize,anchor=west] at ([xshift=2mm,yshift=-12mm]grid.north east) {$I_2$};
+  \node[font=\footnotesize,anchor=west] at ([xshift=2mm,yshift=-20mm]grid.north east) {$I_N$};
+  \coordinate (textport) at (grid.north west);
+  \coordinate (imageport) at (grid.south west);
+  \draw[->,thick,rounded corners=1mm]
+    (textvec.east) -- ++(4mm,0) |- (textport);
+  \draw[->,thick,rounded corners=1mm]
+    (imagevec.east) -- ++(6mm,0) |- (imageport);
+  \node[font=\footnotesize,align=center,text width=38mm,below=3mm of grid]
+    {Diagonal: pares positivos;\\no máximos iniciales};
+\end{tikzpicture}
+
+\par\medskip
+{\color{tfgaccent}\rule{0.95\linewidth}{0.4pt}}\par\smallskip
+
+\begin{tikzpicture}[>={Stealth[length=2mm]},node distance=12mm and 7mm]
+  \node[anchor=west,font=\small\bfseries,text=tfgink] (inference) at (0,0)
+    {(b) Inferencia: recuperación texto--imagen, no clasificación zero-shot};
+
+  \node[cliptexto,anchor=north west] (query)
+    at ([yshift=-7mm]inference.west) {Descripción\\de consulta};
+  \node[clipencoder,fill=tfgblue!11,right=7mm of query] (queryenc)
+    {Codificador\\textual};
+  \node[clipvector,minimum height=15mm,right=7mm of queryenc] (queryvec) {};
+  \node[clipimagen,below=13mm of query] (gallery)
+    {Imágenes OSM\\$m_1,m_2,\ldots$\\$m_M$};
+  \node[clipencoder,fill=tfgteal!14,right=7mm of gallery] (galleryenc)
+    {Codificador\\visual};
+  \node[clipvector,right=7mm of galleryenc] (galleryvec) {};
+  \draw[->,thick] (query.east) -- (queryenc.west);
+  \draw[->,thick] (queryenc.east) -- (queryvec.west);
+  \draw[->,thick] (gallery.east) -- (galleryenc.west);
+  \draw[->,thick] (galleryenc.east) -- (galleryvec.west);
+  \node[font=\footnotesize,below=1mm of queryvec] {$T(q)$};
+  \node[font=\footnotesize,below=1mm of galleryvec] {$I_1,I_2,\ldots,I_M$};
+  \begin{scope}[shift={(queryvec.south west)}]
+    \foreach \c in {0,1,2,3,4,5} {
+      \filldraw[draw=tfgblue!65,fill=tfgblue!23]
+        ({2mm+3.3mm*\c},5mm) rectangle ++(2.5mm,2.5mm);
+    }
+  \end{scope}
+  \begin{scope}[shift={(galleryvec.south west)}]
+    \foreach \r in {0,1,2} {
+      \foreach \c in {0,1,2,3,4,5} {
+        \filldraw[draw=tfgteal!75,fill=tfgteal!28]
+          ({2mm+3.3mm*\c},{2mm+3.5mm*\r}) rectangle ++(2.5mm,2.5mm);
+      }
+    }
+  \end{scope}
+
+  \node[clipproceso,right=8mm of queryvec,yshift=-15mm] (similarity)
+    {Similitud\\con cada\\candidato};
+  \coordinate (queryport) at ([yshift=4mm]similarity.west);
+  \coordinate (galleryport) at ([yshift=-4mm]similarity.west);
+  \draw[->,thick,rounded corners=1mm]
+    (queryvec.east) -- ++(4mm,0) |- (queryport);
+  \draw[->,thick,rounded corners=1mm]
+    (galleryvec.east) -- ++(6mm,0) |- (galleryport);
+  \node[clipproceso,text width=20mm,right=7mm of similarity] (ranking)
+    {Ranking Top-K\\1. $c_{(1)}$\\2. $c_{(2)}$\\$\vdots$};
+  \draw[->,thick] (similarity.east) -- (ranking.west);
+  \node[clipproceso,dashed,fill=white,text width=30mm,
+    below=7mm of ranking.south east,anchor=north east] (madrid)
+    {ID y coordenadas\\del catálogo de Madrid\\(pendiente)};
+  \draw[->,thick,dashed] (ranking.south) -- (madrid.north);
+\end{tikzpicture}
+
+\caption{Arriba: CLIP aprende a asociar los textos e imágenes emparejados de un lote; con índices correspondientes, la diagonal señala los pares positivos que el entrenamiento favorece, no similitudes altas garantizadas. Abajo: esquema conceptual de recuperación mediante CrossText2Loc con pesos fijos y varios candidatos; el vínculo discontinuo al catálogo de Madrid aún no está implementado \cite{radford2021clip,ye2025crosstext}.}
+\label{fig:clip-recuperacion}
+\end{figure}

@@ -1,16 +1,22 @@
-\chapter*{RESUMEN}
+\chapter*{Resumen}
 \addcontentsline{toc}{chapter}{Resumen / Abstract}
 \markboth{Resumen / Abstract}{}
 \begin{center}
   \textbf{\tituloTFG}\par\medskip
   \textbf{\tituloTFGEnglish}
 \end{center}
-% TODO: redactar el resumen en castellano cuando exista trabajo realizado.
+En esta memoria se estudia sobre la recuperación de ubicaciones geográficas a partir de descripciones en lenguaje natural y una región aproximada conocida. En específico, la región a estudiar es Madrid. El trabajo distingue la coordenada representativa de una celda candidata de la posición real del observador, diseñando así una arquitectura que separa la preparación cartográfica reproducible de la interpretación textual y la recuperación.
+
+Como base implementada, se han desarrollado contratos y validadores, un catálogo geométrico determinista para una zona piloto y un mecanismo de adquisición que produjo un snapshot real y validado de OpenStreetMap. Asimismo, se reprodujo con pesos congelados la evaluación oficial del modelo CrossText2Loc sobre 1200 consultas de Nueva York, con R@1 global del 59,08\,\%. Dicho protocolo selecciona previamente 100 vecinos mediante la coordenada verdadera y, por tanto, no mide la búsqueda autónoma en Madrid. La construcción de una galería visual y la evaluación con descripciones madrileñas permanecen pendientes; se delimitan los requisitos metodológicos para abordarlas sin confundir diseños y resultados.
+
 \noindent\textbf{Palabras clave:} \palabrasClaveTFG
 
 \begin{otherlanguage}{english}
 \section*{Abstract}
-% TODO: redactar la versión inglesa del resumen.
+This thesis investigates the retrieval of geographic locations from natural language descriptions within a known approximate region. Specifically, the study focuses on Madrid. The work distinguishes between the representative coordinates of a candidate grid cell and the observer's actual position, proposing an architecture that separates reproducible cartographic data preparation from textual interpretation and retrieval.
+
+The implemented foundation includes contracts and validators, a deterministic geometric catalog for a pilot area, and a data acquisition mechanism that produced a real, validated OpenStreetMap snapshot. Furthermore, the official evaluation of the CrossText2Loc model was reproduced using frozen weights on 1,200 queries from New York, achieving an overall R@1 of 59.08\%. This evaluation protocol preselects 100 neighboring candidates using the ground-truth coordinates and therefore does not measure autonomous geographic retrieval in Madrid. The construction of a visual reference gallery and evaluation using descriptions of locations in Madrid remain pending. The methodological requirements for these tasks are established to clearly distinguish the proposed design from the results actually obtained.
+
 \noindent\textbf{Keywords:} \keywordsTFG
 \end{otherlanguage}
 \clearpage

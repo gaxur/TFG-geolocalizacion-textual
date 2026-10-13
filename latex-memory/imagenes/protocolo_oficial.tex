@@ -1,0 +1,19 @@
+\begin{figure}[htbp]
+\centering
+\shorthandoff{>}
+\resizebox{.95\linewidth}{!}{%
+\begin{tikzpicture}[>={Stealth[length=2mm]},
+  proc/.style={draw=tfgblue,rounded corners,align=center,text width=34mm,minimum height=12mm,font=\small},
+  special/.style={proc,fill=tfgblue!13},
+  node distance=12mm and 7mm]
+  \node[proc] (query) {Texto de consulta\\y galería original};
+  \node[special,right=of query] (gt) {Coordenada real\\de la consulta};
+  \node[special,right=of gt] (near) {Selección de los\\100 vecinos más cercanos};
+  \node[proc,right=of near] (rank) {Similitud\\CrossText2Loc\\y métricas};
+  \draw[->,thick] (query) -- (gt);
+  \draw[->,thick] (gt) -- (near);
+  \draw[->,thick] (near) -- (rank);
+\end{tikzpicture}}
+\caption{Protocolo de la evaluación oficial reproducida en Nueva York. Las cajas sombreadas utilizan la posición verdadera antes del ranking; no constituyen un flujo aplicable a la consulta real en Madrid. Elaboración propia a partir de \texttt{evaluate.py} \cite{cvg:codigo}.}
+\label{fig:protocolo-oficial}
+\end{figure}
