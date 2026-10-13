@@ -34,6 +34,22 @@ incluye LLM, vocabularios de consulta, buffers, radios, fallback, scoring,
 ground truth, imágenes, embeddings, CrossText2Loc o GOTPR. No resuelve D003 ni
 D021.
 
+## Estado de F3.3
+
+F3.3 implementa la normalización y construcción geométrica. Proyecta las
+coordenadas OSM mediante la transformación usada por F1 y construye Point para
+nodes, LineString para ways lineales y Polygon para ways areales. Aplica D049,
+valida las geometrías y asigna `geometry_role`, `geometry_status`,
+`geometry_reason` y bbox métrica.
+
+La etapa opera sobre `VerifiedF3Inputs` mediante
+`src.tfg_phase0.f3_geometry.normalize_osm_geometries`. El resultado conserva las
+geometrías Shapely solo en memoria y mantiene las relations como contexto sin
+geometría. El diagnóstico interno `unrecognized_area_value` se conserva para
+ways abiertos sin alterar el contrato serializado de `geometry_reason`. F3.3 no
+construye índices ni asociaciones entre candidatos y OSM; esas operaciones
+siguen pendientes para F3.4.
+
 ## Input F1
 
 F3 recibe mediante una ruta explícita un manifest ya materializado y nunca lo
@@ -178,10 +194,10 @@ Shapely 2.x y GEOS serán la única capa geométrica nueva. Deben aportar Point,
 LineString, Polygon, validación, predicados, distancia y STRtree. No se
 introducirán inicialmente GeoPandas, `rtree`, PyArrow, Parquet ni `pyproj`.
 
-Antes de implementar geometría se realizará un preflight para Python 3.12 y
-Linux `aarch64`. Ese preflight comprobará la disponibilidad del wheel, fijará
-versiones exactas de Shapely y GEOS y ejecutará fixtures topológicas. Ambas
-versiones participarán en la identidad F3.
+El preflight en CPython 3.12/Linux `aarch64` fijó `NumPy==2.5.4` y
+`Shapely==2.1.2`. El wheel binario de Shapely incluye GEOS 3.13.1 y GEOS C API
+1.19.2, sin compilación local ni dependencia de una copia GEOS del sistema.
+Shapely y GEOS se registrarán en provenance y participarán en la identidad F3.
 
 STRtree indexará las geometrías OSM asociables y se consultará una vez por celda
 F1. Para cada consulta, los resultados se convierten a identidad OSM, se

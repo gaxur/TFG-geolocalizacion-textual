@@ -63,6 +63,7 @@
 
 # Entornos, cachés Python y herramientas ML.
 .venv/
+.venv-geo/
 venv/
 env/
 .conda/

@@ -31,3 +31,7 @@ F3_PROVENANCE_ONLY_SOFTWARE_FIELDS = (
     "platform_system",
     "platform_machine",
 )
+
+F3_NUMPY_VERSION = "2.5.4"
+F3_SHAPELY_VERSION = "2.1.2"
+F3_GEOS_VERSION = "3.13.1"

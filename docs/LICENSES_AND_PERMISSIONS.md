@@ -1,6 +1,6 @@
 # Licencias y permisos de software y datos
 
-## Matriz de auditoría (actualizada: 6 de octubre de 2026)
+## Matriz de auditoría (actualizada: 13 de octubre de 2026)
 
 Esta matriz distingue usar, modificar, almacenar, generar derivados, publicar
 y redistribuir. Una URL pública o un checkpoint descargable no implica que
@@ -10,6 +10,7 @@ todas esas acciones estén autorizadas.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Datos OSM | [OpenStreetMap](https://www.openstreetmap.org/copyright) | Catálogo, filtros y derivados geográficos | ODbL 1.0, con atribución | Almacenables; registrar snapshot y procedencia | Condicionada por ODbL y tipo de obra/base derivada | PERMITIDO CON CONDICIONES | Revisar obligaciones del artefacto concreto publicado. |
 | `osm-polygon-features` | [Repositorio upstream](https://github.com/tyrasd/osm-polygon-features) | Reglas offline para interpretar closed ways en F3 | CC0-1.0 | Copia exacta de `polygon-features.json` v0.9.2 permitida | Permitida por CC0-1.0 | PERMITIDO | Conservar commit, hash, licencia y procedencia; no presentar la tabla como norma oficial de OSM. |
+| NumPy / Shapely / GEOS | [NumPy](https://numpy.org/), [Shapely](https://github.com/shapely/shapely) y [GEOS](https://libgeos.org/) | Normalización geométrica F3 | NumPy y Shapely: BSD-3-Clause; GEOS: LGPL-2.1-or-later | Bibliotecas locales; sin datos ni pesos | Conforme a las licencias incluidas en las distribuciones | PERMITIDO CON CONDICIONES | Fijar NumPy 2.5.4, Shapely 2.1.2 y registrar GEOS 3.13.1 empaquetado en el wheel. |
 | Overpass API | [Overpass](https://wiki.openstreetmap.org/wiki/Overpass_API) | Adquisición/adaptación de OSM | Datos devueltos bajo ODbL; servicio sujeto a política de uso | Cache local razonable y reproducible | Datos según ODbL; no se redistribuye el servicio | PERMITIDO CON CONDICIONES | Respetar límites del endpoint y atribuir OSM. |
 | Wikidata | [Wikidata](https://www.wikidata.org/wiki/Wikidata:Copyright) | Enriquecimiento opcional | CC0 para datos estructurados | Almacenables; revisar fuentes enlazadas | Posible para CC0 | PERMITIDO CON CONDICIONES | Mantener procedencia y revisar contenido externo. |
 | Código GOTPR | [GitHub](https://github.com/donghwijung/GOTPR) | Extensión de retrieval por grafos | MIT | No cubre automáticamente pesos/datasets | Sí para código, conservando aviso MIT | PERMITIDO CON CONDICIONES | Auditar cada artefacto no incluido en MIT. |
@@ -48,7 +49,7 @@ el raw continuará fuera de Git y la publicación de provenance o derivados se
 revisará según ODbL.
 
 **Proyecto:** localización geográfica a partir de descripciones textuales en Madrid  
-**Fecha de revisión:** 6 de octubre de 2026
+**Fecha de revisión:** 13 de octubre de 2026
 
 **Estado:** guía de cumplimiento para el desarrollo y la memoria del TFG
 
@@ -178,6 +179,19 @@ Esta licencia corresponde a la tabla de reglas, no a los datos cartográficos.
 El snapshot y los datos OSM continúan bajo ODbL 1.0 y mantienen su atribución y
 sus condiciones propias. La documentación de OSM Wiki consultada durante la
 auditoría no forma parte del recurso ejecutable de F3 ni se copia en él.
+
+## Dependencias geométricas de F3
+
+El preflight de F3.3 fija `NumPy==2.5.4` y `Shapely==2.1.2` para CPython
+3.12/Linux `aarch64`. El wheel oficial de Shapely comprobado es
+`shapely-2.1.2-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl`,
+de 2.988.308 bytes y SHA-256
+`0bd308103340030feef6c111d3eb98d50dc13feea33affc8a6f9fa549e9458a3`.
+
+El wheel incluye y carga GEOS 3.13.1 y GEOS C API 1.19.2, en lugar de una copia
+GEOS del sistema. NumPy y Shapely declaran BSD-3-Clause; GEOS declara
+LGPL-2.1-or-later. Las versiones de Shapely y GEOS se registrarán en provenance
+F3 y formarán parte de su identidad algorítmica conforme a D050.
 
 ## Checkpoints, datasets e imágenes
 
