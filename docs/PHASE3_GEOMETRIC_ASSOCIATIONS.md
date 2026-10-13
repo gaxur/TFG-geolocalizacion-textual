@@ -47,8 +47,30 @@ La etapa opera sobre `VerifiedF3Inputs` mediante
 geometrías Shapely solo en memoria y mantiene las relations como contexto sin
 geometría. El diagnóstico interno `unrecognized_area_value` se conserva para
 ways abiertos sin alterar el contrato serializado de `geometry_reason`. F3.3 no
-construye índices ni asociaciones entre candidatos y OSM; esas operaciones
-siguen pendientes para F3.4.
+construye índices ni asociaciones entre candidatos y OSM.
+
+## Estado de F3.4
+
+F3.4 está implementada en `src.tfg_phase0.f3_associations`. Construye cada celda
+cuadrada exclusivamente desde su centro EPSG:25830 y `cell_size_m`, e indexa en
+un STRtree temporal solo las geometrías OSM asociables. Para cada celda resuelve
+los índices enteros devueltos por Shapely contra una secuencia estable, elimina
+duplicados, ordena por identidad OSM y aplica la intersección exacta
+muchos-a-muchos.
+
+También calcula los predicados neutrales y `center_distance_m` desde el centro
+de la celda hasta la geometría OSM completa. La salida permanece en memoria,
+ordenada por `candidate_id`, tipo OSM e ID. No aplica buffers, radios,
+nearest-only, desempates, scoring ni semántica de consulta, y no serializa los
+outputs finales de F3.
+
+La integración real sobre el snapshot
+`osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141`
+indexó 26.546 geometrías. El catálogo de 25 m produjo 30.118 asociaciones para
+1.115 candidatos; el de 50 m produjo 23.808 para 253 candidatos. Una muestra
+determinista de candidatos de cada resolución coincidió exactamente con una
+búsqueda exhaustiva. Estos conteos describen la ejecución observada y no
+resuelven D003 ni D021.
 
 ## Input F1
 
