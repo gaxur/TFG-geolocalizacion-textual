@@ -72,6 +72,29 @@ determinista de candidatos de cada resolución coincidió exactamente con una
 búsqueda exhaustiva. Estos conteos describen la ejecución observada y no
 resuelven D003 ni D021.
 
+## Estado de F3.5
+
+F3.5 está implementada en `src.tfg_phase0.f3_relations`. Propaga, en un solo
+nivel, los `candidate_id` de nodes y ways presentes que tengan asociaciones
+directas hacia las relations que los referencian. Conserva tags, roles y conteos
+de todas las entradas member presentes y ausentes. No reconstruye geometrías de
+relations o multipolygons, no descarga members ausentes y no crea asociaciones
+directas entre candidates y relations.
+
+Las entradas member repetidas con igual `(member_type, ref, role)` cuentan por
+separado en `member_count` y en los conteos por presencia, pero se agrupan en un
+único `associated_member`, como exige el contrato sin duplicados. Los roles
+distintos permanecen separados. Relations member presentes o ausentes solo se
+contabilizan: no propagan candidatos y no permiten transitividad.
+
+En la integración real, ambas resoluciones conservaron las 498 relations y los
+conteos F2: 380 nodes, 1.594 ways y 2 relations presentes; 3.285 nodes, 10.167
+ways y 40 relations ausentes. El catálogo de 25 m emitió 210 relations, 1.058
+members asociados y 3.918 apariciones de `candidate_id`; el de 50 m emitió 196,
+945 y 2.122, respectivamente. Se agruparon una entrada duplicada asociada en 25
+m y ninguna en 50 m; las demás entradas duplicadas del snapshot no tenían
+asociación directa en esas ejecuciones. Estos resultados no resuelven D003.
+
 ## Input F1
 
 F3 recibe mediante una ruta explícita un manifest ya materializado y nunca lo
