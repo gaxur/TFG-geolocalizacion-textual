@@ -18,7 +18,8 @@ ARTIFACT_FIELDS = (
     "osm_image", "osm_embedding", "satellite_image", "satellite_embedding",
     "scene_id", "scene_graph", "scene_embedding",
 )
-GENERATOR_VERSION = "phase1-grid-v1"
+GRID_GENERATOR_VERSION = "phase1-grid-v1"
+MANIFEST_GENERATOR_VERSION = "phase1-manifest-v2"
 
 
 def _positive_integer(value: Any, name: str) -> int:
@@ -57,7 +58,33 @@ def catalog_grid_identity(
         "spacing_m": spacing_m,
         "cell_size_m": cell_size_m,
         "border_policy": config["catalog"]["border_policy"],
-        "generator_version": GENERATOR_VERSION,
+        "generator_version": GRID_GENERATOR_VERSION,
+    }
+
+
+def f1_config_input(config: dict[str, Any]) -> dict[str, Any]:
+    """Extrae la configuración efectiva de F1 para su provenance."""
+    region = config["region"]
+    catalog = config["catalog"]
+    return {
+        "schema_version": config["schema_version"],
+        "region": {
+            "name": region["name"],
+            "bbox": {
+                "north": region["bbox"]["north"],
+                "south": region["bbox"]["south"],
+                "east": region["bbox"]["east"],
+                "west": region["bbox"]["west"],
+            },
+            "crs": region["crs"],
+        },
+        "catalog": {
+            "projected_crs": catalog["projected_crs"],
+            "catalog_version": catalog["catalog_version"],
+            "candidate_id_prefix": catalog["candidate_id_prefix"],
+            "candidate_generation": catalog["candidate_generation"],
+            "border_policy": catalog["border_policy"],
+        },
     }
 
 
@@ -182,7 +209,7 @@ def build_catalog(
         "border_policy": catalog["border_policy"],
         "order": "row_south_to_north_then_column_west_to_east",
         "grid_hash": grid_hash,
-        "generator_version": GENERATOR_VERSION,
+        "generator_version": GRID_GENERATOR_VERSION,
     }
     manifest = {
         "schema_version": "1.0",
@@ -195,9 +222,9 @@ def build_catalog(
             artifact_id=f"{catalog['catalog_version']}-s{spacing_m}-l{cell_size_m}",
             source=config_source,
             source_version=config["schema_version"],
-            input_hashes={"region_config": sha256_json(config)},
+            input_hashes={"f1_config": sha256_json(f1_config_input(config))},
             parameters=parameters,
-            code_version=GENERATOR_VERSION,
+            code_version=MANIFEST_GENERATOR_VERSION,
         ),
         "candidates": candidates,
     }

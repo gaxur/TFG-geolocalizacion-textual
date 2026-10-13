@@ -4,10 +4,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.tfg_phase0.catalog import build_catalog, candidate_id, write_manifest
+from src.tfg_phase0.catalog import (
+    GRID_GENERATOR_VERSION,
+    MANIFEST_GENERATOR_VERSION,
+    build_catalog,
+    candidate_id,
+    f1_config_input,
+    write_manifest,
+)
 from src.tfg_phase0.config import load_region_config
 from src.tfg_phase0.crs import epsg25830_to_wgs84, wgs84_to_epsg25830
-from src.tfg_phase0.provenance import canonical_json
+from src.tfg_phase0.provenance import canonical_json, sha256_json
 from src.tfg_phase0.validation import SchemaValidationError, validate_document
 
 
@@ -72,6 +79,85 @@ class Phase1CatalogTests(unittest.TestCase):
             canonical_json(build_catalog(self.config, spacing_m=25)),
             canonical_json(build_catalog(copy.deepcopy(self.config), spacing_m=25)),
         )
+
+    def test_f1_config_input_contains_exactly_effective_fields(self):
+        self.assertEqual(f1_config_input(self.config), {
+            "schema_version": "1.0",
+            "region": {
+                "name": "madrid_pilot",
+                "bbox": {
+                    "north": 40.4200,
+                    "south": 40.4120,
+                    "east": -3.6990,
+                    "west": -3.7090,
+                },
+                "crs": "EPSG:4326",
+            },
+            "catalog": {
+                "projected_crs": "EPSG:25830",
+                "catalog_version": "madrid-pilot-grid-v1",
+                "candidate_id_prefix": "MADP",
+                "candidate_generation": "projected_square_grid",
+                "border_policy": "full_cell_within_bbox",
+            },
+        })
+
+    def test_unrelated_config_does_not_change_f1_input_or_manifest(self):
+        changed = copy.deepcopy(self.config)
+        changed["osm_acquisition"]["endpoint"] = "https://example.test/api"
+        changed["artifacts"]["manifest"] = "another/output.json"
+        self.assertEqual(f1_config_input(changed), f1_config_input(self.config))
+        self.assertEqual(build_catalog(changed, spacing_m=25), self.catalog_25)
+
+    def test_every_relevant_config_field_changes_f1_input_hash(self):
+        mutations = {
+            "schema_version": lambda value: "2.0",
+            "region.name": lambda value: value + "_other",
+            "region.bbox.north": lambda value: value + 0.001,
+            "region.bbox.south": lambda value: value - 0.001,
+            "region.bbox.east": lambda value: value + 0.001,
+            "region.bbox.west": lambda value: value - 0.001,
+            "region.crs": lambda value: "EPSG:3857",
+            "catalog.projected_crs": lambda value: "EPSG:3857",
+            "catalog.catalog_version": lambda value: value + "-v2",
+            "catalog.candidate_id_prefix": lambda value: "OTHER",
+            "catalog.candidate_generation": lambda value: "other",
+            "catalog.border_policy": lambda value: "other",
+        }
+        original_hash = sha256_json(f1_config_input(self.config))
+        for path, mutate in mutations.items():
+            changed = copy.deepcopy(self.config)
+            parts = path.split(".")
+            target = changed
+            for part in parts[:-1]:
+                target = target[part]
+            target[parts[-1]] = mutate(target[parts[-1]])
+            with self.subTest(path=path):
+                self.assertNotEqual(sha256_json(f1_config_input(changed)), original_hash)
+
+    def test_manifest_v2_provenance_and_grid_version_are_separate(self):
+        self.assertEqual(
+            self.catalog_25["provenance"]["input_hashes"],
+            {"f1_config": sha256_json(f1_config_input(self.config))},
+        )
+        self.assertNotIn("region_config", self.catalog_25["provenance"]["input_hashes"])
+        self.assertEqual(self.catalog_25["provenance"]["code_version"], MANIFEST_GENERATOR_VERSION)
+        self.assertEqual(self.catalog_25["generation"]["generator_version"], GRID_GENERATOR_VERSION)
+
+    def test_manifest_v2_preserves_catalog_identity_and_geometry(self):
+        self.assertEqual(self.catalog_25["manifest_id"], "madrid-pilot-grid-v1-s25-l25")
+        self.assertEqual(self.catalog_50["manifest_id"], "madrid-pilot-grid-v1-s50-l50")
+        unrelated_change = copy.deepcopy(self.config)
+        unrelated_change["osm_acquisition"]["endpoint"] = "https://example.test/api"
+        unrelated_change["artifacts"]["manifest"] = "another/output.json"
+        other_25 = build_catalog(unrelated_change, spacing_m=25)
+        other_50 = build_catalog(unrelated_change, spacing_m=50)
+        self.assertEqual(self.catalog_25["generation"], other_25["generation"])
+        self.assertEqual(self.catalog_50["generation"], other_50["generation"])
+        self.assertEqual(self.catalog_25["candidates"], other_25["candidates"])
+        self.assertEqual(self.catalog_50["candidates"], other_50["candidates"])
+        self.assertEqual(len(self.catalog_25["candidates"]), 1115)
+        self.assertEqual(len(self.catalog_50["candidates"]), 253)
 
     def test_spacing_is_configurable(self):
         self.assertEqual(self.catalog_25["generation"]["spacing_m"], 25)

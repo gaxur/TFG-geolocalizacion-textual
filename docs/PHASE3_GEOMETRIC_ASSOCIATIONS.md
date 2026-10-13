@@ -50,6 +50,15 @@ unicidad de `candidate_id`, valores finitos, celdas válidas, CRS esperado y
 compatibilidad de región y bbox con F2. El path guardado en provenance es lógico
 y relativo.
 
+Conforme a D051, F3.2 exige manifests nuevos con
+`provenance.input_hashes.f1_config` y
+`provenance.code_version=phase1-manifest-v2`. El hash `f1_config` cubre solo
+`schema_version` y los bloques efectivos `region` y `catalog` definidos por F1;
+excluye `osm_acquisition`, `artifacts` y los valores configurables nulos de
+spacing y tamaño. Estos últimos se registran con sus valores efectivos en
+`generation` y `parameters_hash`. No existe fallback automático a la provenance
+v1.
+
 La celda métrica autoritativa se reconstruye como un cuadrado en EPSG:25830 a
 partir de `center_easting_m`, `center_northing_m` y `cell_size_m`. El Polygon
 WGS84 redondeado del manifest se utiliza para validar coherencia, no como fuente

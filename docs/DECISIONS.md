@@ -66,6 +66,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D048 | Fijar endpoint, consulta, bordes, identidad, reintentos y validación del snapshot | ACEPTADA | OSM / operación |
 | D049 | Aplicar una política versionada para interpretar la geometría de OSM ways | ACEPTADA | OSM / catálogo geométrico F3 |
 | D050 | Fijar el contrato del dataset de asociaciones geométricas F3 | ACEPTADA | OSM / catálogo geométrico F3 |
+| D051 | Limitar la provenance de cada artefacto a sus inputs efectivos | ACEPTADA | Provenance / catálogo F1 |
 
 ## D001 — Identidad del candidato
 
@@ -2415,6 +2416,106 @@ D001-D005, D012, D019, D022 y D043-D049.
 Fijar mediante preflight la versión exacta de Shapely y GEOS compatible con
 Python 3.12/Linux `aarch64` antes de implementar la geometría. D003 y D021
 continúan pendientes de experimento.
+
+## D051 — Limitar la provenance de cada artefacto a sus inputs efectivos
+
+**Estado:** ACEPTADA
+
+**Componente:** Provenance / catálogo F1
+
+**Fecha:** 2026-10-07
+
+**Origen:** Auditoría histórica de los manifests F1 y aprobación expresa del
+responsable del TFG.
+
+### Contexto
+
+F1 registraba `sha256_json(config)` sobre todo `config/madrid.yaml` como
+`provenance.input_hashes.region_config`. Cuando F2 añadió posteriormente el
+bloque `osm_acquisition` al mismo fichero, cambió el hash completo de los
+manifests F1 sin cambiar la cuadrícula, sus candidatos, IDs, coordenadas ni
+geometrías.
+
+La reproducción del commit histórico
+`a526a585ae35736248bb90ac8eaa6e671e61589c` confirmó que los hashes publicados
+de 25 m y 50 m son correctos para la política de provenance v1. La comparación
+estructural encontró una única diferencia con los manifests actuales:
+`provenance.input_hashes.region_config`. No existió una regresión geométrica.
+
+### Decisión
+
+Cada artefacto identificará criptográficamente todos los inputs que puedan
+modificar su contenido o interpretación y excluirá configuración perteneciente
+a fases independientes que no influya en ese artefacto.
+
+Como primera aplicación, F1 sustituye `provenance.input_hashes.region_config`
+por `provenance.input_hashes.f1_config`. Este valor es el SHA-256 del JSON
+canónico compuesto exactamente por:
+
+```text
+schema_version
+region.name
+region.bbox.north
+region.bbox.south
+region.bbox.east
+region.bbox.west
+region.crs
+catalog.projected_crs
+catalog.catalog_version
+catalog.candidate_id_prefix
+catalog.candidate_generation
+catalog.border_policy
+```
+
+No participan `osm_acquisition`, `artifacts`,
+`catalog.candidate_spacing_m` ni `catalog.cell_size_m`. Los valores efectivos de
+spacing y tamaño siguen registrados en `generation` y cubiertos por
+`provenance.parameters_hash`.
+
+La versión de construcción y provenance del manifest pasa a
+`provenance.code_version = phase1-manifest-v2`. La versión del algoritmo
+geométrico permanece `generation.generator_version = phase1-grid-v1`.
+
+Los nuevos manifests destinados a F3 deberán declarar exclusivamente
+`input_hashes.f1_config` y `phase1-manifest-v2`; no habrá fallback silencioso a
+la política v1.
+
+### Alternativas consideradas
+
+- Mantener el hash de la configuración completa, descartado por acoplar F1 a
+  cambios de F2, F3 o modelos.
+- Registrar hashes separados de región, catálogo y argumentos, descartado por
+  duplicar información ya cubierta por `parameters_hash` y complicar el
+  contrato sin cambiar su capacidad de detección.
+
+### Consecuencias
+
+No cambian `schema_version`, `catalog_version`, `manifest_id`, `grid_hash`,
+`candidate_id`, `parameters_hash`, geometría, orden ni serialización general.
+Los hashes completos de los nuevos manifests sí cambian porque cambia su
+provenance. Los manifests históricos y sus hashes siguen siendo resultados
+válidos y reproducibles de F1 v1, pero no serán inputs del primer F3 real.
+
+Los futuros campos de configuración que afecten a F1 deberán incorporarse de
+forma explícita al subconjunto canónico. Los campos de otras fases no lo
+invalidarán.
+
+### Evidencia
+
+- Commit histórico: `a526a585ae35736248bb90ac8eaa6e671e61589c`.
+- El commit F2 `6a17a81b754b5aaf0e134699ab55a964537a08d0`
+  añadió `osm_acquisition` sin modificar los parámetros geométricos F1.
+- La reproducción histórica produjo los hashes documentados y la comparación
+  mostró candidatos y geometrías idénticos.
+
+### Dependencias
+
+D001-D004, D012 y D050.
+
+### Pendiente
+
+Ninguno sobre la política. D003 continúa pendiente de experimento y se aplicará
+mediante manifests separados de 25 m y 50 m.
 
 # Decisiones pendientes
 

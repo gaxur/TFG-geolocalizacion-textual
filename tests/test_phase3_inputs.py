@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from src.tfg_phase0.catalog import build_catalog, write_manifest
+from src.tfg_phase0.catalog import build_catalog, f1_config_input, write_manifest
 from src.tfg_phase0.config import load_region_config
 from src.tfg_phase0.f3_inputs import (
     D049_RULES_SHA256,
@@ -177,18 +177,55 @@ class Phase3InputTests(unittest.TestCase):
         with self.assertRaises(F3InputError):
             load_verified_catalog(self.manifest_path, self.config)
 
+    def test_requires_f1_config_provenance_v2(self):
+        original = self.manifest_path.read_bytes()
+        manifest = json.loads(original)
+        del manifest["provenance"]["input_hashes"]["f1_config"]
+        self.manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaises(F3InputError):
+            load_verified_catalog(self.manifest_path, self.config)
+
+        self.manifest_path.write_bytes(original)
+        manifest = json.loads(original)
+        manifest["provenance"]["input_hashes"]["f1_config"] = "0" * 64
+        self.manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaises(F3InputError):
+            load_verified_catalog(self.manifest_path, self.config)
+
+        self.manifest_path.write_bytes(original)
+        manifest = json.loads(original)
+        manifest["provenance"]["input_hashes"] = {
+            "region_config": manifest["provenance"]["input_hashes"]["f1_config"]
+        }
+        self.manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaises(F3InputError):
+            load_verified_catalog(self.manifest_path, self.config)
+
+        self.manifest_path.write_bytes(original)
+        manifest = json.loads(original)
+        manifest["provenance"]["code_version"] = "phase1-grid-v1"
+        self.manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaises(F3InputError):
+            load_verified_catalog(self.manifest_path, self.config)
+
+    def test_unrelated_config_changes_do_not_invalidate_f1(self):
+        changed = copy.deepcopy(self.config)
+        changed["osm_acquisition"]["endpoint"] = "https://example.test/api"
+        changed["artifacts"]["manifest"] = "another/output.json"
+        self.assertEqual(f1_config_input(changed), f1_config_input(self.config))
+        load_verified_catalog(self.manifest_path, changed)
+
+    def test_relevant_catalog_config_change_invalidates_f1(self):
+        changed = copy.deepcopy(self.config)
+        changed["catalog"]["candidate_id_prefix"] = "OTHER"
+        with self.assertRaises(F3InputError):
+            load_verified_catalog(self.manifest_path, changed)
+
     def test_rejects_non_finite_bbox(self):
         incompatible = copy.deepcopy(self.config)
         incompatible["region"]["bbox"]["north"] = math.nan
         with self.assertRaises(F3InputError):
             load_verified_catalog(self.manifest_path, incompatible)
-
-        write_manifest(build_catalog(self.config, spacing_m=25), self.manifest_path)
-        manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-        manifest["candidates"][0]["candidate_id"] = "candidate-wrong"
-        self.manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-        with self.assertRaises(F3InputError):
-            load_verified_catalog(self.manifest_path, self.config)
 
     def test_rejects_incompatible_config_without_selecting_a_default_spacing(self):
         incompatible = copy.deepcopy(self.config)

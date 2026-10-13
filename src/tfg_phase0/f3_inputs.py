@@ -11,7 +11,13 @@ from types import MappingProxyType
 from typing import Any, Mapping
 import xml.etree.ElementTree as ET
 
-from .catalog import GENERATOR_VERSION, catalog_grid_identity, iter_catalog_candidates
+from .catalog import (
+    GRID_GENERATOR_VERSION,
+    MANIFEST_GENERATOR_VERSION,
+    catalog_grid_identity,
+    f1_config_input,
+    iter_catalog_candidates,
+)
 from .config import load_region_config
 from .osm_snapshot import SnapshotConflictError, sha256_bytes, validate_local_snapshot
 from .provenance import sha256_json
@@ -204,7 +210,7 @@ def load_verified_catalog(manifest_path: str | Path, config: Mapping[str, Any]) 
         "source_crs": config["region"]["crs"],
         "projected_crs": config["catalog"]["projected_crs"],
         "border_policy": config["catalog"]["border_policy"],
-        "generator_version": GENERATOR_VERSION,
+        "generator_version": GRID_GENERATOR_VERSION,
     }
     if document["region_id"] != config["region"]["name"]:
         raise F3InputError("region_id de F1 no coincide con la configuración")
@@ -223,9 +229,11 @@ def load_verified_catalog(manifest_path: str | Path, config: Mapping[str, Any]) 
         raise F3InputError("artifact_id de provenance no coincide con manifest_id")
     if document["provenance"]["parameters_hash"] != sha256_json(generation):
         raise F3InputError("parameters_hash de F1 no corresponde a generation")
-    if document["provenance"]["input_hashes"].get("region_config") != sha256_json(config):
-        raise F3InputError("hash canónico de configuración en F1 no coincide")
-    if document["provenance"]["code_version"] != GENERATOR_VERSION:
+    if set(document["provenance"]["input_hashes"]) != {"f1_config"}:
+        raise F3InputError("provenance F1 debe declarar exclusivamente f1_config")
+    if document["provenance"]["input_hashes"]["f1_config"] != sha256_json(f1_config_input(config)):
+        raise F3InputError("hash canónico f1_config no coincide")
+    if document["provenance"]["code_version"] != MANIFEST_GENERATOR_VERSION:
         raise F3InputError("code_version de F1 no soportada")
 
     if not document["candidates"]:

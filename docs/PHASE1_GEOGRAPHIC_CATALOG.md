@@ -110,6 +110,22 @@ Se generaron en una ubicación temporal para validar tamaño y determinismo. No 
 añaden al repositorio porque 25 m frente a 50 m continúa pendiente en D003; el
 manifest definitivo se elegirá después del experimento correspondiente.
 
+Los hashes anteriores corresponden al commit histórico
+`a526a585ae35736248bb90ac8eaa6e671e61589c`, a la política de provenance F1 v1
+y al hash canónico de la configuración completa disponible entonces. Son
+correctos y reproducibles para esa revisión. La incorporación posterior del
+bloque `osm_acquisition` a `config/madrid.yaml` cambió únicamente
+`provenance.input_hashes.region_config`; no cambió la cuadrícula, el número u
+orden de candidatos, sus identificadores, coordenadas o geometrías.
+
+D051 introduce para los nuevos manifests la política F1 v2. El campo
+`provenance.input_hashes.f1_config` identifica solo el subconjunto efectivo de
+configuración de F1 y excluye bloques de otras fases. En consecuencia,
+`provenance.code_version` pasa a `phase1-manifest-v2`, mientras
+`generation.generator_version` permanece `phase1-grid-v1`. Los manifests v2
+tienen hashes de fichero nuevos, pero conservan la misma identidad y geometría
+del catálogo.
+
 ## Dependencias y precisión
 
 La implementación usa únicamente la biblioteca estándar de Python. Las
