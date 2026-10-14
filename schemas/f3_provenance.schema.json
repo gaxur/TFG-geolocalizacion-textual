@@ -28,7 +28,7 @@
   },
   "$defs": {
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "logicalPath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?![A-Za-z]:[\\\\/]).+$"},
+    "logicalPath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.{1,2}(?:[\\\\/]|$)).+$"},
     "typeCounts": {
       "type": "object",
       "additionalProperties": false,
@@ -111,11 +111,12 @@
     "configInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["logical_path", "schema_version", "file_sha256", "canonical_sha256"],
+      "required": ["logical_path", "schema_version", "file_sha256", "canonical_policy", "canonical_sha256"],
       "properties": {
         "logical_path": {"$ref": "#/$defs/logicalPath"},
         "schema_version": {"const": "1.0"},
         "file_sha256": {"$ref": "#/$defs/sha256"},
+        "canonical_policy": {"const": "f3-config-v1"},
         "canonical_sha256": {"$ref": "#/$defs/sha256"}
       }
     },
@@ -140,11 +141,12 @@
     "software": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["generator_source_sha256", "python_implementation", "python_version", "shapely_version", "geos_version", "platform_system", "platform_machine"],
+      "required": ["generator_source_sha256", "python_implementation", "python_version", "numpy_version", "shapely_version", "geos_version", "platform_system", "platform_machine"],
       "properties": {
         "generator_source_sha256": {"$ref": "#/$defs/sha256"},
         "python_implementation": {"type": "string", "minLength": 1},
         "python_version": {"type": "string", "minLength": 1},
+        "numpy_version": {"type": "string", "minLength": 1},
         "shapely_version": {"type": "string", "minLength": 1},
         "geos_version": {"type": "string", "minLength": 1},
         "platform_system": {"type": "string", "minLength": 1},

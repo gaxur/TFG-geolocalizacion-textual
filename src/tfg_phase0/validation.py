@@ -480,6 +480,7 @@ def _logical_path(value: Any, field: str) -> None:
         or not value
         or value.startswith("/")
         or re.match(r"^[A-Za-z]:[\\/]", value)
+        or any(part in {"", ".", ".."} for part in value.replace("\\", "/").split("/"))
     ):
         raise SchemaValidationError(f"{field} debe ser un path lógico relativo")
 
@@ -687,7 +688,7 @@ def _validate_f3_provenance(document: Mapping[str, Any]) -> None:
         },
         "software": {
             "generator_source_sha256", "python_implementation", "python_version",
-            "shapely_version", "geos_version", "platform_system", "platform_machine",
+            "numpy_version", "shapely_version", "geos_version", "platform_system", "platform_machine",
         },
         "serialization": {
             "version", "encoding", "ensure_ascii", "allow_nan", "separators",
@@ -775,7 +776,7 @@ def _validate_f3_provenance(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("inputs.rules no corresponde a D049")
 
     config = inputs["config"]
-    config_fields = {"logical_path", "schema_version", "file_sha256", "canonical_sha256"}
+    config_fields = {"logical_path", "schema_version", "file_sha256", "canonical_policy", "canonical_sha256"}
     if not isinstance(config, Mapping):
         raise SchemaValidationError("f3_provenance.inputs.config debe ser un objeto")
     _required(config, tuple(config_fields), "f3_provenance.inputs.config")
@@ -783,6 +784,8 @@ def _validate_f3_provenance(document: Mapping[str, Any]) -> None:
     _logical_path(config["logical_path"], "f3_provenance.inputs.config.logical_path")
     if config["schema_version"] != "1.0":
         raise SchemaValidationError("inputs.config.schema_version no válido")
+    if config["canonical_policy"] != "f3-config-v1":
+        raise SchemaValidationError("inputs.config.canonical_policy no válido")
     for field in ("file_sha256", "canonical_sha256"):
         _sha256(config[field], f"f3_provenance.inputs.config.{field}")
 
@@ -804,7 +807,7 @@ def _validate_f3_provenance(document: Mapping[str, Any]) -> None:
     _sha256(geometry["transform_source_sha256"], "geometry.transform_source_sha256")
 
     software = document["software"]
-    for field in ("python_implementation", "python_version", "shapely_version", "geos_version", "platform_system", "platform_machine"):
+    for field in ("python_implementation", "python_version", "numpy_version", "shapely_version", "geos_version", "platform_system", "platform_machine"):
         if not isinstance(software[field], str) or not software[field]:
             raise SchemaValidationError(f"f3_provenance.software.{field} debe ser texto no vacío")
     _sha256(software["generator_source_sha256"], "f3_provenance.software.generator_source_sha256")

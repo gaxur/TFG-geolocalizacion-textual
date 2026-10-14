@@ -95,6 +95,34 @@ members asociados y 3.918 apariciones de `candidate_id`; el de 50 m emitió 196,
 m y ninguna en 50 m; las demás entradas duplicadas del snapshot no tenían
 asociación directa en esas ejecuciones. Estos resultados no resuelven D003.
 
+## Estado de F3.6
+
+F3.6 está implementada en `src.tfg_phase0.f3_identity`,
+`src.tfg_phase0.f3_serialization`, `src.tfg_phase0.f3_validation` y
+`src.tfg_phase0.f3_bundle`. Ordena y serializa los tres JSONL canónicos,
+construye el objeto de identidad de `f3_dataset_id`, genera `provenance.json` y
+calcula `sha256.txt`. Aplica UTF-8, JSON compacto, orden canónico, redondeo
+métrico `ROUND_HALF_EVEN`, normalización de `-0.0` y rechazo de valores no
+finitos.
+
+La decisión D052 fija el preimage JSON exacto de la identidad, la proyección
+`f3-config-v1`, el manifiesto cerrado `f3-generator-source-v1`, el hash de los
+bytes de `crs.py`, el redondeo `ROUND_HALF_EVEN`, los JSONL vacíos de cero bytes
+y la publicación Linux mediante `renameat2(RENAME_NOREPLACE)` sin fallback.
+
+Esta etapa no añade timestamps variables al bundle canónico. Las versiones de
+Python, NumPy, Shapely y GEOS participan en la identidad;
+`python_implementation`, `platform_system` y `platform_machine` se conservan
+únicamente en provenance. Un bundle válido de otra plataforma puede ser cache
+hit, mientras que un destino incompleto o incoherente es conflicto y nunca se
+sobrescribe.
+
+La validación integral relee los bytes, comprueba checksums, schemas, orden,
+unicidad, referencias cruzadas, conteos e identidad. La publicación usa un
+temporal en el mismo filesystem, lock exclusivo, `fsync` y
+`renameat2(RENAME_NOREPLACE)`. F3.6 se ha validado solo con fixtures y
+directorios temporales; la generación de bundles reales queda reservada a F3.8.
+
 ## Input F1
 
 F3 recibe mediante una ruta explícita un manifest ya materializado y nunca lo
@@ -390,6 +418,7 @@ osm.osm_snapshot_id
 osm.raw_sha256
 rules.policy
 rules.sha256
+config.policy
 config.canonical_sha256
 geometry.projected_crs
 geometry.transform_version
@@ -399,8 +428,10 @@ geometry.predicate_direction
 geometry.boundary_contact_policy
 geometry.relation_policy
 geometry.invalid_geometry_policy
+geometry.direct_node_policy
 software.generator_source_sha256
 software.python_version
+software.numpy_version
 software.shapely_version
 software.geos_version
 serialization_version

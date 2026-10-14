@@ -248,7 +248,7 @@ class Phase3ContractTests(unittest.TestCase):
     def test_platform_metadata_is_excluded_from_identity_fields(self):
         self.assertEqual(
             F3_IDENTITY_SOFTWARE_FIELDS,
-            ("generator_source_sha256", "python_version", "shapely_version", "geos_version"),
+            ("generator_source_sha256", "python_version", "numpy_version", "shapely_version", "geos_version"),
         )
         self.assertEqual(
             F3_PROVENANCE_ONLY_SOFTWARE_FIELDS,
@@ -266,6 +266,11 @@ class Phase3ContractTests(unittest.TestCase):
         with self.assertRaises(jsonschema.ValidationError):
             jsonschema.validate(unexpected, self.schemas["f3_provenance"])
         assert_rejected(self, unexpected, "f3_provenance")
+        parent = copy.deepcopy(self.provenance)
+        parent["inputs"]["catalog"]["logical_path"] = "../manifest.json"
+        with self.assertRaises(jsonschema.ValidationError):
+            jsonschema.validate(parent, self.schemas["f3_provenance"])
+        assert_rejected(self, parent, "f3_provenance")
 
 
 if __name__ == "__main__":

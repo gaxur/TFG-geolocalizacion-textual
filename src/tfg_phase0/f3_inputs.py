@@ -134,6 +134,8 @@ class VerifiedF3Inputs:
     rules: D049RulesInput
     config_sha256: str
     config_canonical_sha256: str
+    config_path: Path
+    config_effective_sha256: str
 
 
 def _freeze(value: Any) -> Any:
@@ -169,6 +171,11 @@ def _finite(value: Any, field: str) -> float:
 def _validate_finite_bbox(bbox: Mapping[str, Any], context: str) -> None:
     for field in ("north", "south", "east", "west"):
         _finite(bbox[field], f"{context}.{field}")
+
+
+def f3_config_input(config: Mapping[str, Any]) -> dict[str, Any]:
+    """Extrae exactamente la configuración efectiva `f3-config-v1`."""
+    return f1_config_input(config)
 
 
 def _tags(element: ET.Element, context: str) -> tuple[tuple[str, str], ...]:
@@ -501,4 +508,6 @@ def load_verified_f3_inputs(
         rules=rules,
         config_sha256=sha256_bytes(config_raw),
         config_canonical_sha256=sha256_json(config),
+        config_path=config_file,
+        config_effective_sha256=sha256_json(f3_config_input(config)),
     )
