@@ -105,3 +105,107 @@ No se mezclarán las métricas de A, B y C. La documentación completa está en
 [CROSSTEXT2LOC_REPRODUCTION.md](CROSSTEXT2LOC_REPRODUCTION.md) y el resumen
 saneado en
 [`results/reproductions/crosstext2loc-newyork-osm-gb10-v1/`](../results/reproductions/crosstext2loc-newyork-osm-gb10-v1/).
+
+## Materialización F3 de Madrid
+
+### Objetivo y entorno
+
+El 14 de octubre de 2026 se materializaron los bundles geométricos F3 para los
+manifests F1 de 50 m y 25 m, sin red, imágenes, embeddings ni datos de
+evaluación. El código efectivo cubierto por D052 correspondía al commit
+`425ac494cf50b26ca14037d4d238550a91ab42f7`, con Python 3.12.3, NumPy 2.5.4,
+Shapely 2.1.2 y GEOS 3.13.1 sobre Linux/ext4. El entrypoint F3.8 todavía no
+estaba versionado y el worktree contenía cambios locales; por tanto, ese commit
+no identifica por sí solo el script operativo usado. No se conserva un hash
+histórico verificable de aquellos bytes del entrypoint.
+
+Inputs comunes:
+
+- snapshot F2: `osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141`;
+- raw F2: 8.420.815 B, 25.537 nodes, 4.240 ways y 498 relations;
+- reglas D049: `way_is_area-v1`, SHA-256
+  `cf81018ba820557c59c2c27de7ea6b314009abed040cd11249e94ed1a3a10583`.
+
+### Comandos
+
+Las primeras publicaciones se ejecutaron primero para 50 m y después para 25 m.
+Cada comando se repitió después para verificar cache hit. Las rutas históricas
+`madrid-*-first.json` fueron reutilizadas accidentalmente y ahora contienen
+informes de cache hit, no la evidencia de publicación inicial. Los tiempos de
+primera publicación de la tabla proceden de la salida JSON capturada durante
+BUILD; esta limitación se conserva explícitamente y esos informes no se
+reconstruyen de forma artificial.
+
+El entrypoint corregido exige nombres independientes y publicación no-replace
+bajo `results/generated/f3/`, por ejemplo `*-publish.json` y
+`*-cache-hit.json`. La raíz operativa queda fijada mediante un descriptor abierto
+sin seguir symlinks y debe existir previamente; cada informe se escribe en un
+inode anónimo `O_TMPFILE` y
+se enlaza sin reemplazo desde su descriptor. La trazabilidad se captura al
+inicio. Un error posterior al hard link distingue un informe no publicado de
+uno visible cuya durabilidad no ha podido confirmarse. Los comandos de
+verificación conservados son:
+
+```bash
+.venv-geo/bin/python -B scripts/materialize_f3_bundle.py \
+  --manifest data/processed/catalog/manifest-50m.json \
+  --snapshot-dir data/raw/osm/snapshots/osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141 \
+  --report-json results/generated/f3/madrid-50m-cache-hit.json
+
+.venv-geo/bin/python -B scripts/materialize_f3_bundle.py \
+  --manifest data/processed/catalog/manifest-25m.json \
+  --snapshot-dir data/raw/osm/snapshots/osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141 \
+  --report-json results/generated/f3/madrid-25m-cache-hit.json
+```
+
+### Resultados observados
+
+| Medida | 50 m | 25 m |
+|---|---:|---:|
+| Manifest SHA-256 | `ad35d5cb3b602a9ce313e06e10f913f169430d62a948c0f5e77b396bc810f2aa` | `a23d3f3b54958661db76914dff9ff40a3f01a133ee86499fb9e4ddf706a49f11` |
+| Candidatos | 253 | 1.115 |
+| Objetos indexados | 26.546 | 26.546 |
+| Asociaciones | 23.808 | 30.118 |
+| Objetos multi-cell | 1.349 | 2.235 |
+| Relations emitidas | 196 | 210 |
+| Members asociados | 945 | 1.058 |
+| Apariciones de `candidate_id` en relations | 2.122 | 3.918 |
+| Tamaño total | 18.744.138 B | 20.917.604 B |
+| Tiempo total, primera publicación | 8,362 s | 10,980 s |
+| Pico RSS del proceso | 1.385.760 KiB | 1.385.760 KiB |
+| Segunda ejecución | cache hit | cache hit |
+
+IDs publicados:
+
+- 50 m: `f3-madrid-pilot-associations-sha256-5f4af89b9349de792d3a60752a15f227d49b96cdb688a671504e4cf30bf68453`;
+- 25 m: `f3-madrid-pilot-associations-sha256-902e8edcd7892c4b9f6a686a6573fb5c15bf19858ecf2ce14d09fb687e9e0ffa`.
+
+Hashes de outputs 50 m:
+
+| Archivo | SHA-256 | Bytes |
+|---|---|---:|
+| `osm_objects.jsonl` | `c928a1b9a1b43d89d3376395043aca6fe37803f17941823af966ac0049a3e94f` | 10.583.015 |
+| `candidate_osm_associations.jsonl` | `6a43797300c40628c55c64e0fd72bde6a86ccebc6614a7883dfcfea637144b20` | 7.810.063 |
+| `relation_context.jsonl` | `2e91a080b6da1be95913ad1a630bf14be7194d10fb4225ea348c0ecbb5618897` | 346.556 |
+| `provenance.json` | `d637f6ef3f2168f7cdcf52412cd04c94bd0adb199e584f65b34841a4e9fbc7ea` | 4.150 |
+| `sha256.txt` | `99982cd5d0357f83ad6c02cec24745fd69e8b93e01eefe1215b53c8e94029f0f` | 354 |
+
+Hashes de outputs 25 m:
+
+| Archivo | SHA-256 | Bytes |
+|---|---|---:|
+| `osm_objects.jsonl` | `c928a1b9a1b43d89d3376395043aca6fe37803f17941823af966ac0049a3e94f` | 10.583.015 |
+| `candidate_osm_associations.jsonl` | `e6073f04ec36e565b972c1bb687273547c855b08c3a26c135f1dcbe2068ae4d3` | 9.852.406 |
+| `relation_context.jsonl` | `463061b5273632354a846c0ff053fe940c00a5c67a3be6db9298254dc120fee2` | 477.679 |
+| `provenance.json` | `528e2cee3388e6e1f889dd2ab19387ffe5b1e6c5a3e4f4ebc4f3d5c31d5a2da8` | 4.150 |
+| `sha256.txt` | `0a898420116658d9983222ac94f823db2a688487e859c1fbd49299f5f51d6ba9` | 354 |
+
+Los cinco archivos de cada bundle superaron la validación integral posterior.
+La repetición conservó hashes, tamaños y mtimes. Los informes operativos están
+bajo `results/generated/f3/`, fuera del bundle canónico e ignorados por Git. Los
+informes históricos conservados registran `git_commit`, pero no el estado sucio
+ni el hash del entrypoint; el formato corregido añade ambos campos y su propia
+versión, capturados antes de cargar los inputs. El pico RSS es acumulado para el
+proceso y no una medición independiente por etapa. Las verificaciones de cache
+hit de 50 m y 25 m realizadas después de la publicación se solaparon
+temporalmente; esto no alteró los bundles ni sus locks independientes por ID.

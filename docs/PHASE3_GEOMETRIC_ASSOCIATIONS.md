@@ -153,6 +153,46 @@ entre la última revalidación de inputs y código y el rename final; F3 presupo
 inputs y bundles inmutables y no introduce un protocolo nuevo de bloqueo para
 actores externos.
 
+## Estado de F3.8
+
+F3.8 está implementada mediante `scripts/materialize_f3_bundle.py`, que recibe un
+manifest F1 explícito y el snapshot F2 local, ejecuta el pipeline F3.2-F3.6 y
+una validación integral posterior, apoyándose en la campaña F3.7 previamente
+superada. Registra fuera del bundle tiempos, tamaños, hashes, pico RSS, commit,
+estado Git y hash del propio entrypoint. No contiene una selección implícita de
+resolución ni rutas de red.
+
+El 14 de octubre de 2026 se publicaron y validaron los bundles reales de 50 m y
+25 m sobre el snapshot F2 `f2152555...`. Ambos reprodujeron los conteos ya
+observados en F3.4/F3.5 y una segunda ejecución completa fue cache hit sin
+alterar hashes, tamaños o mtimes de los cinco archivos canónicos.
+
+| Resolución | `f3_dataset_id` | Candidatos | Asociaciones | Relations | Tamaño |
+|---|---|---:|---:|---:|---:|
+| 50 m | `f3-madrid-pilot-associations-sha256-5f4af89b9349de792d3a60752a15f227d49b96cdb688a671504e4cf30bf68453` | 253 | 23.808 | 196 | 18.744.138 B |
+| 25 m | `f3-madrid-pilot-associations-sha256-902e8edcd7892c4b9f6a686a6573fb5c15bf19858ecf2ce14d09fb687e9e0ffa` | 1.115 | 30.118 | 210 | 20.917.604 B |
+
+Los bundles y los informes JSON operativos permanecen fuera de Git. Materializar
+ambas resoluciones no cierra D003; conserva dos alternativas para evaluación.
+Los informes solo pueden publicarse sin reemplazo bajo `results/generated/f3/`:
+se rechazan aliases de inputs, snapshots, outputs, destinos existentes y rutas
+con ancestros inválidos antes de ejecutar el pipeline. La raíz de informes se
+debe crear de forma explícita antes de ejecutar el entrypoint y se abre
+componente a componente con `O_DIRECTORY|O_NOFOLLOW`; su descriptor se
+mantiene durante toda la ejecución y la creación, enlace, limpieza y `fsync` se
+realizan respecto al mismo `dir_fd`. El contenido se escribe en un inode anónimo
+creado con `O_TMPFILE` y se publica directamente desde su descriptor mediante
+`linkat(AT_EMPTY_PATH)`, sin nombre temporal que otro proceso pueda sustituir.
+Así, cambiar posteriormente la ruta léxica no redirige la publicación.
+
+El informe distingue publicación visible de durabilidad confirmada. Si el hard
+link final existe pero falla el `fsync` del directorio, el error conserva
+`report_published=true` y `durability_unknown=true`; no elimina el informe ni
+recomienda reutilizar el mismo nombre. La trazabilidad Git y el hash del
+entrypoint se capturan antes de cargar F1/F2. Una ruta externa con permisos puede
+modificar un bundle después de validarlo, y la ventana entre la última
+revalidación y el rename continúa siendo un riesgo residual documentado.
+
 ## Input F1
 
 F3 recibe mediante una ruta explícita un manifest ya materializado y nunca lo
@@ -378,6 +418,48 @@ data/processed/osm/<osm_snapshot_id>/<f3_dataset_id>/
 
 No se crea un manifest F1 enriquecido. SQLite y los índices persistentes son
 derivados regenerables, no fuentes canónicas.
+
+### Cómo interpretar el directorio generado
+
+El primer nivel, `<osm_snapshot_id>`, identifica los bytes exactos del mapa OSM
+de partida. Los dos directorios `<f3_dataset_id>` materializados dentro de ese
+snapshot corresponden a los catálogos F1 de 50 m y 25 m:
+
+| Resolución | Identificador del bundle | Candidatos | Asociaciones |
+|---|---|---:|---:|
+| 50 m | `f3-madrid-pilot-associations-sha256-5f4af89b9349de792d3a60752a15f227d49b96cdb688a671504e4cf30bf68453` | 253 | 23.808 |
+| 25 m | `f3-madrid-pilot-associations-sha256-902e8edcd7892c4b9f6a686a6573fb5c15bf19858ecf2ce14d09fb687e9e0ffa` | 1.115 | 30.118 |
+
+Ambos bundles parten del mismo snapshot y, por ello, contienen el mismo
+inventario de objetos OSM. Cambian las asociaciones y el contexto de relations
+porque cambia el tamaño y el número de celdas candidatas.
+
+| Archivo | Función |
+|---|---|
+| `osm_objects.jsonl` | Inventario normalizado de nodes y ways OSM, con sus tags, procedencia y estado geométrico. Responde a «qué objetos cartográficos existen y cuáles son asociables». |
+| `candidate_osm_associations.jsonl` | Relación muchos-a-muchos entre celdas F1 y objetos OSM que las intersectan. Responde a «qué elementos del mapa corresponden a cada candidato». |
+| `relation_context.jsonl` | Contexto de las relations OSM padre directas de los nodes y ways asociados. Añade roles y agrupaciones sin construir geometrías de relations. |
+| `provenance.json` | Identidad y trazabilidad: inputs, hashes, reglas D049, configuración efectiva, políticas, versiones y conteos del bundle. |
+| `sha256.txt` | Hashes SHA-256 de los cuatro archivos canónicos anteriores para detectar corrupción o modificaciones. No incluye su propio hash. |
+
+En conjunto, los archivos se leen así:
+
+```text
+osm_objects.jsonl
+    qué objetos OSM existen y qué estado geométrico tienen
+candidate_osm_associations.jsonl
+    qué objetos intersectan cada candidate_id
+relation_context.jsonl
+    a qué relations padre pertenecen los objetos asociados
+provenance.json
+    con qué inputs, reglas y software se generó el resultado
+sha256.txt
+    cómo comprobar la integridad de los cuatro archivos anteriores
+```
+
+Estos bundles todavía no contienen imágenes OSM ni embeddings de
+CrossText2Loc. Constituyen la base geográfica que conecta las celdas candidatas
+de Madrid con los objetos vectoriales de OpenStreetMap.
 
 ### `osm_objects.jsonl`
 
