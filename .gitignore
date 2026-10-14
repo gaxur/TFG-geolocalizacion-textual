@@ -1,8 +1,6 @@
 # Código de terceros: clon local, nunca incorporado al monorepo.
 /external/
 
-# Borradores de correspondencia local, no publicar.
-/docs/MAILS.md
 
 # Datasets locales. Se conservan README y marcadores, no su contenido.
 /data/*

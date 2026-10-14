@@ -77,6 +77,34 @@ del tamaño/área deben vivir en un wrapper propio.
 Los datos raw, procesados, imágenes, embeddings, grafos e índices se mantienen
 separados y no se incorporan al repositorio Git.
 
+El recorrido específico desde Madrid hasta la representación visual y su uso
+en recuperación se resume así:
+
+```mermaid
+flowchart TD
+    M[Madrid]
+    G[Cuadrícula de celdas]
+    O[Mapa OSM]
+    C[Celda candidata]
+    T[Teselas OSM]
+    I[Imagen OSM del candidato]
+    E[Encoder CrossText2Loc]
+    V[Embedding visual]
+    R[Recuperación Top-K]
+    S[candidate_id + coordenadas]
+
+    M --> G
+    M --> O
+    G --> C
+    O --> T
+    C --> I
+    T --> I
+    I --> E
+    E --> V
+    V --> R
+    R --> S
+```
+
 ### Qué generan F1 y F2
 
 F1 y F2 producen recursos distintos e independientes. F1 define **dónde puede

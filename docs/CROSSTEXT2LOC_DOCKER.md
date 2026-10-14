@@ -131,7 +131,35 @@ No se modifica `.git` ni la configuración persistente del host.
 
 ## Evaluación oficial reproducida
 
-El comando oficial que produjo D5 fue:
+`evaluate.py` no ofrece una CLI independiente. La entrada oficial es
+`zeroshot.py`, que carga el modelo y llama internamente a la evaluación de
+`evaluate.py`.
+
+Desde la raíz del proyecto, levantar primero el servicio:
+
+```bash
+docker compose -f compose.cross-text2loc.yaml up -d crosstext2loc
+```
+
+Comprobar la GPU visible dentro del contenedor:
+
+```bash
+docker compose -f compose.cross-text2loc.yaml exec crosstext2loc nvidia-smi
+```
+
+El comando completo desde el host que reproduce D5 es:
+
+```bash
+docker compose -f compose.cross-text2loc.yaml exec crosstext2loc \
+  python zeroshot.py \
+    --version NewYork-mixed \
+    --img_type osm \
+    --model CLIP-L/14@336 \
+    --expand \
+    --checkpoint long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth
+```
+
+El comando equivalente si ya se está dentro del shell del contenedor es:
 
 ```bash
 python zeroshot.py \
@@ -147,6 +175,27 @@ Procesa 1200 muestras con lote 4 y cuatro workers. El protocolo oficial usa la
 coordenada ground truth para elegir los 100 candidatos geográficamente más
 cercanos antes del ranking; no representa el futuro protocolo de Madrid.
 
+Los CSV generados quedan persistidos en el host bajo:
+
+```text
+results/cross_text2loc_docker/manual/CLIP-L_14@336/
+```
+
+Consultar las métricas:
+
+```bash
+less results/cross_text2loc_docker/manual/CLIP-L_14@336/long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth_metric.csv
+```
+
+Al terminar, detener y eliminar el contenedor de Compose:
+
+```bash
+docker compose -f compose.cross-text2loc.yaml down
+```
+
+Este `down` no elimina la imagen Docker ni los datos, checkpoint o resultados
+montados desde el host.
+
 ## Ver contenedores
 
 Contenedores activos:
@@ -161,102 +210,63 @@ Contenedores activos y detenidos:
 docker ps -a
 ```
 
-## Salir, parar y bajar el entorno
+## Eliminar completamente el contenedor y la imagen derivada
 
-Para salir del shell abierto mediante `exec`, sin detener el contenedor:
-
-```bash
-exit
-```
-
-Para detener el servicio conservando el contenedor:
+`docker compose down` elimina el contenedor; no se limita a detenerlo. Para
+eliminar en una sola operación el contenedor del servicio, los contenedores
+huérfanos del mismo proyecto Compose, su red y las imágenes usadas por el
+servicio, ejecutar desde la raíz del proyecto:
 
 ```bash
-docker compose -f compose.cross-text2loc.yaml stop
+docker compose -f compose.cross-text2loc.yaml down --rmi all --remove-orphans
 ```
 
-Puede volver a iniciarse con:
-
-```bash
-docker compose -f compose.cross-text2loc.yaml start
-```
-
-Para detener y eliminar el contenedor de Compose:
-
-```bash
-docker compose -f compose.cross-text2loc.yaml down
-```
-
-`down` no elimina la imagen, el repositorio, el dataset, el checkpoint ni los
-resultados montados desde el host.
-
-Para detener un contenedor que siga activo, obtener primero su ID o nombre con
-`docker ps` y ejecutar:
-
-```bash
-docker stop <nombre-o-id>
-```
-
-Para borrar un contenedor detenido:
-
-```bash
-docker rm <nombre-o-id>
-```
-
-Esto no borra la imagen. Normalmente `docker rm` no será necesario al gestionar
-el servicio mediante `docker compose down`.
-
-## Borrar la imagen
-
-Comprobar primero la imagen:
-
-```bash
-docker image ls crosstext2loc-gb10
-```
-
-Para borrar exclusivamente la imagen derivada:
+Si la imagen derivada siguiera presente porque Docker no la considera parte del
+proyecto Compose, eliminarla explícitamente:
 
 ```bash
 docker image rm crosstext2loc-gb10:ngc26.02
 ```
 
-Este comando no debe ejecutarse mientras exista un contenedor que use la
-imagen. El espacio recuperado puede ser inferior a 19,80 GiB porque Docker
-comparte capas. No utilizar `docker system prune`, `docker image prune -a` ni
-`docker volume prune` para esta operación.
-
-## Reconstruir la imagen
-
-Con Compose:
+Se puede comprobar que el contenedor y la imagen ya no existen con:
 
 ```bash
-docker compose -f compose.cross-text2loc.yaml build crosstext2loc
+docker compose -f compose.cross-text2loc.yaml ps -a
+docker image ls crosstext2loc-gb10
 ```
 
-Comando Docker equivalente:
+Si Docker indica que otro contenedor todavía utiliza la imagen, localizarlo
+antes de eliminar nada:
 
 ```bash
-docker build \
-  -t crosstext2loc-gb10:ngc26.02 \
-  -f docker/crosstext2loc-gb10/Dockerfile \
-  docker/crosstext2loc-gb10
+docker ps -a --filter ancestor=crosstext2loc-gb10:ngc26.02
 ```
 
-El Dockerfile está en `docker/crosstext2loc-gb10/Dockerfile` y el contexto de
-build es `docker/crosstext2loc-gb10/`.
-
-## Descargar la imagen base
+Tras confirmar que el contenedor encontrado pertenece a este entorno y que ya
+no se necesita, eliminarlo y repetir el borrado de la imagen:
 
 ```bash
-docker pull nvcr.io/nvidia/pytorch@sha256:8014e4ffc674ae9cc9aecad04b64b29c3d311ed738e54ac3042d2d45690d19e9
+docker rm <nombre-o-id>
+docker image rm crosstext2loc-gb10:ngc26.02
 ```
 
-- `docker pull` descarga una imagen existente.
-- `docker build` construye una imagen usando el Dockerfile.
-- `docker run` o `docker compose up` crea y ejecuta un contenedor.
-- `docker stop` detiene un contenedor activo.
-- `docker rm` elimina un contenedor.
-- `docker image rm` elimina una imagen local.
+Esta operación no elimina los bind mounts del host: los resultados de
+`results/cross_text2loc_docker/`, el clon `external/CVG-Text/`, el dataset, los
+checkpoints y `${HOME}/.cache/clip` permanecen en disco. Tampoco elimina la
+imagen base de NVIDIA, que puede estar compartida por otras imágenes. Para
+consultar el espacio utilizado después de la limpieza:
+
+```bash
+docker system df
+```
+
+Esto limpia los recursos Docker del entorno, pero no garantiza que «no quede
+rastro» de la ejecución: pueden permanecer los resultados montados en el host,
+el historial del shell y registros del daemon o del sistema. Esos elementos no
+deben borrarse automáticamente, especialmente si forman parte de la trazabilidad
+experimental del TFG. No usar `docker compose down -v`, `docker system prune`,
+`docker image prune -a` ni `docker volume prune`: no son necesarios para este
+entorno y podrían eliminar recursos de otros proyectos.
 
 ## Persistencia
 

@@ -34,24 +34,53 @@ incluye LLM, vocabularios de consulta, buffers, radios, fallback, scoring,
 ground truth, imágenes, embeddings, CrossText2Loc o GOTPR. No resuelve D003 ni
 D021.
 
-## Estado de F3.3
+## Descomposición de la Fase 3
 
-F3.3 implementa la normalización y construcción geométrica. Proyecta las
-coordenadas OSM mediante la transformación usada por F1 y construye Point para
-nodes, LineString para ways lineales y Polygon para ways areales. Aplica D049,
-valida las geometrías y asigna `geometry_role`, `geometry_status`,
-`geometry_reason` y bbox métrica.
+La implementación de F3 se divide en etapas pequeñas para separar los contratos,
+la lectura de inputs, la geometría, la asociación y la publicación. Una etapa no
+debe adelantar responsabilidades de las siguientes.
 
-La etapa opera sobre `VerifiedF3Inputs` mediante
+### F3.1: contratos, schemas y validación estructural
+
+Define la forma de los cuatro documentos estructurados de F3:
+`osm_objects.jsonl`, `candidate_osm_associations.jsonl`,
+`relation_context.jsonl` y `provenance.json`. Incluye sus JSON Schema, el
+vocabulario cerrado de estados y razones, fixtures sintéticas y validadores
+manuales para las invariantes entre campos que JSON Schema no expresa por sí
+solo.
+
+F3.1 no interpreta XML OSM ni construye geometrías. Esta etapa está
+implementada y validada con tests.
+
+### F3.2: preparación y verificación de inputs
+
+Carga un manifest F1 indicado mediante un path explícito, valida un snapshot F2
+exclusivamente local y comprueba el recurso de reglas D049. También parsea
+`source.osm` en estructuras inmutables que conservan candidates, nodes, orden de
+referencias de ways, relations, members, tags, roles y presencia de referencias.
+
+Su salida es una representación interna verificada y no geométrica para F3.3.
+No materializa un manifest real, no aplica `way_is_area-v1`, no crea outputs F3
+y no dispone de fallback de red. La selección de un manifest de 25 m o 50 m es
+explícita y no resuelve D003.
+
+### F3.3: normalización y construcción geométrica
+
+Proyecta las coordenadas OSM mediante la transformación usada por F1 y construye
+Point para nodes, LineString para ways lineales y Polygon para ways areales.
+Aplica D049, valida las geometrías y asigna
+`geometry_role`, `geometry_status`, `geometry_reason` y bbox métrica.
+
+Esta etapa está implementada sobre `VerifiedF3Inputs` mediante
 `src.tfg_phase0.f3_geometry.normalize_osm_geometries`. El resultado conserva las
 geometrías Shapely solo en memoria y mantiene las relations como contexto sin
 geometría. El diagnóstico interno `unrecognized_area_value` se conserva para
-ways abiertos sin alterar el contrato serializado de `geometry_reason`. F3.3 no
-construye índices ni asociaciones entre candidatos y OSM.
+ways abiertos sin alterar el contrato serializado de `geometry_reason`. No
+construye todavía asociaciones entre candidatos y OSM.
 
-## Estado de F3.4
+### F3.4: índice espacial y asociaciones
 
-F3.4 está implementada en `src.tfg_phase0.f3_associations`. Construye cada celda
+Está implementada en `src.tfg_phase0.f3_associations`. Construye cada celda
 cuadrada exclusivamente desde su centro EPSG:25830 y `cell_size_m`, e indexa en
 un STRtree temporal solo las geometrías OSM asociables. Para cada celda resuelve
 los índices enteros devueltos por Shapely contra una secuencia estable, elimina
@@ -72,14 +101,15 @@ determinista de candidatos de cada resolución coincidió exactamente con una
 búsqueda exhaustiva. Estos conteos describen la ejecución observada y no
 resuelven D003 ni D021.
 
-## Estado de F3.5
+### F3.5: contexto parcial de relations
 
-F3.5 está implementada en `src.tfg_phase0.f3_relations`. Propaga, en un solo
-nivel, los `candidate_id` de nodes y ways presentes que tengan asociaciones
-directas hacia las relations que los referencian. Conserva tags, roles y conteos
-de todas las entradas member presentes y ausentes. No reconstruye geometrías de
-relations o multipolygons, no descarga members ausentes y no crea asociaciones
-directas entre candidates y relations.
+Está implementada en `src.tfg_phase0.f3_relations`. Propaga, en un solo nivel,
+los `candidate_id` de nodes y ways presentes que tengan asociaciones directas
+hacia las relations que los referencian. Conserva tags, roles y conteos de todas
+las entradas member presentes y ausentes.
+
+No reconstruirá geometrías de relations o multipolygons, no descargará members
+ausentes y no creará asociaciones directas entre candidates y relations.
 
 Las entradas member repetidas con igual `(member_type, ref, role)` cuentan por
 separado en `member_count` y en los conteos por presencia, pero se agrupan en un
@@ -95,9 +125,9 @@ members asociados y 3.918 apariciones de `candidate_id`; el de 50 m emitió 196,
 m y ninguna en 50 m; las demás entradas duplicadas del snapshot no tenían
 asociación directa en esas ejecuciones. Estos resultados no resuelven D003.
 
-## Estado de F3.6
+### F3.6: serialización, identidad y provenance
 
-F3.6 está implementada en `src.tfg_phase0.f3_identity`,
+Está implementada en `src.tfg_phase0.f3_identity`,
 `src.tfg_phase0.f3_serialization`, `src.tfg_phase0.f3_validation` y
 `src.tfg_phase0.f3_bundle`. Ordena y serializa los tres JSONL canónicos,
 construye el objeto de identidad de `f3_dataset_id`, genera `provenance.json` y
@@ -110,12 +140,11 @@ La decisión D052 fija el preimage JSON exacto de la identidad, la proyección
 bytes de `crs.py`, el redondeo `ROUND_HALF_EVEN`, los JSONL vacíos de cero bytes
 y la publicación Linux mediante `renameat2(RENAME_NOREPLACE)` sin fallback.
 
-Esta etapa no añade timestamps variables al bundle canónico. Las versiones de
-Python, NumPy, Shapely y GEOS participan en la identidad;
-`python_implementation`, `platform_system` y `platform_machine` se conservan
-únicamente en provenance. Un bundle válido de otra plataforma puede ser cache
-hit, mientras que un destino incompleto o incoherente es conflicto y nunca se
-sobrescribe.
+Esta etapa no añadirá timestamps variables al bundle canónico. Las versiones de
+Python, NumPy, Shapely y GEOS participarán en la identidad; `python_implementation`,
+`platform_system` y `platform_machine` se conservarán únicamente en provenance.
+Un bundle válido de otra plataforma podrá ser cache hit, mientras que un destino
+incompleto o incoherente será conflicto y nunca se sobrescribirá.
 
 La validación integral relee los bytes, comprueba checksums, schemas, orden,
 unicidad, referencias cruzadas, conteos e identidad. La publicación usa un
@@ -123,9 +152,9 @@ temporal en el mismo filesystem, lock exclusivo, `fsync` y
 `renameat2(RENAME_NOREPLACE)`. F3.6 se ha validado solo con fixtures y
 directorios temporales; la generación de bundles reales queda reservada a F3.8.
 
-## Estado de F3.7
+### F3.7: pruebas completas
 
-F3.7 está implementada mediante pruebas unitarias, integración multiproceso y
+Está implementada mediante pruebas unitarias, integración multiproceso y
 comprobaciones específicas de Linux. Cubre corrupción con checksums
 recalculados, escrituras parciales, fallos de `write`, `flush`, `fsync` y
 `renameat2`, interrupciones capturables, carreras de destino, locks
@@ -153,9 +182,9 @@ entre la última revalidación de inputs y código y el rename final; F3 presupo
 inputs y bundles inmutables y no introduce un protocolo nuevo de bloqueo para
 actores externos.
 
-## Estado de F3.8
+### F3.8: generación real
 
-F3.8 está implementada mediante `scripts/materialize_f3_bundle.py`, que recibe un
+Está implementada mediante `scripts/materialize_f3_bundle.py`, que recibe un
 manifest F1 explícito y el snapshot F2 local, ejecuta el pipeline F3.2-F3.6 y
 una validación integral posterior, apoyándose en la campaña F3.7 previamente
 superada. Registra fuera del bundle tiempos, tamaños, hashes, pico RSS, commit,
@@ -193,6 +222,40 @@ entrypoint se capturan antes de cargar F1/F2. Una ruta externa con permisos pued
 modificar un bundle después de validarlo, y la ventana entre la última
 revalidación y el rename continúa siendo un riesgo residual documentado.
 
+### F3.9: validación y cierre
+
+Revisará los conteos reales, objetos ambiguos o inválidos, asociaciones
+multi-cell, relations propagadas, hashes, consumo de recursos y repetibilidad.
+También registrará el experimento y revisará las obligaciones ODbL antes de
+publicar cualquier derivado.
+
+El cierre de F3 acreditará que el dataset se ha generado conforme a D049 y D050;
+no resolverá automáticamente D003, D021 ni el rendimiento de las etapas de
+recuperación posteriores.
+
+### Por qué se separan F3.6, F3.7, F3.8 y F3.9
+
+Estas etapas convierten un resultado geométrico en un artefacto científico
+reproducible de forma progresiva. Separarlas evita confundir cuatro preguntas
+distintas: cómo representar el resultado, si la publicación resiste fallos, qué
+ocurre al ejecutarla sobre Madrid y si el resultado real puede darse por
+cerrado.
+
+| Etapa | Por qué es necesaria | Ventaja principal |
+|---|---|---|
+| F3.6: identidad, serialización y publicación | Los inventarios en memoria de F3.3-F3.5 no bastan para compartir, reutilizar o auditar un dataset. Es necesario fijar bytes, orden, hashes, provenance e identidad antes de generar resultados reales. | Produce bundles deterministas, autocontenidos y verificables. Permite detectar corrupción, distinguir configuraciones y reutilizar un resultado válido mediante cache hit sin sobrescribirlo. |
+| F3.7: robustez y recuperación ante fallos | Una publicación correcta en el caso ideal no demuestra seguridad ante escrituras parciales, concurrencia, interrupciones, symlinks, locks abandonados o filesystems incompatibles. | Reduce el riesgo de aceptar bundles parciales o mezclar ejecuciones. Demuestra que los fallos se detectan explícitamente, que los destinos existentes no se reemplazan y que solo se limpian recursos propios. |
+| F3.8: materialización real | Los tests sintéticos no prueban por sí solos que los contratos soporten el volumen, los conteos y las particularidades del snapshot real de Madrid. | Genera los dos datasets utilizables de 25 m y 50 m, mide recursos, confirma los conteos reales y comprueba repetibilidad y cache hit sobre los inputs efectivos, sin usar red ni modificar F1/F2. |
+| F3.9: validación y cierre | Que un programa termine sin error no basta para cerrar una fase de datos. Es necesario revisar los resultados observados, sus anomalías, sus obligaciones de publicación y sus límites metodológicos. | Separa la generación de la aceptación científica. Permite documentar incidencias, justificar los artefactos finales y evitar que resultados no revisados pasen silenciosamente a recuperación o evaluación. |
+
+El orden también reduce el coste de corregir errores. Un defecto de formato se
+resuelve en F3.6 antes de crear datos reales; un defecto de atomicidad se detecta
+en F3.7 antes de comprometer artefactos; F3.8 se limita a ejecutar un pipeline ya
+probado; y F3.9 puede centrarse en interpretar y cerrar resultados, no en cambiar
+silenciosamente el generador. Esta separación mantiene además fuera de los
+bundles canónicos los tiempos, logs e informes operativos, que son útiles para
+auditar una ejecución pero no deben alterar `f3_dataset_id`.
+
 ## Input F1
 
 F3 recibe mediante una ruta explícita un manifest ya materializado y nunca lo
@@ -208,15 +271,6 @@ La validación comprueba el schema F1, SHA-256 y tamaño de los bytes exactos,
 unicidad de `candidate_id`, valores finitos, celdas válidas, CRS esperado y
 compatibilidad de región y bbox con F2. El path guardado en provenance es lógico
 y relativo.
-
-Conforme a D051, F3.2 exige manifests nuevos con
-`provenance.input_hashes.f1_config` y
-`provenance.code_version=phase1-manifest-v2`. El hash `f1_config` cubre solo
-`schema_version` y los bloques efectivos `region` y `catalog` definidos por F1;
-excluye `osm_acquisition`, `artifacts` y los valores configurables nulos de
-spacing y tamaño. Estos últimos se registran con sus valores efectivos en
-`generation` y `parameters_hash`. No existe fallback automático a la provenance
-v1.
 
 La celda métrica autoritativa se reconstruye como un cuadrado en EPSG:25830 a
 partir de `center_easting_m`, `center_northing_m` y `cell_size_m`. El Polygon
