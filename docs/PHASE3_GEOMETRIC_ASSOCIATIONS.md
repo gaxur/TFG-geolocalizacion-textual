@@ -123,6 +123,36 @@ temporal en el mismo filesystem, lock exclusivo, `fsync` y
 `renameat2(RENAME_NOREPLACE)`. F3.6 se ha validado solo con fixtures y
 directorios temporales; la generación de bundles reales queda reservada a F3.8.
 
+## Estado de F3.7
+
+F3.7 está implementada mediante pruebas unitarias, integración multiproceso y
+comprobaciones específicas de Linux. Cubre corrupción con checksums
+recalculados, escrituras parciales, fallos de `write`, `flush`, `fsync` y
+`renameat2`, interrupciones capturables, carreras de destino, locks
+preexistentes o abandonados y publicaciones concurrentes del mismo ID y de IDs
+distintos.
+
+El endurecimiento derivado garantiza escritura completa, valida cada fichero
+desde un único descriptor con `O_NOFOLLOW` y `fstat`, informa explícitamente de
+filesystems sin `fsync` de directorio y conserva el error principal si también
+falla la retirada del lock. La revalidación aplica la misma apertura segura a
+los inputs y usa una única instantánea de bytes para comprobar la configuración
+exacta y efectiva. La prueba Linux real confirma una colisión
+`RENAME_NOREPLACE` sin alterar fuente ni destino, además de publicación normal,
+validación integral, cache hit y ausencia de residuos tras una ejecución normal.
+
+Una terminación no capturable puede dejar un temporal o lock abandonado. D052
+prohíbe romper ese lock automáticamente: su retirada sigue siendo una operación
+manual tras comprobar que no existe un escritor activo. Estas pruebas no
+demuestran durabilidad ante pérdida eléctrica ni las garantías de filesystems
+remotos; ambas requieren validar el filesystem operativo antes de F3.8. La
+lectura por descriptor evita que una sustitución posterior de la ruta redirija
+los bytes ya abiertos, pero no impide que otro proceso con permisos modifique el
+bundle visible durante o después de validarlo. También permanece una ventana
+entre la última revalidación de inputs y código y el rename final; F3 presupone
+inputs y bundles inmutables y no introduce un protocolo nuevo de bloqueo para
+actores externos.
+
 ## Input F1
 
 F3 recibe mediante una ruta explícita un manifest ya materializado y nunca lo

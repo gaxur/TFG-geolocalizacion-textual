@@ -5,11 +5,13 @@ from __future__ import annotations
 import ctypes
 import errno
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
+import stat
+import sys
 import tempfile
-from .config import load_region_config
 from .f3_associations import CandidateAssociationInventory
 from .f3_geometry import NormalizedGeometryInventory
 from .f3_identity import (
@@ -24,6 +26,7 @@ from .f3_serialization import (
 )
 from .f3_validation import F3BundleValidationError, validate_f3_bundle
 from .provenance import sha256_json
+from .validation import validate_document
 
 
 AT_FDCWD = -100
@@ -42,12 +45,43 @@ class F3PublicationUnsupportedError(F3BundleError):
     """El sistema no ofrece publicación atómica no-replace."""
 
 
+_UNSUPPORTED_FILESYSTEM_ERRORS = {
+    errno.ENOSYS,
+    errno.EINVAL,
+    errno.EOPNOTSUPP,
+    getattr(errno, "ENOTSUP", errno.EOPNOTSUPP),
+}
+
+
 def _fsync_directory(path: Path) -> None:
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
     try:
-        os.fsync(descriptor)
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    except OSError as error:
+        if error.errno in _UNSUPPORTED_FILESYSTEM_ERRORS:
+            raise F3PublicationUnsupportedError(
+                f"el filesystem no permite abrir directorios para fsync: {path}"
+            ) from error
+        raise
+    try:
+        try:
+            os.fsync(descriptor)
+        except OSError as error:
+            if error.errno in _UNSUPPORTED_FILESYSTEM_ERRORS:
+                raise F3PublicationUnsupportedError(
+                    f"el filesystem no soporta fsync de directorio: {path}"
+                ) from error
+            raise
     finally:
         os.close(descriptor)
+
+
+def _write_all(output, content: bytes) -> None:
+    view = memoryview(content)
+    while view:
+        written = output.write(view)
+        if not isinstance(written, int) or written <= 0:
+            raise OSError("escritura parcial sin progreso en bundle F3")
+        view = view[written:]
 
 
 def _rename_noreplace(source: Path, destination: Path) -> None:
@@ -72,15 +106,34 @@ def _rename_noreplace(source: Path, destination: Path) -> None:
     raise OSError(error, os.strerror(error), destination)
 
 
-def _file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
+def _read_input_file(path: Path) -> bytes:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
     try:
-        with path.open("rb") as source:
-            for chunk in iter(lambda: source.read(1024 * 1024), b""):
-                digest.update(chunk)
+        descriptor = os.open(path, flags)
     except OSError as error:
         raise F3BundleConflictError(f"no se pudo revalidar el input {path}") from error
-    return digest.hexdigest()
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise F3BundleConflictError(f"el input no es un fichero regular: {path}")
+        chunks = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                return b"".join(chunks)
+            chunks.append(chunk)
+    except OSError as error:
+        raise F3BundleConflictError(f"no se pudo revalidar el input {path}") from error
+    finally:
+        os.close(descriptor)
+
+
+def _load_config_bytes(raw: bytes) -> dict:
+    document = json.loads(raw.decode("utf-8"))
+    validate_document(document, "region_config")
+    bbox = document["region"]["bbox"]
+    if bbox["south"] >= bbox["north"] or bbox["west"] >= bbox["east"]:
+        raise ValueError("bbox de configuración no válida")
+    return document
 
 
 def _revalidate_input_files(
@@ -92,15 +145,19 @@ def _revalidate_input_files(
         (inputs.rules.path, inputs.rules.sha256),
     )
     for path, digest in expected:
-        if not path.is_file() or _file_sha256(path) != digest:
+        raw = _read_input_file(path)
+        if hashlib.sha256(raw).hexdigest() != digest:
             raise F3BundleConflictError(f"el input cambió durante F3.6: {path}")
     try:
-        config = load_region_config(inputs.config_path)
+        config_raw = _read_input_file(inputs.config_path)
+        config = _load_config_bytes(config_raw)
     except Exception as error:
+        if isinstance(error, F3BundleConflictError):
+            raise
         raise F3BundleConflictError("no se pudo revalidar la configuración F3") from error
     if sha256_json(f3_config_input(config)) != inputs.config_effective_sha256:
         raise F3BundleConflictError("la configuración cambió durante F3.6")
-    if require_exact_config and _file_sha256(inputs.config_path) != inputs.config_sha256:
+    if require_exact_config and hashlib.sha256(config_raw).hexdigest() != inputs.config_sha256:
         raise F3BundleConflictError("los bytes de configuración cambiaron durante F3.6")
 
 
@@ -135,15 +192,16 @@ def publish_f3_bundle(
 
     _revalidate_input_files(inputs, require_exact_config=True)
     parent.mkdir(parents=True, exist_ok=True)
-    temp_dir = Path(tempfile.mkdtemp(prefix=f".{dataset_id}.tmp-", dir=parent))
+    temp_dir: Path | None = None
     lock_dir = parent / f".{dataset_id}.lock"
     lock_acquired = False
     published = False
     try:
+        temp_dir = Path(tempfile.mkdtemp(prefix=f".{dataset_id}.tmp-", dir=parent))
         for filename, content in outputs.items():
             path = temp_dir / filename
             with path.open("xb") as output:
-                output.write(content)
+                _write_all(output, content)
                 output.flush()
                 os.fsync(output.fileno())
         _fsync_directory(temp_dir)
@@ -186,10 +244,26 @@ def publish_f3_bundle(
     except F3BundleValidationError as error:
         raise F3BundleConflictError("bundle F3 inválido") from error
     finally:
-        if not published:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        active_error = sys.exc_info()[1]
+        cleanup_errors = []
+        if not published and temp_dir is not None:
+            try:
+                shutil.rmtree(temp_dir)
+            except OSError as error:
+                cleanup_errors.append(("temporal", error))
         if lock_acquired:
             try:
                 lock_dir.rmdir()
             except OSError as error:
-                raise F3BundleError("no se pudo retirar el lock propio") from error
+                cleanup_errors.append(("lock", error))
+        if cleanup_errors:
+            details = "; ".join(f"{kind}: {error}" for kind, error in cleanup_errors)
+            if active_error is not None:
+                active_error.add_note(f"falló el cleanup F3 ({details})")
+            else:
+                message = (
+                    "no se pudo retirar el lock propio"
+                    if len(cleanup_errors) == 1 and cleanup_errors[0][0] == "lock"
+                    else f"no se pudo completar el cleanup F3 ({details})"
+                )
+                raise F3BundleError(message) from cleanup_errors[0][1]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 import json
+import os
 from pathlib import Path
 import re
 import stat
@@ -30,16 +31,25 @@ class F3BundleValidationError(ValueError):
 
 
 def _read_regular(path: Path) -> bytes:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
     try:
-        metadata = path.lstat()
+        descriptor = os.open(path, flags)
     except OSError as error:
-        raise F3BundleValidationError(f"falta el fichero {path.name}") from error
-    if not stat.S_ISREG(metadata.st_mode) or path.is_symlink():
-        raise F3BundleValidationError(f"{path.name} no es un fichero regular")
+        raise F3BundleValidationError(f"no se pudo abrir el fichero {path.name}") from error
     try:
-        return path.read_bytes()
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise F3BundleValidationError(f"{path.name} no es un fichero regular")
+        chunks = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                return b"".join(chunks)
+            chunks.append(chunk)
     except OSError as error:
         raise F3BundleValidationError(f"no se pudo leer {path.name}") from error
+    finally:
+        os.close(descriptor)
 
 
 def _parse_json(raw: bytes, label: str) -> Any:
@@ -244,10 +254,13 @@ def validate_f3_bundle(
     require_canonical_directory_name: bool = True,
 ) -> dict[str, Any]:
     path = Path(bundle_dir)
-    if path.is_symlink() or not path.is_dir():
-        raise F3BundleValidationError("el bundle F3 no es un directorio regular")
-    if {item.name for item in path.iterdir()} != set(F3_BUNDLE_FILES):
-        raise F3BundleValidationError("el bundle F3 no contiene exactamente cinco archivos")
+    try:
+        if path.is_symlink() or not path.is_dir():
+            raise F3BundleValidationError("el bundle F3 no es un directorio regular")
+        if {item.name for item in path.iterdir()} != set(F3_BUNDLE_FILES):
+            raise F3BundleValidationError("el bundle F3 no contiene exactamente cinco archivos")
+    except OSError as error:
+        raise F3BundleValidationError("no se pudo inspeccionar el directorio F3") from error
     raw = {filename: _read_regular(path / filename) for filename in F3_BUNDLE_FILES}
     checksums = _parse_checksums(raw["sha256.txt"])
     if any(sha256_bytes(raw[name]) != checksums[name] for name in F3_HASHED_OUTPUT_FILES):
