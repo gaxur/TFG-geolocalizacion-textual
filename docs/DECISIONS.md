@@ -67,6 +67,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D049 | Aplicar una política versionada para interpretar la geometría de OSM ways | ACEPTADA | OSM / catálogo geométrico F3 |
 | D050 | Fijar el contrato del dataset de asociaciones geométricas F3 | ACEPTADA | OSM / catálogo geométrico F3 |
 | D051 | Limitar la provenance de cada artefacto a sus inputs efectivos | ACEPTADA | Provenance / catálogo F1 |
+| D052 | Fijar la serialización, identidad y publicación canónica de F3 | ACEPTADA | OSM / publicación F3 |
 
 ## D001 — Identidad del candidato
 
@@ -2516,6 +2517,180 @@ D001-D004, D012 y D050.
 
 Ninguno sobre la política. D003 continúa pendiente de experimento y se aplicará
 mediante manifests separados de 25 m y 50 m.
+
+## D052 — Serialización, identidad y publicación canónica de F3
+
+**Estado:** ACEPTADA
+
+**Componente:** OSM / serialización y publicación F3
+
+**Fecha:** 2026-10-14
+
+**Origen:** Revisión de diseño previa a F3.6 y aprobación expresa del
+responsable del TFG.
+
+### Contexto
+
+D050 fija el contenido lógico, los outputs y el carácter reproducible e
+inmutable de F3. D051 exige que cada artefacto identifique todos y solo sus
+inputs efectivos. Faltaba cerrar el preimage exacto de `f3_dataset_id`, los
+hashes de código y configuración, la representación numérica, el JSONL vacío y
+la publicación sin reemplazo.
+
+### Decisión
+
+El digest de `f3_dataset_id` será SHA-256 de los bytes UTF-8, sin newline, del
+JSON canónico (`ensure_ascii=false`, claves ordenadas, separadores `,` y `:`,
+`allow_nan=false`) del siguiente objeto anidado exacto:
+
+```json
+{
+  "contract_version": "f3-associations-v1",
+  "generator_version": "phase3-geometric-associations-v1",
+  "catalog": {"manifest_sha256": "<sha256>", "manifest_id": "<id>"},
+  "osm": {"osm_snapshot_id": "<id>", "raw_sha256": "<sha256>"},
+  "rules": {"policy": "way_is_area-v1", "sha256": "<sha256>"},
+  "config": {"policy": "f3-config-v1", "canonical_sha256": "<sha256>"},
+  "geometry": {
+    "projected_crs": "EPSG:25830",
+    "transform_version": "phase1-crs-v1",
+    "transform_source_sha256": "<sha256>",
+    "association_predicate": "intersects",
+    "predicate_direction": "osm_geometry_to_candidate_cell",
+    "boundary_contact_policy": "touches",
+    "relation_policy": "present_associated_members_one_hop",
+    "invalid_geometry_policy": "reject_without_repair",
+    "direct_node_policy": "node_bbox_only"
+  },
+  "software": {
+    "generator_source_sha256": "<sha256>",
+    "python_version": "<versión>",
+    "numpy_version": "<versión>",
+    "shapely_version": "<versión>",
+    "geos_version": "<versión>"
+  },
+  "serialization_version": "f3-jsonl-v1"
+}
+```
+
+El ID completo será
+`f3-madrid-pilot-associations-sha256-<digest>`. No participarán hashes de
+outputs, paths, hostname, usuario, PID, timestamps, duración, cores, orden de
+STRtree, implementación de Python, sistema o arquitectura.
+
+`generator_source_sha256` será el SHA-256 del JSON canónico, sin newline, de un
+objeto `{"version":"f3-generator-source-v1","files":[...]}`. Cada entrada
+contendrá `path` lógico y SHA-256 de bytes exactos, ordenada por path. La lista
+cerrada será:
+
+```text
+schemas/f3_association.schema.json
+schemas/f3_osm_object.schema.json
+schemas/f3_provenance.schema.json
+schemas/f3_relation_context.schema.json
+src/tfg_phase0/catalog.py
+src/tfg_phase0/config.py
+src/tfg_phase0/crs.py
+src/tfg_phase0/f3_associations.py
+src/tfg_phase0/f3_contracts.py
+src/tfg_phase0/f3_geometry.py
+src/tfg_phase0/f3_identity.py
+src/tfg_phase0/f3_inputs.py
+src/tfg_phase0/f3_relations.py
+src/tfg_phase0/f3_serialization.py
+src/tfg_phase0/f3_validation.py
+src/tfg_phase0/osm_snapshot.py
+src/tfg_phase0/provenance.py
+src/tfg_phase0/validation.py
+```
+
+Esta lista cubre la transformación desde los inputs verificados hasta los bytes
+canónicos, incluida la carga y validación que construye la frontera F3.2. El
+código puramente operativo de publicación no determina los bytes y no participa.
+Cambiar estas fronteras exige una nueva versión del manifiesto de código o del
+generador.
+
+`transform_source_sha256` será SHA-256 de los bytes exactos de
+`src/tfg_phase0/crs.py`.
+
+La proyección `f3-config-v1` contendrá exactamente `schema_version`,
+`region.name`, los cuatro valores de `region.bbox`, `region.crs`,
+`catalog.projected_crs`, `catalog.catalog_version`,
+`catalog.candidate_id_prefix`, `catalog.candidate_generation` y
+`catalog.border_policy`. Excluirá `osm_acquisition`, `artifacts` y los valores
+configurables de spacing y tamaño. El hash del fichero completo será solo
+informativo; la identidad utilizará la política y el hash de esta proyección.
+
+La identidad y la provenance registrarán las versiones exactas de Python,
+NumPy, Shapely y GEOS. `python_implementation`, `platform_system` y
+`platform_machine` serán solo informativos.
+
+Las magnitudes métricas persistidas (`center_distance_m` y los cuatro campos de
+`metric_bbox`) se convertirán mediante `Decimal(str(value))`, cuantización a
+seis decimales y `ROUND_HALF_EVEN`, y después a número JSON. Se rechazará todo
+valor no finito y todo cero se normalizará a `0.0`. Esta canonicalización se
+aplica únicamente al construir los documentos persistidos: no modifica
+geometrías ni predicados. F3.4 ya entrega `center_distance_m` redondeado a seis
+decimales conforme a D050; F3.6 no recalcula la distancia y la cuantización
+decimal de ese valor debe ser idempotente.
+
+Los JSONL vacíos tendrán cero bytes. Con una o más filas, cada JSON compacto
+terminará en un único `\n`. `provenance.json` será JSON canónico con newline
+final. `sha256.txt` tendrá exactamente estas cuatro líneas, en este orden y con
+dos espacios entre hash y nombre:
+
+```text
+<SHA256>  osm_objects.jsonl
+<SHA256>  candidate_osm_associations.jsonl
+<SHA256>  relation_context.jsonl
+<SHA256>  provenance.json
+```
+
+Terminará en newline y no incluirá su propio hash.
+
+La publicación será exclusiva para Linux y usará un temporal privado en el
+mismo filesystem, `fsync` de archivos y directorios, lock exclusivo por ID y
+`renameat2(RENAME_NOREPLACE)`. No habrá fallback a `rename`; la falta de soporte
+producirá error explícito. Los locks abandonados no se romperán automáticamente
+y solo se limpiarán recursos propios.
+
+Un bundle existente será cache hit únicamente si supera la validación integral,
+reproduce su ID y coincide en inputs efectivos. Un bundle válido de otra
+plataforma será cache hit y conservará su provenance. Un destino incompleto o
+incoherente será conflicto y nunca se reparará o sobrescribirá.
+
+### Justificación
+
+La decisión convierte D050 en una representación ejecutable y aplica D051 sin
+acoplar la identidad a cambios ajenos. Separa identidad algorítmica, provenance
+informativa e integridad de los bytes, evitando dependencias circulares.
+
+### Consecuencias
+
+El schema de provenance exigirá `inputs.config.canonical_policy` y
+`software.numpy_version`; `F3_IDENTITY_SOFTWARE_FIELDS` incluirá también
+`numpy_version`. F3.6 implementará identidad, serialización, provenance,
+checksums, validación integral y publicación. F3.7 realizará la campaña
+exhaustiva de concurrencia, fallos y corrupción; F3.8 generará los bundles
+reales y F3.9 realizará su auditoría final.
+
+La publicación requiere Linux y un filesystem compatible con
+`renameat2(RENAME_NOREPLACE)`. El bundle no contendrá tiempos ni metadata
+operativa del lock.
+
+### Alternativas descartadas
+
+- Hash del commit Git completo, por incluir cambios ajenos.
+- Hash del bundle como ID, por introducir ciclos con provenance.
+- Configuración completa, por vulnerar D051.
+- `Path.rename()` como fallback, por no garantizar no-replace.
+- Plataforma en identidad, por fragmentar resultados equivalentes.
+- Rotura automática de locks por antigüedad, por riesgo de carrera.
+
+### Pendiente
+
+Ninguno sobre el diseño F3.6. La publicación de derivados continúa sujeta a la
+revisión ODbL prevista en D045-D046 y F3.9.
 
 # Decisiones pendientes
 
