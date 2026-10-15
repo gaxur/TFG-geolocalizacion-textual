@@ -6,7 +6,8 @@ en [PHASE1_GEOGRAPHIC_CATALOG.md](PHASE1_GEOGRAPHIC_CATALOG.md). La Fase 2 ha
 adquirido y validado el primer snapshot OSM raw de D004, identificado como
 `osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141`;
 se documenta en [PHASE2_OSM_SNAPSHOT.md](PHASE2_OSM_SNAPSHOT.md) y permanece
-fuera de Git. Todavía no se ha generado el catálogo visual. El piloto utiliza
+fuera de Git. F3 ha materializado el catálogo geométrico asociado; todavía no se
+ha generado el catálogo visual de imágenes y embeddings de F4. El piloto utiliza
 la bounding box fijada en D004; la extensión definitiva de Madrid continúa
 pendiente.
 
@@ -128,9 +129,9 @@ celda cuadrada estable de la cuadrícula y contiene:
 
 El manifest se materializa mediante `scripts/generate_madrid_catalog.py`. La
 configuración base no fija 25 m frente a 50 m porque D003 continúa pendiente;
-cada alternativa genera un manifest diferente. Los manifests comprobados hasta
-ahora se crearon temporalmente para validar F1 y no existe todavía un manifest
-definitivo persistido en `data/processed/catalog/`.
+cada alternativa genera un manifest diferente. Los manifests F1 v2 de 25 m y
+50 m están persistidos localmente en `data/processed/catalog/`; D003 mantiene
+pendiente cuál se adoptará como resolución definitiva.
 
 F1 no contiene objetos OSM, tags, imágenes, embeddings, consultas, ground truth
 ni asociaciones con OSM. Su campo `osm_snapshot_id` permanece `null` y F3 no lo
@@ -167,11 +168,11 @@ El snapshot actual contiene 25.537 nodes, 4.240 ways y 498 relations. Los
 para completar ways. Las relations son contexto directo no expandido; sus
 members ausentes se contabilizan y no implican corrupción del raw.
 
-### Asociación geométrica propuesta para Fase 3
+### Asociación geométrica materializada por Fase 3
 
 El contrato global está fijado en D050 y se desarrolla en
-[PHASE3_GEOMETRIC_ASSOCIATIONS.md](PHASE3_GEOMETRIC_ASSOCIATIONS.md). La fase
-continúa pendiente de implementación.
+[PHASE3_GEOMETRIC_ASSOCIATIONS.md](PHASE3_GEOMETRIC_ASSOCIATIONS.md). F3 está
+cerrada conforme a [PHASE3_CLOSURE.md](PHASE3_CLOSURE.md).
 
 F3 debe:
 
@@ -191,9 +192,9 @@ F3 debe:
 14. Registrar provenance, conteos, versiones e integridad.
 15. Publicar el dataset de forma atómica e inmutable.
 
-El siguiente diagrama describe la arquitectura propuesta, todavía no
-implementada, para vincular de forma reproducible el manifest geométrico de
-Fase 1 con la evidencia del snapshot OSM local de Fase 2. F3 no consulta
+El siguiente diagrama describe la arquitectura implementada para vincular de
+forma reproducible el manifest geométrico de Fase 1 con la evidencia del
+snapshot OSM local de Fase 2. F3 no consulta
 Overpass, no modifica el manifest F1 y registra el vínculo entre ambos inputs
 en su propia provenance:
 
@@ -244,6 +245,15 @@ ambiguos. Los `unknown_closed_way` y las áreas inválidas no producen
 asociaciones geométricas base. Las relations incompletas de F2 no reciben
 geometría propia ni transmiten automáticamente sus tags o semántica a los
 member ways.
+
+Bundles F3 reales:
+
+- 50 m: `f3-madrid-pilot-associations-sha256-5f4af89b9349de792d3a60752a15f227d49b96cdb688a671504e4cf30bf68453`;
+- 25 m: `f3-madrid-pilot-associations-sha256-902e8edcd7892c4b9f6a686a6573fb5c15bf19858ecf2ce14d09fb687e9e0ffa`.
+
+Son bundles geométricos: no contienen imágenes OSM, embeddings ni un índice de
+recuperación CrossText2Loc. Véase el
+[acta de cierre de F3](PHASE3_CLOSURE.md).
 
 ## 3. Flujo online
 

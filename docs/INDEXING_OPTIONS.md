@@ -6,7 +6,7 @@ Este documento describe dos índices para etapas distintas del proyecto:
 
 | Índice | Datos que organiza | Uso previsto | Estado en el TFG |
 |---|---|---|---|
-| STRtree de Shapely | Geometrías OSM | Acelerar las asociaciones geométricas entre objetos OSM y celdas en F3 | Aceptado por D050; F3 aún está pendiente de implementación |
+| STRtree de Shapely | Geometrías OSM | Acelerar las asociaciones geométricas entre objetos OSM y celdas en F3 | Implementado y validado en F3 conforme a D050 |
 | HNSW | Embeddings vectoriales | Posible aceleración aproximada del ranking texto–imagen de CrossText2Loc | Alternativa experimental; no seleccionada ni implementada |
 
 No son intercambiables: STRtree genera pares espaciales candidatos para comprobar

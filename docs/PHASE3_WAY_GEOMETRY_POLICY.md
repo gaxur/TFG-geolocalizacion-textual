@@ -4,8 +4,8 @@
 
 Este documento especifica la política `way_is_area-v1`, aceptada en D049, para
 interpretar la geometría de los ways de OpenStreetMap durante la Fase 3. La
-política está cerrada documentalmente, pero **Fase 3 todavía no está
-implementada**.
+política está implementada, se aplicó al snapshot real de Madrid y forma parte
+de los bundles D050/D052 aceptados en [PHASE3_CLOSURE.md](PHASE3_CLOSURE.md).
 
 El objetivo es evitar la inferencia incorrecta `closed way = Polygon`. Un way
 cerrado puede representar un área, una línea cerrada o un caso cuya semántica no
@@ -81,8 +81,8 @@ license: CC0-1.0
 ```
 
 El recurso se conserva en
-`third_party/osm-polygon-features/v0.9.2/`. F3 verificará su hash y lo consumirá
-offline. No descargará reglas durante la generación.
+`third_party/osm-polygon-features/v0.9.2/`. F3 verificó su hash y lo consumió
+offline. No descargó reglas durante la generación.
 
 ### Semántica de la tabla
 
@@ -187,14 +187,14 @@ generar F3, produjo:
 | `invalid_area` detectado por comprobación local simple | 0 |
 
 Los 710 casos sin regla incluyen 661 ways sin tags usados como members de
-relations. La ausencia provisional de `invalid_area` no sustituye la futura
-validación con la biblioteca geométrica fijada para F3.
+relations. La validación geométrica final confirmó 713 closed ways ambiguos no
+asociables —710 sin regla y 3 por conflicto— y ninguna geometría inválida en el
+snapshot procesado.
 
-## Condiciones de implementación
+## Condiciones satisfechas
 
 1. Verificar el SHA-256 de la tabla antes de procesar ways.
 2. Registrar `way_is_area-v1`, la revisión de la tabla y las versiones de la
    biblioteca geométrica en provenance F3.
 3. Validar la política con fixtures antes de generar el primer derivado F3.
-4. Mantener el contrato global de F3 como una decisión posterior todavía sin
-   identificador.
+4. Aplicar el contrato global D050 y la identidad/publicación D052.

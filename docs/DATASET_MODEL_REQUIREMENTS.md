@@ -20,9 +20,9 @@ oficial de GOTPR.
 | Componente | Viabilidad | Evidencia | Qué falta | Riesgo |
 | --- | --- | --- | --- | --- |
 | LLM como intérprete geográfico | VIABLE CON ADAPTACIÓN | D017, D026 y `schemas/llm_geo_query.schema.json` | Proveedor e implementación del adaptador | El LLM puede introducir restricciones no justificadas |
-| OpenStreetMap | CONFIRMADO | Infraestructura D043-D048 y snapshot raw real D004 validado: `osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141` | Preparar derivados en una fase posterior sin modificar el raw | Etiquetas incompletas o inconsistentes |
+| OpenStreetMap | CONFIRMADO | Snapshot raw D004 y bundles geométricos F3 validados: `osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141` | Preparar en F4 representaciones visuales sin modificar raw ni bundles F3 | Etiquetas incompletas o inconsistentes |
 | Overpass API | CONFIRMADO | Cliente, caché, validación y adquisición real HTTP 200 en un intento | Revisar política y disponibilidad antes de cada nueva adquisición | Límites de carga o cobertura |
-| Catálogo geográfico de Madrid | VIABLE CON ADAPTACIÓN | D001–D005, D012 y `docs/MADRID_DATASET.md` | Política de muestreo experimental; la bbox piloto ya está fijada | El catálogo puede no cubrir el lugar correcto |
+| Catálogo geográfico de Madrid | CONFIRMADO | F1, F3 y [`PHASE3_CLOSURE.md`](PHASE3_CLOSURE.md) | Elegir experimentalmente 25 m o 50 m mediante D003 | El catálogo puede no cubrir el lugar correcto |
 | Generación de imágenes OSM | VIABLE CON ADAPTACIÓN | `external/CVG-Text/download_osm_street.py:17-74` | Wrapper corregido y validación del recorte/área | Incompatibilidad de escala o formato |
 | Embeddings visuales | VIABLE CON ADAPTACIÓN | `external/CVG-Text/model_loader.py:27-215`; `evaluate.py:24-54` | Checkpoint fijado e índice persistente | Licencia o pesos no confirmados |
 | Imágenes satelitales | EXPERIMENTAL | `external/CVG-Text/config.yaml:11-20`; `zeroshot.py:36-40` | Fuente con permisos de almacenamiento y embeddings | Restricciones del proveedor |
@@ -54,17 +54,15 @@ resueltos son consecuencia prevista de no expandir relations, no un fallo de
 integridad; todos los `nd ref` de ways sí están resueltos. Véase
 [`PHASE2_OSM_SNAPSHOT.md`](PHASE2_OSM_SNAPSHOT.md).
 
-La política geométrica D049 está aceptada y fija `way_is_area-v1` junto con una
-copia exacta y versionada de `osm-polygon-features` v0.9.2. Esta decisión evita
-interpretar automáticamente todo closed way como Polygon. La Fase 3 continúa
-sin implementar; la aceptación de la política no implica que existan todavía
-geometrías procesadas ni asociaciones `candidate_id`–OSM.
+La política geométrica D049 fija `way_is_area-v1` junto con una copia exacta y
+versionada de `osm-polygon-features` v0.9.2. F3 la aplicó al snapshot real y
+materializó asociaciones `candidate_id`–OSM para 25 m y 50 m. El cierre se
+documenta en [`PHASE3_CLOSURE.md`](PHASE3_CLOSURE.md).
 
 D050 acepta el contrato global del dataset derivado F3. Sus inputs, outputs,
 identidad, predicados, serialización, provenance y publicación se detallan en
-[`PHASE3_GEOMETRIC_ASSOCIATIONS.md`](PHASE3_GEOMETRIC_ASSOCIATIONS.md). La
-versión exacta de Shapely/GEOS se fijará mediante un preflight separado antes de
-implementar geometría.
+[`PHASE3_GEOMETRIC_ASSOCIATIONS.md`](PHASE3_GEOMETRIC_ASSOCIATIONS.md). El
+entorno efectivo quedó fijado en NumPy 2.5.4, Shapely 2.1.2 y GEOS 3.13.1.
 
 | Repositorio | URL | Commit auditado |
 | --- | --- | --- |
@@ -330,10 +328,11 @@ Se intentó construir una fixture mínima con:
 - un `SceneGraph` `human` con dos nodos, una arista y vectores de 300
   dimensiones.
 
-No pudieron ejecutarse porque el entorno Python actual no tiene `Pillow` ni
-`numpy`. No se instalaron dependencias ni se descargaron modelos. La ejecución
-debe repetirse en entornos aislados de cada repositorio antes de comenzar la
-generación de Madrid.
+En la auditoría inicial no pudieron ejecutarse porque aquel entorno de modelos
+no tenía `Pillow` ni `numpy`. Esta observación histórica no describe el entorno
+geométrico `.venv-geo` de F3, que sí ejecuta NumPy 2.5.4, Shapely 2.1.2 y GEOS
+3.13.1. Las fixtures de los repositorios externos deben repetirse en sus propios
+entornos antes de integrar los modelos.
 
 ## 4. Conclusiones para Madrid
 
@@ -382,13 +381,13 @@ reproducción oficial de GOTPR.
 6. Origen exacto de los embeddings Ada incluidos en los artefactos GOTPR.
 7. Criterio de acierto geográfico común entre ambos métodos.
 
-### D. Partes que ya pueden implementarse con seguridad
+### D. Partes disponibles y siguiente adaptación
 
-- manifiesto común de candidatos con `candidate_id`, latitud y longitud;
+- manifests F1 de 25 m y 50 m con `candidate_id`, latitud y longitud;
+- snapshot F2 y bundles F3 geométricos verificados;
 - almacenamiento separado de raw, processed, embeddings e índices;
-- adaptador de configuración con la bbox piloto fijada en D004 y granularidad
-  todavía configurable;
-- caché local y metadatos de procedencia;
+- configuración con la bbox piloto D004 y granularidad todavía experimental;
+- caché local y metadatos de procedencia e integridad;
 - wrapper de `OSMTextImageDataset`;
 - generación de imágenes CrossText2Loc mediante un script corregido y versionado;
 - cálculo offline de embeddings CrossText2Loc una vez fijado el checkpoint;
@@ -398,11 +397,11 @@ reproducción oficial de GOTPR.
 
 ### E. Decisión recomendada
 
-Recomiendo continuar primero con las fases independientes: modelo geográfico,
-manifest, cache OSM y catálogo geométrico. El LLM/preselección y la
-infraestructura de evaluación pueden avanzar después en paralelo. La
-integración completa de CrossText2Loc debe esperar a D007, D013 y D016; no se
-debe construir todavía un generador OSM→GOTPR.
+El modelo geográfico, manifests, snapshot OSM y catálogo geométrico F3 ya están
+disponibles. F4 puede comenzar con contratos, loaders, fixtures y el diseño del
+renderizado. La generación definitiva de imágenes, embeddings y evaluación de
+CrossText2Loc debe esperar a D007, D013 y D016; no se debe construir todavía un
+generador OSM→GOTPR.
 
 Para GOTPR, la decisión debería ser una de estas:
 
@@ -414,8 +413,21 @@ Para GOTPR, la decisión debería ser una de estas:
    como reference dataset nuevo de Madrid si no se puede justificar la
    compatibilidad.
 
-Hasta resolver esa elección no debe comenzar la generación masiva del catálogo
-de Madrid.
+Hasta resolver esa elección no debe comenzar una generación masiva de scene
+graphs GOTPR para Madrid.
+
+### F. Frontera entre F3 y F4
+
+F1 aporta `candidate_id`, coordenadas y celdas. F3 aporta objetos OSM
+normalizados, asociaciones, contexto parcial de relations, provenance e
+integridad. F4 deberá producir un manifest visual derivado con imágenes,
+embeddings y su correspondencia con candidatos, sin modificar F1 ni F3.
+
+Los bundles F3 no contienen geometrías completas suficientes para renderizar un
+mapa por sí solos. F4 deberá usar una fuente de teselas permitida o reconstruir
+el render desde F2 mediante infraestructura propia. El servidor estándar
+`tile.openstreetmap.org` no debe utilizarse para descarga masiva u offline; se
+requiere un proveedor compatible o renderizado propio, además de atribución OSM.
 
 ## 5. Estado actual de implementación y contratos
 

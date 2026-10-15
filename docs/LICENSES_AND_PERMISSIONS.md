@@ -1,6 +1,6 @@
 # Licencias y permisos de software y datos
 
-## Matriz de auditoría (actualizada: 13 de octubre de 2026)
+## Matriz de auditoría (actualizada: 14 de octubre de 2026)
 
 Esta matriz distingue usar, modificar, almacenar, generar derivados, publicar
 y redistribuir. Una URL pública o un checkpoint descargable no implica que
@@ -49,7 +49,7 @@ el raw continuará fuera de Git y la publicación de provenance o derivados se
 revisará según ODbL.
 
 **Proyecto:** localización geográfica a partir de descripciones textuales en Madrid  
-**Fecha de revisión:** 13 de octubre de 2026
+**Fecha de revisión:** 14 de octubre de 2026
 
 **Estado:** guía de cumplimiento para el desarrollo y la memoria del TFG
 
@@ -153,6 +153,29 @@ En la memoria y en cualquier aplicación o material publicado debe aparecer, com
 > © OpenStreetMap contributors. Datos disponibles bajo la Open Database License (ODbL). https://www.openstreetmap.org/copyright
 
 También deben conservarse la fecha de descarga, la consulta o área utilizada, la versión o fuente de los datos y cualquier transformación aplicada. Las teselas raster, estilos cartográficos, imágenes satelitales y servicios de terceros pueden tener condiciones adicionales a las de los datos OSM.
+
+### Estado al cierre de F3
+
+| Escenario | Estado operativo |
+|---|---|
+| Uso interno académico del snapshot F2 y bundles F3 | Admitido dentro del alcance documentado, conservando provenance, hashes y atribución. |
+| Publicación del código propio | Separada de ODbL; publicar código no autoriza automáticamente distribuir datos OSM o derivados. |
+| Distribución pública del snapshot F2 | Pendiente de definir y revisar un paquete con atribución, referencia a ODbL, provenance y acceso al raw. |
+| Distribución pública de bundles F3 | No aprobada todavía; requiere revisar el artefacto concreto y acompañarlo de atribución y avisos de licencia. |
+| Visualización pública con datos OSM | Requiere atribución visible, legible y próxima al mapa o resultado mostrado. |
+| Generación de imágenes cartográficas para F4 | Requiere revisar datos, estilo, proveedor, caché, almacenamiento y redistribución. |
+
+El cierre [PHASE3_CLOSURE.md](PHASE3_CLOSURE.md) acepta F3 para uso interno y
+continuidad técnica, no como paquete público autónomo. Los bundles F3 identifican
+su snapshot fuente por ID y hash, pero una futura distribución deberá añadir un
+README o NOTICE externo con la atribución y las condiciones aplicables; no se
+modifica retrospectivamente el contrato D052.
+
+La política vigente del servidor estándar `tile.openstreetmap.org` exige
+atribución, identificación y respeto de caché, y no permite descarga masiva o
+prefetch para uso offline. La galería visual de F4 deberá utilizar un proveedor
+que autorice el flujo previsto o un renderizador propio. Fuente oficial:
+[Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/).
 
 ## Reglas `osm-polygon-features`
 

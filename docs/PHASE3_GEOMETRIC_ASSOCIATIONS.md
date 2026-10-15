@@ -2,9 +2,10 @@
 
 ## Estado y propósito
 
-D050 fija el contrato global de Fase 3. Este documento describe su operación
-prevista; **F3 todavía no está implementada** y no existen artefactos derivados
-generados por ella.
+D050 fija el contrato global de Fase 3. F3 está implementada, materializada y
+cerrada para uso interno y continuidad técnica hacia F4. El acta de aceptación,
+los riesgos asumidos y las reservas de distribución están en
+[PHASE3_CLOSURE.md](PHASE3_CLOSURE.md).
 
 F3 vinculará de forma reproducible las celdas de un catálogo F1 materializado
 con los objetos de un snapshot F2 local. Materializa D022 y consume la política
@@ -224,14 +225,15 @@ revalidación y el rename continúa siendo un riesgo residual documentado.
 
 ### F3.9: validación y cierre
 
-Revisará los conteos reales, objetos ambiguos o inválidos, asociaciones
-multi-cell, relations propagadas, hashes, consumo de recursos y repetibilidad.
-También registrará el experimento y revisará las obligaciones ODbL antes de
-publicar cualquier derivado.
+Revisó los conteos reales, objetos ambiguos o inválidos, asociaciones multi-cell,
+relations propagadas, hashes, consumo de recursos y repetibilidad. La revisión
+acepta los dos bundles para uso interno y continuidad técnica; la distribución
+pública del snapshot o de los bundles continúa pendiente de una revisión ODbL
+del paquete concreto.
 
-El cierre de F3 acreditará que el dataset se ha generado conforme a D049 y D050;
-no resolverá automáticamente D003, D021 ni el rendimiento de las etapas de
-recuperación posteriores.
+El cierre documentado en [PHASE3_CLOSURE.md](PHASE3_CLOSURE.md) acredita que el
+dataset se generó conforme a D049, D050 y D052. No resuelve D003, D021 ni el
+rendimiento de las etapas de recuperación posteriores.
 
 ### Por qué se separan F3.6, F3.7, F3.8 y F3.9
 
@@ -644,9 +646,9 @@ El bundle canónico no contiene un `created_at_utc` variable. Puede conservar
 timestamps fijos heredados de inputs. Los logs operativos con tiempos o duración
 quedan fuera del bundle.
 
-## Schemas previstos
+## Schemas implementados
 
-Sin crearlos todavía, F3 necesitará:
+F3 utiliza los siguientes schemas versionados:
 
 ```text
 schemas/f3_osm_object.schema.json
@@ -655,8 +657,8 @@ schemas/f3_relation_context.schema.json
 schemas/f3_provenance.schema.json
 ```
 
-Los schemas validarán filas y provenance; un validador de dataset comprobará
-unicidad, referencias cruzadas, conteos, orden y hashes.
+Los schemas validan filas y provenance; el validador integral comprueba además
+unicidad, referencias cruzadas, conteos, orden, hashes e identidad.
 
 ### Validación manual en Python
 
@@ -687,9 +689,9 @@ El validador manual comprueba:
 - serialización D050 exacta;
 - conteos de provenance no negativos.
 
-Estas comprobaciones son estructurales. F3.1 no valida todavía la existencia
-real de candidatos u objetos, la geometría, los predicados, las distancias ni
-el orden global de las filas JSONL.
+Estas comprobaciones estructurales se complementan en
+`src/tfg_phase0/f3_validation.py` con la validación integral del bundle contra
+los inventarios F3.3-F3.5.
 
 ## Publicación atómica
 
@@ -709,7 +711,7 @@ La generación seguirá esta secuencia:
 Un ID existente con hashes correctos es cache hit. Un ID existente incompleto o
 inconsistente es error y no se repara ni sobrescribe automáticamente.
 
-## Tests previstos
+## Cobertura de tests implementada
 
 ### Unitarios
 
@@ -734,9 +736,10 @@ inconsistente es error y no se repara ni sobrescribe automáticamente.
 
 ### Snapshot real
 
-Tras completar implementación y fixtures se validarán conteos, estados D049,
-asociaciones, contexto de relations, repetición byte-identical y recursos sobre
-el snapshot F2 local. Esta validación no forma parte del diseño documental.
+F3.8 validó conteos, estados D049, asociaciones, contexto de relations,
+repetibilidad, cache hit y recursos sobre el snapshot F2 local. Los resultados
+y hashes están en [EXPERIMENTS.md](EXPERIMENTS.md#materialización-f3-de-madrid)
+y su aceptación final en [PHASE3_CLOSURE.md](PHASE3_CLOSURE.md).
 
 ## Riesgos
 
