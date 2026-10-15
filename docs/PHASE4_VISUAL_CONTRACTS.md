@@ -19,8 +19,8 @@ como clave primaria.
 | Fuente OSM | `schemas/f4_osm_source.schema.json` | Datos, provenance, cobertura, licencia y cierre |
 | Renderer y estilo | `schemas/f4_renderer_provenance.schema.json` | Configuración, versión, estilo y manifests de assets/fuentes |
 | Assets | `schemas/f4_assets_manifest.schema.json` | Hash, tamaño, origen y licencia de recursos cartográficos |
-| Embeddings | `schemas/f4_embedding_manifest.schema.json` | Futuro tensor `[N, 768]`, checkpoint, preprocesamiento y orden de filas |
-| Recuperación | `schemas/f4_retrieval_result.schema.json` | Futuro ranking exhaustivo texto-imagen sin ground truth |
+| Embeddings | `schemas/f4_embedding_manifest.schema.json` | Tensor `[N, 768]`, checkpoint, preprocesamiento y orden de filas |
+| Recuperación | `schemas/f4_retrieval_result.schema.json` | Ranking exhaustivo texto-imagen sin ground truth |
 
 Los validadores básicos se integran en `validate_document()`. Las invariantes
 que requieren cruzar documentos o inspeccionar ficheros están en
@@ -300,3 +300,112 @@ permanece abierta: ni OSM Carto v5.9.0 ni el fallback tipográfico prueban
 equivalencia exacta con las imágenes de entrenamiento. F4.1c deberá tratar la
 galería como experimental, cargar el checkpoint solo tras las comprobaciones
 previstas y separar sus resultados del protocolo oficial de Nueva York.
+
+## Embeddings y recuperación F4.1c
+
+F4.1c reutiliza las nueve imágenes sin ejecutar de nuevo Mapnik. El trabajo se
+divide en dos recorridos:
+
+```text
+offline: bundle visual validado -> encoder de imagen -> matriz (9, 768)
+online:  descripción -> encoder de texto -> similitud coseno -> Top-K
+```
+
+Ambos encoders pertenecen al mismo checkpoint CrossText2Loc provisional de
+Nueva York. Se carga OpenAI CLIP `ViT-L/14@336px`, se amplía el contexto textual
+a 300 posiciones como hace el código original y se exige que el checkpoint no
+produzca claves ausentes ni inesperadas. Los PNG almacenados a 512 x 512 se
+abren en RGB y pasan por el preprocesamiento oficial de CLIP, que produce la
+entrada real del encoder de 336 x 336. No se aplica un resize manual alternativo.
+
+### Artefacto offline
+
+El bundle observado es:
+
+```text
+data/embeddings/
+  f4-madrid-embeddings-sha256-9d721b9893e004b39a238c1b1e40ece8f865964e4555c82d2732ba9b066709eb/
+    manifest.json
+    embeddings/image_embeddings.npy
+    embeddings/candidate_ids.jsonl
+```
+
+La matriz tiene forma `(9, 768)`, dtype `float32`, orden C, valores finitos y
+filas normalizadas L2. `candidate_ids.jsonl` fija la correspondencia exacta de
+cada fila con el orden del manifest visual. El manifest registra hashes de la
+matriz, filas, checkpoint, pesos base CLIP, commits, preprocesamiento y entorno.
+
+Checkpoint utilizado:
+
+```text
+long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth
+sha256: d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d
+```
+
+Pesos base OpenAI CLIP:
+
+```text
+ViT-L-14-336px.pt
+sha256: 3035c92b350959924f9f00213499208652fc7ea050643e8b385c2dac08641f02
+```
+
+### Recuperación online
+
+La consulta se tokeniza mediante:
+
+```python
+clip.tokenize(text, context_length=300, truncate=True)
+```
+
+Después se normaliza el embedding textual y se calculan los nueve scores de una
+vez:
+
+```text
+scores = image_embeddings @ text_embedding
+```
+
+Como ambas modalidades están normalizadas L2, el producto escalar equivale a
+similitud coseno. Se ordena por score descendente y, en empate, por
+`candidate_id` ascendente. La coordenada WGS84 se obtiene del manifest F1. El
+score no se interpreta como probabilidad.
+
+No se llama a `evaluate.py` ni a `cal_score()`: no se usa la coordenada real de
+la consulta, no se seleccionan 100 vecinos geográficos y se evalúan siempre las
+nueve filas de la galería antes de recortar Top-K.
+
+### Comandos reales
+
+Generación offline:
+
+```bash
+bash scripts/run_f4_crosstext2loc.sh embed \
+  --visual-bundle /workspace/project/data/processed/visual/f4-madrid-visual-sha256-40ed367c74e29ab271308f1f2df0349b1fc423d8e64ba7dc19da60d7d40be915 \
+  --catalog-manifest /workspace/project/data/processed/catalog/manifest-50m.json \
+  --selection /workspace/project/config/madrid_f4_visual_fixture.json \
+  --region-config /workspace/project/config/madrid.yaml \
+  --checkpoint /workspace/project/checkpoints/CrossText2Loc/long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth \
+  --clip-weights /root/.cache/clip/ViT-L-14-336px.pt \
+  --cvg-text-root /workspace/project/external/CVG-Text \
+  --device cuda --output-root /artifacts
+```
+
+Consulta reutilizando la matriz:
+
+```bash
+bash scripts/run_f4_crosstext2loc.sh rank \
+  --visual-bundle /workspace/project/data/processed/visual/f4-madrid-visual-sha256-40ed367c74e29ab271308f1f2df0349b1fc423d8e64ba7dc19da60d7d40be915 \
+  --catalog-manifest /workspace/project/data/processed/catalog/manifest-50m.json \
+  --selection /workspace/project/config/madrid_f4_visual_fixture.json \
+  --region-config /workspace/project/config/madrid.yaml \
+  --checkpoint /workspace/project/checkpoints/CrossText2Loc/long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth \
+  --clip-weights /root/.cache/clip/ViT-L-14-336px.pt \
+  --cvg-text-root /workspace/project/external/CVG-Text \
+  --device cuda \
+  --embedding-bundle /artifacts/f4-madrid-embeddings-sha256-9d721b9893e004b39a238c1b1e40ece8f865964e4555c82d2732ba9b066709eb \
+  --query-id ejemplo --text "Una plaza urbana" --language es --k 5
+```
+
+Las consultas de desarrollo realizadas no constituyen evaluación: no hay
+ground truth independiente ni se calcula Recall@K. Una consulta repetida produjo
+los mismos candidatos y scores; los tiempos se conservan como telemetría
+operacional y pueden variar.

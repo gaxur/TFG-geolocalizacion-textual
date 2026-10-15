@@ -76,6 +76,60 @@ bash scripts/run_f4_osm_render.sh
 - La base Ubuntu está fijada por digest, pero APT resuelve paquetes al construir;
   una reconstrucción con otro ID deberá validarse como otro entorno.
 
+## F4.1c: embeddings y retrieval exhaustivo de nueve candidatos
+
+### Objetivo y entorno
+
+Comprobar el recorrido completo texto-imagen con el checkpoint congelado, sin
+entrenamiento, fine-tuning, preselección geográfica ni ground truth. Se utilizó
+la NVIDIA GB10 mediante la imagen ARM64:
+
+```text
+sha256:4306f8b8596461c3e08ca3b809e370e4de0dbc978715c95b4421ab37ab70a2c4
+```
+
+Checkpoint y pesos base:
+
+```text
+checkpoint sha256: d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d
+OpenAI CLIP sha256: 3035c92b350959924f9f00213499208652fc7ea050643e8b385c2dac08641f02
+```
+
+Entorno observado: Python 3.12.3, PyTorch
+`2.11.0a0+eb65b36914.nv26.02`, torchvision
+`0.25.0a0+1e53952f.nv26.02.44259020`, CUDA 13.1 e inferencia FP32.
+
+### Artefacto offline
+
+```text
+f4-madrid-embeddings-sha256-9d721b9893e004b39a238c1b1e40ece8f865964e4555c82d2732ba9b066709eb
+```
+
+- Matriz: `(9, 768)`, `float32`, C-contiguous, little-endian.
+- Valores finitos; normas de fila entre `0,99999994` y `1,0`.
+- SHA-256 NPY:
+  `19284f67dac2e3efa6e4e4ca212592ccce6db5e4a1d8bb5a3a5634c0fe54a223`.
+- SHA-256 JSONL de filas:
+  `6cdc68c6d5d33574d267fac1d805bc5650b56d954b503b46fd3185aa47bd7b44`.
+- SHA-256 del `utils.py` de CVG-Text realmente importado:
+  `18dad4696c205dba5f934f9382ff5bd7d380c502680e462612bbdc49229ba597`.
+
+### Consultas de desarrollo observadas
+
+| Query | Top-1 | Score coseno |
+|---|---|---:|
+| `madrid-dev-es-001`: «Una plaza urbana rodeada de edificios y calles estrechas» | `...R0008_C0004` | 0,24788210 |
+| `madrid-dev-en-001`: “A dense city block with narrow streets and many buildings” | `...R0008_C0004` | 0,18201816 |
+| `madrid-dev-es-002`: «Veo una avenida amplia cerca de una zona verde» | `...R0004_C0008` | 0,23069473 |
+
+Los JSON completos permanecen bajo `results/generated/f4/`, fuera de Git. La
+consulta `madrid-dev-es-001` se repitió con los embeddings persistidos y produjo
+el mismo ranking, scores y coordenadas; solo cambió la telemetría temporal.
+
+Estos resultados demuestran ejecución y reutilización del índice exacto, no
+acierto geográfico ni generalización. No existe ground truth para estas frases y
+los scores no son probabilidades. D007, D013 y D016 permanecen abiertas.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

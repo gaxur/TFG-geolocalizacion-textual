@@ -1,6 +1,6 @@
 services:
   crosstext2loc:
-    image: crosstext2loc-gb10:ngc26.02
+    image: ${F4_CROSSTEXT2LOC_IMAGE_ID:-crosstext2loc-gb10:ngc26.02}
     build:
       context: ./docker/crosstext2loc-gb10
       dockerfile: Dockerfile
@@ -17,12 +17,16 @@ services:
       GIT_CONFIG_COUNT: "1"
       GIT_CONFIG_KEY_0: safe.directory
       GIT_CONFIG_VALUE_0: /workspace/project/external/CVG-Text
+      F4_HOST_UID: ${F4_HOST_UID:-0}
+      F4_HOST_GID: ${F4_HOST_GID:-0}
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=1g
     volumes:
       - .:/workspace/project:ro
       - ./results/cross_text2loc_docker:/output:rw
       - ./results/cross_text2loc_docker/manual:/workspace/project/external/CVG-Text/results:rw
+      - ./data/embeddings:/artifacts:rw
+      - ./results/generated/f4:/run-results:rw
       - ${HOME}/.cache/clip:/root/.cache/clip:ro
     working_dir: /workspace/project/external/CVG-Text
     entrypoint: ["/bin/bash"]

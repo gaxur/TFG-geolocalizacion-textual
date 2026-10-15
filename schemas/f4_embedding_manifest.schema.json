@@ -1,14 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "f4_embedding_manifest.schema.json",
-  "title": "F4 CrossText2Loc image embedding manifest",
+  "title": "F4 CrossText2Loc image embedding manifest v2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "embedding_dataset_id", "contract_version", "visual_dataset", "model", "checkpoint", "preprocessing", "embedding"],
+  "required": ["schema_version", "embedding_dataset_id", "contract_version", "generator_version", "generator_source_sha256", "visual_dataset", "model", "checkpoint", "preprocessing", "environment", "embedding"],
   "properties": {
-    "schema_version": {"const": "1.0"},
+    "schema_version": {"const": "2.0"},
     "embedding_dataset_id": {"type": "string", "pattern": "^f4-madrid-embeddings-sha256-[0-9a-f]{64}$"},
-    "contract_version": {"const": "f4-image-embeddings-v1"},
+    "contract_version": {"const": "f4-image-embeddings-v2"},
+    "generator_version": {"const": "phase4-crosstext2loc-embeddings-v1"},
+    "generator_source_sha256": {"$ref": "#/$defs/sha256"},
     "visual_dataset": {
       "type": "object", "additionalProperties": false,
       "required": ["visual_dataset_id", "manifest_sha256"],
@@ -16,31 +18,54 @@
     },
     "model": {
       "type": "object", "additionalProperties": false,
-      "required": ["name", "architecture", "cvg_text_commit", "openai_clip_commit", "text_context_length"],
+      "required": ["name", "architecture", "cvg_text_commit", "cvg_utils_sha256", "openai_clip_commit", "openai_clip_weights_filename", "openai_clip_weights_sha256", "text_context_length"],
       "properties": {
         "name": {"const": "CLIP-L/14@336"}, "architecture": {"const": "ViT-L/14@336px"},
-        "cvg_text_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "openai_clip_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "cvg_text_commit": {"const": "6910d2747a94fbe985309bde60cd4732bcbbf50f"},
+        "cvg_utils_sha256": {"$ref": "#/$defs/sha256"},
+        "openai_clip_commit": {"const": "dcba3cb2e2827b402d2701e7e1c7d9fed8a20ef1"},
+        "openai_clip_weights_filename": {"const": "ViT-L-14-336px.pt"},
+        "openai_clip_weights_sha256": {"const": "3035c92b350959924f9f00213499208652fc7ea050643e8b385c2dac08641f02"},
         "text_context_length": {"const": 300}
       }
     },
     "checkpoint": {
       "type": "object", "additionalProperties": false,
-      "required": ["filename", "sha256", "selection_status"],
-      "properties": {"filename": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}, "selection_status": {"const": "provisional_d013"}}
+      "required": ["filename", "size_bytes", "sha256", "selection_status"],
+      "properties": {
+        "filename": {"const": "long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth"},
+        "size_bytes": {"const": 1712649548},
+        "sha256": {"const": "d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d"},
+        "selection_status": {"const": "provisional_d013"}
+      }
     },
     "preprocessing": {
       "type": "object", "additionalProperties": false,
-      "required": ["policy", "input_width_px", "input_height_px"],
-      "properties": {"policy": {"const": "official_clip_preprocess"}, "input_width_px": {"const": 336}, "input_height_px": {"const": 336}}
+      "required": ["policy", "input_width_px", "input_height_px", "image_color_mode", "text_tokenizer", "text_truncation"],
+      "properties": {
+        "policy": {"const": "official_openai_clip_preprocess"}, "input_width_px": {"const": 336}, "input_height_px": {"const": 336},
+        "image_color_mode": {"const": "RGB"}, "text_tokenizer": {"const": "clip.tokenize_context_300"}, "text_truncation": {"const": true}
+      }
+    },
+    "environment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["container_image_id", "python_version", "torch_version", "torchvision_version", "cuda_version", "device_type", "inference_dtype"],
+      "properties": {
+        "container_image_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "python_version": {"type": "string", "minLength": 1}, "torch_version": {"type": "string", "minLength": 1},
+        "torchvision_version": {"type": "string", "minLength": 1}, "cuda_version": {"type": "string", "minLength": 1},
+        "device_type": {"enum": ["cuda", "cpu"]}, "inference_dtype": {"const": "float32"}
+      }
     },
     "embedding": {
       "type": "object", "additionalProperties": false,
-      "required": ["matrix_path", "matrix_sha256", "candidate_ids_path", "candidate_ids_sha256", "count", "dimension", "dtype", "normalization", "row_order"],
+      "required": ["matrix_path", "matrix_sha256", "candidate_ids_path", "candidate_ids_sha256", "candidate_ids_format", "count", "dimension", "dtype", "byte_order", "normalization", "row_order"],
       "properties": {
         "matrix_path": {"$ref": "#/$defs/logicalPath"}, "matrix_sha256": {"$ref": "#/$defs/sha256"},
         "candidate_ids_path": {"$ref": "#/$defs/logicalPath"}, "candidate_ids_sha256": {"$ref": "#/$defs/sha256"},
-        "count": {"type": "integer", "minimum": 1}, "dimension": {"const": 768}, "dtype": {"const": "float32"},
-        "normalization": {"const": "l2"}, "row_order": {"const": "candidate_ids_file_order"}
+        "candidate_ids_format": {"const": "jsonl_object_candidate_id_v1"},
+        "count": {"const": 9}, "dimension": {"const": 768}, "dtype": {"const": "float32"}, "byte_order": {"const": "little"},
+        "normalization": {"const": "l2"}, "row_order": {"const": "visual_manifest_order"}
       }
     }
   },

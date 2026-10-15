@@ -64,10 +64,13 @@ def visual_dataset_id(document: Mapping[str, Any]) -> str:
 def embedding_identity(document: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "contract_version": document["contract_version"],
+        "generator_version": document["generator_version"],
+        "generator_source_sha256": document["generator_source_sha256"],
         "visual_dataset": dict(document["visual_dataset"]),
         "model": dict(document["model"]),
         "checkpoint": dict(document["checkpoint"]),
         "preprocessing": dict(document["preprocessing"]),
+        "environment": dict(document["environment"]),
         "embedding": dict(document["embedding"]),
     }
 
@@ -231,7 +234,88 @@ def validate_embedding_manifest(document: Mapping[str, Any], visual_manifest: Ma
             raise F4ValidationError("el número de embeddings no coincide con las imágenes generadas")
 
 
-def validate_retrieval_result(document: Mapping[str, Any], catalog: CatalogInput | None = None) -> None:
+def validate_embedding_bundle(
+    document: Mapping[str, Any],
+    bundle_root: str | Path,
+    visual_manifest: Mapping[str, Any],
+    visual_manifest_raw: bytes,
+    catalog: CatalogInput,
+) -> tuple[Any, tuple[str, ...]]:
+    """Valida completamente matriz, filas, hashes y referencias F4.1c."""
+    validate_embedding_manifest(document, visual_manifest)
+    if document["visual_dataset"]["manifest_sha256"] != sha256_bytes(visual_manifest_raw):
+        raise F4ValidationError("hash del manifest visual no coincide")
+    root = Path(bundle_root).resolve()
+
+    def artifact(logical_path: str, expected_hash: str, label: str) -> tuple[Path, bytes]:
+        unresolved = root / logical_path
+        if unresolved.is_symlink():
+            raise F4ValidationError(f"{label} no puede ser symlink")
+        path = unresolved.resolve()
+        try:
+            path.relative_to(root)
+        except ValueError as error:
+            raise F4ValidationError(f"{label} fuera del bundle") from error
+        if not path.is_file() or path.is_symlink():
+            raise F4ValidationError(f"{label} inexistente o no regular")
+        raw = path.read_bytes()
+        if sha256_bytes(raw) != expected_hash:
+            raise F4ValidationError(f"hash de {label} no coincide")
+        return path, raw
+
+    matrix_path, _ = artifact(
+        document["embedding"]["matrix_path"], document["embedding"]["matrix_sha256"], "matriz de embeddings"
+    )
+    _, candidate_raw = artifact(
+        document["embedding"]["candidate_ids_path"], document["embedding"]["candidate_ids_sha256"], "filas de candidate_id"
+    )
+    try:
+        import numpy as np
+        matrix = np.load(matrix_path, allow_pickle=False)
+    except (ImportError, OSError, ValueError) as error:
+        raise F4ValidationError("matriz NPY inválida") from error
+    expected_shape = (document["embedding"]["count"], F4_EMBEDDING_DIMENSION)
+    if matrix.shape != expected_shape:
+        raise F4ValidationError(f"forma de embeddings inválida: {matrix.shape}")
+    if matrix.dtype != np.dtype("<f4") or not matrix.flags.c_contiguous:
+        raise F4ValidationError("embeddings deben ser C-contiguous little-endian float32")
+    if not np.isfinite(matrix).all():
+        raise F4ValidationError("embeddings contienen valores no finitos")
+    norms = np.linalg.norm(matrix, axis=1)
+    if np.any(norms == 0) or not np.allclose(norms, 1.0, rtol=1e-5, atol=1e-6):
+        raise F4ValidationError("embeddings no están normalizados L2")
+    try:
+        text = candidate_raw.decode("utf-8")
+        if not text.endswith("\n"):
+            raise ValueError("falta newline final")
+        lines = text.splitlines()
+        candidate_ids = tuple(json.loads(line)["candidate_id"] for line in lines)
+        if any(set(json.loads(line)) != {"candidate_id"} for line in lines):
+            raise ValueError("campos inesperados")
+    except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+        raise F4ValidationError("candidate_ids.jsonl inválido") from error
+    if len(candidate_ids) != expected_shape[0] or len(set(candidate_ids)) != len(candidate_ids):
+        raise F4ValidationError("candidate_id ausente o duplicado")
+    expected_ids = tuple(row["candidate_id"] for row in visual_manifest["images"] if row["generation_status"] == "generated")
+    if candidate_ids != expected_ids:
+        raise F4ValidationError("orden de candidate_id no corresponde al manifest visual")
+    catalog_ids = {candidate.candidate_id for candidate in catalog.candidates}
+    if any(candidate_id not in catalog_ids for candidate_id in candidate_ids):
+        raise F4ValidationError("embedding con candidate_id ajeno a F1")
+    if document["embedding_dataset_id"] != embedding_dataset_id(document):
+        raise F4ValidationError("embedding_dataset_id inconsistente")
+    return matrix, candidate_ids
+
+
+def validate_retrieval_result(
+    document: Mapping[str, Any],
+    catalog: CatalogInput | None = None,
+    *,
+    embedding_manifest: Mapping[str, Any] | None = None,
+    candidate_ids: tuple[str, ...] | None = None,
+    matrix: Any | None = None,
+    text_embedding: Any | None = None,
+) -> None:
     try:
         validate_document(document, "f4_retrieval_result")
     except SchemaValidationError as error:
@@ -242,6 +326,23 @@ def validate_retrieval_result(document: Mapping[str, Any], catalog: CatalogInput
             candidate = candidates.get(result["candidate_id"])
             if candidate is None or not _close(result["latitude"], candidate.latitude) or not _close(result["longitude"], candidate.longitude):
                 raise F4ValidationError("resultado Top-K inconsistente con F1")
+    if embedding_manifest is not None:
+        if document["embedding_dataset_id"] != embedding_manifest["embedding_dataset_id"]:
+            raise F4ValidationError("resultado referencia otro bundle de embeddings")
+        if document["checkpoint_sha256"] != embedding_manifest["checkpoint"]["sha256"]:
+            raise F4ValidationError("resultado referencia otro checkpoint")
+    if candidate_ids is not None:
+        if any(row["candidate_id"] not in candidate_ids for row in document["results"]):
+            raise F4ValidationError("resultado contiene candidate_id ajeno a la galería")
+    if matrix is not None and text_embedding is not None and candidate_ids is not None:
+        from .f4_retrieval import exhaustive_rank
+        expected = exhaustive_rank(matrix, candidate_ids, text_embedding, document["requested_k"])
+        actual = [(row["candidate_id"], row["score"]) for row in document["results"]]
+        if len(actual) != len(expected) or any(
+            candidate != expected_candidate or not _close(score, expected_score)
+            for (candidate, score), (expected_candidate, expected_score) in zip(actual, expected)
+        ):
+            raise F4ValidationError("ranking o scores no corresponden al cálculo exhaustivo")
 
 
 def load_visual_manifest(

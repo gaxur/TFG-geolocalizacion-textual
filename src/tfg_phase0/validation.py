@@ -1095,12 +1095,16 @@ def _validate_f4_visual_manifest(document: Mapping[str, Any]) -> None:
 
 def _validate_f4_embedding_manifest(document: Mapping[str, Any]) -> None:
     context = "f4_embedding_manifest"
-    fields = ("schema_version", "embedding_dataset_id", "contract_version", "visual_dataset", "model", "checkpoint", "preprocessing", "embedding")
+    fields = ("schema_version", "embedding_dataset_id", "contract_version", "generator_version", "generator_source_sha256", "visual_dataset", "model", "checkpoint", "preprocessing", "environment", "embedding")
     _required(document, fields, context)
     _no_unknown(document, set(fields), context)
-    _version(document, context)
+    if document["schema_version"] != "2.0":
+        raise SchemaValidationError("f4_embedding_manifest.schema_version debe ser '2.0'")
     if document["contract_version"] != F4_EMBEDDING_CONTRACT_VERSION:
         raise SchemaValidationError("f4_embedding_manifest.contract_version no soportada")
+    if document["generator_version"] != "phase4-crosstext2loc-embeddings-v1":
+        raise SchemaValidationError("f4_embedding_manifest.generator_version no soportada")
+    _sha256(document["generator_source_sha256"], "f4_embedding_manifest.generator_source_sha256")
     if not isinstance(document["embedding_dataset_id"], str) or not re.fullmatch(r"f4-madrid-embeddings-sha256-[0-9a-f]{64}", document["embedding_dataset_id"]):
         raise SchemaValidationError("f4_embedding_manifest.embedding_dataset_id no válido")
     visual = document["visual_dataset"]
@@ -1110,25 +1114,39 @@ def _validate_f4_embedding_manifest(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("referencia visual no válida")
     _sha256(visual["manifest_sha256"], "f4_embedding_manifest.visual_dataset.manifest_sha256")
     model = document["model"]
-    expected_model_fields = {"name", "architecture", "cvg_text_commit", "openai_clip_commit", "text_context_length"}
+    expected_model_fields = {"name", "architecture", "cvg_text_commit", "cvg_utils_sha256", "openai_clip_commit", "openai_clip_weights_filename", "openai_clip_weights_sha256", "text_context_length"}
     if not isinstance(model, Mapping) or set(model) != expected_model_fields:
         raise SchemaValidationError("f4_embedding_manifest.model no válido")
     if model["name"] != "CLIP-L/14@336" or model["architecture"] != "ViT-L/14@336px" or model["text_context_length"] != 300:
         raise SchemaValidationError("modelo CrossText2Loc no corresponde al contrato")
-    for field in ("cvg_text_commit", "openai_clip_commit"):
-        if not isinstance(model[field], str) or not re.fullmatch(r"[0-9a-f]{40}", model[field]):
-            raise SchemaValidationError(f"f4_embedding_manifest.model.{field} no válido")
+    expected_model = {
+        "cvg_text_commit": "6910d2747a94fbe985309bde60cd4732bcbbf50f",
+        "openai_clip_commit": "dcba3cb2e2827b402d2701e7e1c7d9fed8a20ef1",
+        "openai_clip_weights_filename": "ViT-L-14-336px.pt",
+        "openai_clip_weights_sha256": "3035c92b350959924f9f00213499208652fc7ea050643e8b385c2dac08641f02",
+    }
+    if any(model[field] != value for field, value in expected_model.items()):
+        raise SchemaValidationError("identidad de OpenAI CLIP/CVG-Text no corresponde al contrato")
+    _sha256(model["cvg_utils_sha256"], "f4_embedding_manifest.model.cvg_utils_sha256")
     checkpoint = document["checkpoint"]
-    if not isinstance(checkpoint, Mapping) or set(checkpoint) != {"filename", "sha256", "selection_status"}:
+    if not isinstance(checkpoint, Mapping) or set(checkpoint) != {"filename", "size_bytes", "sha256", "selection_status"}:
         raise SchemaValidationError("f4_embedding_manifest.checkpoint no válido")
-    _non_empty_string(checkpoint["filename"], "f4_embedding_manifest.checkpoint.filename")
-    _sha256(checkpoint["sha256"], "f4_embedding_manifest.checkpoint.sha256")
-    if checkpoint["selection_status"] != "provisional_d013":
+    if checkpoint != {"filename": "long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth", "size_bytes": 1712649548, "sha256": "d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d", "selection_status": "provisional_d013"}:
         raise SchemaValidationError("checkpoint debe conservar estado provisional D013")
-    if document["preprocessing"] != {"policy": "official_clip_preprocess", "input_width_px": 336, "input_height_px": 336}:
+    if document["preprocessing"] != {"policy": "official_openai_clip_preprocess", "input_width_px": 336, "input_height_px": 336, "image_color_mode": "RGB", "text_tokenizer": "clip.tokenize_context_300", "text_truncation": True}:
         raise SchemaValidationError("preprocessing de embeddings no válido")
+    environment = document["environment"]
+    environment_fields = {"container_image_id", "python_version", "torch_version", "torchvision_version", "cuda_version", "device_type", "inference_dtype"}
+    if not isinstance(environment, Mapping) or set(environment) != environment_fields:
+        raise SchemaValidationError("entorno de embeddings no válido")
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", environment["container_image_id"]):
+        raise SchemaValidationError("container_image_id no válido")
+    for field in ("python_version", "torch_version", "torchvision_version", "cuda_version"):
+        _non_empty_string(environment[field], f"environment.{field}")
+    if environment["device_type"] not in {"cuda", "cpu"} or environment["inference_dtype"] != "float32":
+        raise SchemaValidationError("dispositivo o dtype de inferencia no válido")
     embedding = document["embedding"]
-    embedding_fields = {"matrix_path", "matrix_sha256", "candidate_ids_path", "candidate_ids_sha256", "count", "dimension", "dtype", "normalization", "row_order"}
+    embedding_fields = {"matrix_path", "matrix_sha256", "candidate_ids_path", "candidate_ids_sha256", "candidate_ids_format", "count", "dimension", "dtype", "byte_order", "normalization", "row_order"}
     if not isinstance(embedding, Mapping) or set(embedding) != embedding_fields:
         raise SchemaValidationError("f4_embedding_manifest.embedding no válido")
     for field in ("matrix_path", "candidate_ids_path"):
@@ -1136,7 +1154,7 @@ def _validate_f4_embedding_manifest(document: Mapping[str, Any]) -> None:
     for field in ("matrix_sha256", "candidate_ids_sha256"):
         _sha256(embedding[field], f"f4_embedding_manifest.embedding.{field}")
     _positive_id(embedding["count"], "f4_embedding_manifest.embedding.count")
-    expected_embedding = {"dimension": F4_EMBEDDING_DIMENSION, "dtype": "float32", "normalization": "l2", "row_order": "candidate_ids_file_order"}
+    expected_embedding = {"count": 9, "dimension": F4_EMBEDDING_DIMENSION, "dtype": "float32", "byte_order": "little", "normalization": "l2", "row_order": "visual_manifest_order", "candidate_ids_format": "jsonl_object_candidate_id_v1"}
     if any(embedding[field] != value for field, value in expected_embedding.items()):
         raise SchemaValidationError("representación de embeddings no válida")
 
@@ -1242,10 +1260,11 @@ def _validate_f4_renderer_provenance(document: Mapping[str, Any]) -> None:
 
 def _validate_f4_retrieval_result(document: Mapping[str, Any]) -> None:
     context = "f4_retrieval_result"
-    fields = ("schema_version", "contract_version", "query", "embedding_dataset_id", "ranking_method", "requested_k", "results", "timings_ms")
+    fields = ("schema_version", "contract_version", "query", "embedding_dataset_id", "checkpoint_sha256", "ranking_method", "tie_break", "gallery_count", "requested_k", "effective_k", "results", "timings_ms")
     _required(document, fields, context)
     _no_unknown(document, set(fields), context)
-    _version(document, context)
+    if document["schema_version"] != "2.0":
+        raise SchemaValidationError("f4_retrieval_result.schema_version debe ser '2.0'")
     if document["contract_version"] != F4_RETRIEVAL_CONTRACT_VERSION or document["ranking_method"] != "exhaustive_cosine":
         raise SchemaValidationError("contrato o método de ranking F4 no soportado")
     if not isinstance(document["embedding_dataset_id"], str) or not re.fullmatch(r"f4-madrid-embeddings-sha256-[0-9a-f]{64}", document["embedding_dataset_id"]):
@@ -1258,9 +1277,12 @@ def _validate_f4_retrieval_result(document: Mapping[str, Any]) -> None:
     if len(query["language"]) < 2:
         raise SchemaValidationError("f4_retrieval_result.query.language no válido")
     _positive_id(document["requested_k"], "f4_retrieval_result.requested_k")
+    if document["checkpoint_sha256"] != "d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d" or document["tie_break"] != "candidate_id_ascending" or document["gallery_count"] != 9:
+        raise SchemaValidationError("identidad o política de ranking no válida")
     results = document["results"]
-    if not isinstance(results, list) or len(results) > document["requested_k"]:
-        raise SchemaValidationError("f4_retrieval_result.results excede requested_k")
+    expected_k = min(document["requested_k"], document["gallery_count"])
+    if not isinstance(results, list) or len(results) != expected_k or document["effective_k"] != expected_k:
+        raise SchemaValidationError("número de resultados no corresponde a K y galería")
     seen = set()
     for index, result in enumerate(results, start=1):
         if not isinstance(result, Mapping) or set(result) != {"rank", "candidate_id", "latitude", "longitude", "score"}:
@@ -1275,6 +1297,10 @@ def _validate_f4_retrieval_result(document: Mapping[str, Any]) -> None:
             _finite_number(result[field], f"resultado.{field}")
         if not -90 <= result["latitude"] <= 90 or not -180 <= result["longitude"] <= 180 or not -1 <= result["score"] <= 1:
             raise SchemaValidationError("resultado Top-K fuera de rango")
+        if index > 1:
+            previous = results[index - 2]
+            if result["score"] > previous["score"] or (result["score"] == previous["score"] and result["candidate_id"] < previous["candidate_id"]):
+                raise SchemaValidationError("resultado Top-K no respeta score y desempate")
     timings = document["timings_ms"]
     if not isinstance(timings, Mapping) or set(timings) != {"text_encoding", "ranking", "total"}:
         raise SchemaValidationError("f4_retrieval_result.timings_ms no válido")

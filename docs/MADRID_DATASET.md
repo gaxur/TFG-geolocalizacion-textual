@@ -7,10 +7,11 @@ adquirido y validado el primer snapshot OSM raw de D004, identificado como
 `osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141`;
 se documenta en [PHASE2_OSM_SNAPSHOT.md](PHASE2_OSM_SNAPSHOT.md) y permanece
 fuera de Git. F3 ha materializado el catálogo geométrico asociado. F4 ha
-generado una fixture local de nueve imágenes cartográficas, documentada en
-[PHASE4_VISUAL_CONTRACTS.md](PHASE4_VISUAL_CONTRACTS.md); los embeddings y el
-retrieval siguen pendientes. El piloto utiliza la bounding box fijada en D004;
-la extensión definitiva de Madrid continúa pendiente.
+generado una fixture local de nueve imágenes cartográficas y sus embeddings, y
+ha ejecutado una prueba técnica de retrieval exhaustivo, documentada en
+[PHASE4_VISUAL_CONTRACTS.md](PHASE4_VISUAL_CONTRACTS.md). La evaluación formal
+de Madrid sigue pendiente. El piloto utiliza la bounding box fijada en D004; la
+extensión definitiva de Madrid continúa pendiente.
 
 ## 1. Separación de recursos
 

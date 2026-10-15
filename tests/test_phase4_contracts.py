@@ -131,29 +131,32 @@ class Phase4ContractTests(unittest.TestCase):
 
     def _embedding_manifest(self):
         document = {
-            "schema_version": "1.0", "embedding_dataset_id": "f4-madrid-embeddings-sha256-" + ZERO_HASH,
-            "contract_version": "f4-image-embeddings-v1",
+            "schema_version": "2.0", "embedding_dataset_id": "f4-madrid-embeddings-sha256-" + ZERO_HASH,
+            "contract_version": "f4-image-embeddings-v2", "generator_version": "phase4-crosstext2loc-embeddings-v1", "generator_source_sha256": ZERO_HASH,
             "visual_dataset": {"visual_dataset_id": self.visual["visual_dataset_id"], "manifest_sha256": ONE_HASH},
-            "model": {"name": "CLIP-L/14@336", "architecture": "ViT-L/14@336px", "cvg_text_commit": "6910d2747a94fbe985309bde60cd4732bcbbf50f", "openai_clip_commit": "dcba3cb2e2827b402d2701e7e1c7d9fed8a20ef1", "text_context_length": 300},
-            "checkpoint": {"filename": "checkpoint.pth", "sha256": ZERO_HASH, "selection_status": "provisional_d013"},
-            "preprocessing": {"policy": "official_clip_preprocess", "input_width_px": 336, "input_height_px": 336},
-            "embedding": {"matrix_path": "embeddings/image_embeddings.npy", "matrix_sha256": ZERO_HASH, "candidate_ids_path": "embeddings/candidate_ids.jsonl", "candidate_ids_sha256": ONE_HASH, "count": 8, "dimension": 768, "dtype": "float32", "normalization": "l2", "row_order": "candidate_ids_file_order"},
+            "model": {"name": "CLIP-L/14@336", "architecture": "ViT-L/14@336px", "cvg_text_commit": "6910d2747a94fbe985309bde60cd4732bcbbf50f", "cvg_utils_sha256": ZERO_HASH, "openai_clip_commit": "dcba3cb2e2827b402d2701e7e1c7d9fed8a20ef1", "openai_clip_weights_filename": "ViT-L-14-336px.pt", "openai_clip_weights_sha256": "3035c92b350959924f9f00213499208652fc7ea050643e8b385c2dac08641f02", "text_context_length": 300},
+            "checkpoint": {"filename": "long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth", "size_bytes": 1712649548, "sha256": "d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d", "selection_status": "provisional_d013"},
+            "preprocessing": {"policy": "official_openai_clip_preprocess", "input_width_px": 336, "input_height_px": 336, "image_color_mode": "RGB", "text_tokenizer": "clip.tokenize_context_300", "text_truncation": True},
+            "environment": {"container_image_id": "sha256:" + "2" * 64, "python_version": "3.12.3", "torch_version": "test", "torchvision_version": "test", "cuda_version": "test", "device_type": "cuda", "inference_dtype": "float32"},
+            "embedding": {"matrix_path": "embeddings/image_embeddings.npy", "matrix_sha256": ZERO_HASH, "candidate_ids_path": "embeddings/candidate_ids.jsonl", "candidate_ids_sha256": ONE_HASH, "candidate_ids_format": "jsonl_object_candidate_id_v1", "count": 9, "dimension": 768, "dtype": "float32", "byte_order": "little", "normalization": "l2", "row_order": "visual_manifest_order"},
         }
         document["embedding_dataset_id"] = embedding_dataset_id(document)
         return document
 
     def _retrieval_result(self):
         return {
-            "schema_version": "1.0", "contract_version": "f4-exhaustive-retrieval-v1",
+            "schema_version": "2.0", "contract_version": "f4-exhaustive-retrieval-v2",
             "query": {"query_id": "query-fixture", "text": "A square near a street", "language": "en"},
-            "embedding_dataset_id": "f4-madrid-embeddings-sha256-" + ZERO_HASH, "ranking_method": "exhaustive_cosine", "requested_k": 5,
+            "embedding_dataset_id": "f4-madrid-embeddings-sha256-" + ZERO_HASH, "checkpoint_sha256": "d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d", "ranking_method": "exhaustive_cosine", "tie_break": "candidate_id_ascending", "gallery_count": 9, "requested_k": 5, "effective_k": 1,
             "results": [{"rank": 1, "candidate_id": self.candidate.candidate_id, "latitude": self.candidate.latitude, "longitude": self.candidate.longitude, "score": 0.25}],
             "timings_ms": {"text_encoding": 10.0, "ranking": 0.1, "total": 10.2},
         }
 
     def test_schemas_accept_realistic_synthetic_contracts(self):
+        retrieval = self._retrieval_result()
+        retrieval["requested_k"] = 1
         documents = (
-            self.visual, self._embedding_manifest(), self._retrieval_result(), self.selection,
+            self.visual, self._embedding_manifest(), retrieval, self.selection,
             self.visual["source"], {"renderer": self.visual["renderer"], "style": self.visual["style"]},
         )
         for name, document in zip(self.schemas, documents):
@@ -339,8 +342,9 @@ class Phase4ContractTests(unittest.TestCase):
     def test_embedding_and_top_k_contracts_remain_separate(self):
         embedding = self._embedding_manifest()
         self.assertEqual(embedding["embedding"]["dimension"], F4_EMBEDDING_DIMENSION)
-        validate_embedding_manifest(embedding, self.visual)
+        validate_embedding_manifest(embedding)
         result = self._retrieval_result()
+        result["requested_k"] = 1
         validate_retrieval_result(result, self.catalog)
         self.assertNotIn("ground_truth", result)
         invalid = copy.deepcopy(result)
