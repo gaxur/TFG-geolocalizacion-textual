@@ -14,6 +14,17 @@ import urllib.parse
 from typing import Any
 
 from .f3_contracts import F3_GEOMETRY_REASONS, F3_INVALID_REASONS, F3_NOT_ASSOCIABLE_REASONS
+from .f4_contracts import (
+    F4_EMBEDDING_CONTRACT_VERSION,
+    F4_EMBEDDING_DIMENSION,
+    F4_EXPERIMENTAL_PROFILE_ID,
+    F4_IMAGE_STATUSES,
+    F4_PROFILE_STATUS,
+    F4_RETRIEVAL_CONTRACT_VERSION,
+    F4_VISUAL_CONTRACT_VERSION,
+    F4_VISUAL_GENERATOR_VERSION,
+    experimental_visual_profile,
+)
 
 
 class SchemaValidationError(ValueError):
@@ -883,6 +894,265 @@ def _validate_evaluation(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("ground_truth.crs debe ser EPSG:4326")
 
 
+def _non_empty_string(value: Any, field: str) -> None:
+    if not isinstance(value, str) or not value:
+        raise SchemaValidationError(f"{field} debe ser texto no vacío")
+
+
+def _validate_render_bbox(value: Any, field: str) -> None:
+    if not isinstance(value, Mapping):
+        raise SchemaValidationError(f"{field} debe ser un objeto")
+    fields = ("crs", "min_x", "min_y", "max_x", "max_y")
+    _required(value, fields, field)
+    _no_unknown(value, set(fields), field)
+    _non_empty_string(value["crs"], f"{field}.crs")
+    for coordinate in fields[1:]:
+        _finite_number(value[coordinate], f"{field}.{coordinate}")
+    if value["min_x"] >= value["max_x"] or value["min_y"] >= value["max_y"]:
+        raise SchemaValidationError(f"{field} contiene límites invertidos o vacíos")
+
+
+def _validate_f4_profile(profile: Any) -> None:
+    if not isinstance(profile, Mapping):
+        raise SchemaValidationError("f4_visual_manifest.profile debe ser un objeto")
+    expected = experimental_visual_profile()
+    if dict(profile) != expected:
+        raise SchemaValidationError(
+            f"f4_visual_manifest.profile debe ser {F4_EXPERIMENTAL_PROFILE_ID} "
+            f"con estado {F4_PROFILE_STATUS}"
+        )
+
+
+def _validate_f4_visual_manifest(document: Mapping[str, Any]) -> None:
+    context = "f4_visual_manifest"
+    fields = (
+        "schema_version", "visual_dataset_id", "contract_version", "generator_version",
+        "catalog", "profile", "source", "renderer", "style", "images",
+    )
+    _required(document, fields, context)
+    _no_unknown(document, set(fields), context)
+    _version(document, context)
+    if document["contract_version"] != F4_VISUAL_CONTRACT_VERSION:
+        raise SchemaValidationError("f4_visual_manifest.contract_version no soportada")
+    if document["generator_version"] != F4_VISUAL_GENERATOR_VERSION:
+        raise SchemaValidationError("f4_visual_manifest.generator_version no soportada")
+    if not isinstance(document["visual_dataset_id"], str) or not re.fullmatch(
+        r"f4-madrid-visual-sha256-[0-9a-f]{64}", document["visual_dataset_id"]
+    ):
+        raise SchemaValidationError("f4_visual_manifest.visual_dataset_id no válido")
+
+    catalog = document["catalog"]
+    catalog_fields = (
+        "manifest_id", "manifest_sha256", "region_id", "catalog_version",
+        "spacing_m", "cell_size_m", "grid_hash",
+    )
+    if not isinstance(catalog, Mapping):
+        raise SchemaValidationError("f4_visual_manifest.catalog debe ser un objeto")
+    _required(catalog, catalog_fields, "f4_visual_manifest.catalog")
+    _no_unknown(catalog, set(catalog_fields), "f4_visual_manifest.catalog")
+    for field in ("manifest_id", "region_id", "catalog_version"):
+        _non_empty_string(catalog[field], f"f4_visual_manifest.catalog.{field}")
+    _sha256(catalog["manifest_sha256"], "f4_visual_manifest.catalog.manifest_sha256")
+    if catalog["region_id"] != "madrid_pilot":
+        raise SchemaValidationError("f4_visual_manifest.catalog.region_id no soportado")
+    if catalog["spacing_m"] != 50 or catalog["cell_size_m"] != 50:
+        raise SchemaValidationError("f4_visual_manifest requiere el catálogo experimental de 50 m")
+    if not isinstance(catalog["grid_hash"], str) or not re.fullmatch(r"[0-9a-f]{12}", catalog["grid_hash"]):
+        raise SchemaValidationError("f4_visual_manifest.catalog.grid_hash no válido")
+    _validate_f4_profile(document["profile"])
+
+    source = document["source"]
+    source_fields = ("source_id", "source_type", "data_sha256", "license", "attribution")
+    if not isinstance(source, Mapping):
+        raise SchemaValidationError("f4_visual_manifest.source debe ser un objeto")
+    _required(source, source_fields, "f4_visual_manifest.source")
+    _no_unknown(source, set(source_fields), "f4_visual_manifest.source")
+    for field in ("source_id", "license", "attribution"):
+        _non_empty_string(source[field], f"f4_visual_manifest.source.{field}")
+    if source["source_type"] not in {"osm_snapshot", "authorized_tile_provider", "synthetic_fixture"}:
+        raise SchemaValidationError("f4_visual_manifest.source.source_type no válido")
+    _sha256(source["data_sha256"], "f4_visual_manifest.source.data_sha256")
+
+    for group, group_fields in (
+        ("renderer", ("name", "version", "configuration_sha256")),
+        ("style", ("style_id", "version", "sha256", "license")),
+    ):
+        value = document[group]
+        if not isinstance(value, Mapping):
+            raise SchemaValidationError(f"f4_visual_manifest.{group} debe ser un objeto")
+        _required(value, group_fields, f"f4_visual_manifest.{group}")
+        _no_unknown(value, set(group_fields), f"f4_visual_manifest.{group}")
+        for field in group_fields:
+            if field.endswith("sha256") or field == "sha256":
+                _sha256(value[field], f"f4_visual_manifest.{group}.{field}")
+            else:
+                _non_empty_string(value[field], f"f4_visual_manifest.{group}.{field}")
+
+    images = document["images"]
+    if not isinstance(images, list) or not images:
+        raise SchemaValidationError("f4_visual_manifest.images debe ser una lista no vacía")
+    image_fields = (
+        "candidate_id", "latitude", "longitude", "generation_status", "image_path",
+        "image_sha256", "width_px", "height_px", "color_mode", "format",
+        "requested_bbox", "rendered_bbox", "meters_per_pixel_x", "meters_per_pixel_y",
+        "transformations", "error_code",
+    )
+    seen = set()
+    for index, image in enumerate(images):
+        label = f"f4_visual_manifest.images[{index}]"
+        if not isinstance(image, Mapping):
+            raise SchemaValidationError(f"{label} debe ser un objeto")
+        _required(image, image_fields, label)
+        _no_unknown(image, set(image_fields), label)
+        _non_empty_string(image["candidate_id"], f"{label}.candidate_id")
+        if image["candidate_id"] in seen:
+            raise SchemaValidationError(f"{label}.candidate_id duplicado")
+        seen.add(image["candidate_id"])
+        _finite_number(image["latitude"], f"{label}.latitude")
+        _finite_number(image["longitude"], f"{label}.longitude")
+        if not -90 <= image["latitude"] <= 90 or not -180 <= image["longitude"] <= 180:
+            raise SchemaValidationError(f"{label} contiene coordenadas fuera de rango")
+        if image["generation_status"] not in F4_IMAGE_STATUSES:
+            raise SchemaValidationError(f"{label}.generation_status no válido")
+        _validate_render_bbox(image["requested_bbox"], f"{label}.requested_bbox")
+
+        generated = image["generation_status"] == "generated"
+        generated_fields = (
+            "image_path", "image_sha256", "width_px", "height_px", "color_mode",
+            "format", "rendered_bbox", "meters_per_pixel_x", "meters_per_pixel_y",
+            "transformations",
+        )
+        if generated:
+            if any(image[field] is None for field in generated_fields) or image["error_code"] is not None:
+                raise SchemaValidationError(f"{label} generado tiene metadatos incompletos")
+            _logical_path(image["image_path"], f"{label}.image_path")
+            _sha256(image["image_sha256"], f"{label}.image_sha256")
+            if image["width_px"] != 512 or image["height_px"] != 512:
+                raise SchemaValidationError(f"{label} debe medir 512 x 512")
+            if image["color_mode"] != "RGB" or image["format"] != "PNG":
+                raise SchemaValidationError(f"{label} debe ser PNG RGB")
+            _validate_render_bbox(image["rendered_bbox"], f"{label}.rendered_bbox")
+            _finite_number(image["meters_per_pixel_x"], f"{label}.meters_per_pixel_x", minimum=0)
+            _finite_number(image["meters_per_pixel_y"], f"{label}.meters_per_pixel_y", minimum=0)
+            if image["meters_per_pixel_x"] == 0 or image["meters_per_pixel_y"] == 0:
+                raise SchemaValidationError(f"{label} requiere resolución espacial positiva")
+            transforms = image["transformations"]
+            transform_fields = (
+                "source_width_px", "source_height_px", "crop_left_px", "crop_top_px",
+                "crop_width_px", "crop_height_px", "output_width_px", "output_height_px",
+                "resize_interpolation",
+            )
+            if not isinstance(transforms, Mapping):
+                raise SchemaValidationError(f"{label}.transformations debe ser un objeto")
+            _required(transforms, transform_fields, f"{label}.transformations")
+            _no_unknown(transforms, set(transform_fields), f"{label}.transformations")
+            for field in transform_fields[:-1]:
+                minimum = 0 if field in {"crop_left_px", "crop_top_px"} else 1
+                if isinstance(transforms[field], bool) or not isinstance(transforms[field], int) or transforms[field] < minimum:
+                    raise SchemaValidationError(f"{label}.transformations.{field} no válido")
+            expected = {"crop_width_px": 256, "crop_height_px": 256, "output_width_px": 512, "output_height_px": 512}
+            if any(transforms[field] != value for field, value in expected.items()) or transforms["resize_interpolation"] != "bicubic":
+                raise SchemaValidationError(f"{label}.transformations no corresponde al perfil")
+            if transforms["crop_left_px"] + 256 > transforms["source_width_px"] or transforms["crop_top_px"] + 256 > transforms["source_height_px"]:
+                raise SchemaValidationError(f"{label}.transformations recorta fuera del raster fuente")
+        else:
+            if any(image[field] is not None for field in generated_fields):
+                raise SchemaValidationError(f"{label} fallido no debe declarar artefactos generados")
+            _non_empty_string(image["error_code"], f"{label}.error_code")
+
+
+def _validate_f4_embedding_manifest(document: Mapping[str, Any]) -> None:
+    context = "f4_embedding_manifest"
+    fields = ("schema_version", "embedding_dataset_id", "contract_version", "visual_dataset", "model", "checkpoint", "preprocessing", "embedding")
+    _required(document, fields, context)
+    _no_unknown(document, set(fields), context)
+    _version(document, context)
+    if document["contract_version"] != F4_EMBEDDING_CONTRACT_VERSION:
+        raise SchemaValidationError("f4_embedding_manifest.contract_version no soportada")
+    if not isinstance(document["embedding_dataset_id"], str) or not re.fullmatch(r"f4-madrid-embeddings-sha256-[0-9a-f]{64}", document["embedding_dataset_id"]):
+        raise SchemaValidationError("f4_embedding_manifest.embedding_dataset_id no válido")
+    visual = document["visual_dataset"]
+    if not isinstance(visual, Mapping) or set(visual) != {"visual_dataset_id", "manifest_sha256"}:
+        raise SchemaValidationError("f4_embedding_manifest.visual_dataset no válido")
+    if not re.fullmatch(r"f4-madrid-visual-sha256-[0-9a-f]{64}", visual["visual_dataset_id"]):
+        raise SchemaValidationError("referencia visual no válida")
+    _sha256(visual["manifest_sha256"], "f4_embedding_manifest.visual_dataset.manifest_sha256")
+    model = document["model"]
+    expected_model_fields = {"name", "architecture", "cvg_text_commit", "openai_clip_commit", "text_context_length"}
+    if not isinstance(model, Mapping) or set(model) != expected_model_fields:
+        raise SchemaValidationError("f4_embedding_manifest.model no válido")
+    if model["name"] != "CLIP-L/14@336" or model["architecture"] != "ViT-L/14@336px" or model["text_context_length"] != 300:
+        raise SchemaValidationError("modelo CrossText2Loc no corresponde al contrato")
+    for field in ("cvg_text_commit", "openai_clip_commit"):
+        if not isinstance(model[field], str) or not re.fullmatch(r"[0-9a-f]{40}", model[field]):
+            raise SchemaValidationError(f"f4_embedding_manifest.model.{field} no válido")
+    checkpoint = document["checkpoint"]
+    if not isinstance(checkpoint, Mapping) or set(checkpoint) != {"filename", "sha256", "selection_status"}:
+        raise SchemaValidationError("f4_embedding_manifest.checkpoint no válido")
+    _non_empty_string(checkpoint["filename"], "f4_embedding_manifest.checkpoint.filename")
+    _sha256(checkpoint["sha256"], "f4_embedding_manifest.checkpoint.sha256")
+    if checkpoint["selection_status"] != "provisional_d013":
+        raise SchemaValidationError("checkpoint debe conservar estado provisional D013")
+    if document["preprocessing"] != {"policy": "official_clip_preprocess", "input_width_px": 336, "input_height_px": 336}:
+        raise SchemaValidationError("preprocessing de embeddings no válido")
+    embedding = document["embedding"]
+    embedding_fields = {"matrix_path", "matrix_sha256", "candidate_ids_path", "candidate_ids_sha256", "count", "dimension", "dtype", "normalization", "row_order"}
+    if not isinstance(embedding, Mapping) or set(embedding) != embedding_fields:
+        raise SchemaValidationError("f4_embedding_manifest.embedding no válido")
+    for field in ("matrix_path", "candidate_ids_path"):
+        _logical_path(embedding[field], f"f4_embedding_manifest.embedding.{field}")
+    for field in ("matrix_sha256", "candidate_ids_sha256"):
+        _sha256(embedding[field], f"f4_embedding_manifest.embedding.{field}")
+    _positive_id(embedding["count"], "f4_embedding_manifest.embedding.count")
+    expected_embedding = {"dimension": F4_EMBEDDING_DIMENSION, "dtype": "float32", "normalization": "l2", "row_order": "candidate_ids_file_order"}
+    if any(embedding[field] != value for field, value in expected_embedding.items()):
+        raise SchemaValidationError("representación de embeddings no válida")
+
+
+def _validate_f4_retrieval_result(document: Mapping[str, Any]) -> None:
+    context = "f4_retrieval_result"
+    fields = ("schema_version", "contract_version", "query", "embedding_dataset_id", "ranking_method", "requested_k", "results", "timings_ms")
+    _required(document, fields, context)
+    _no_unknown(document, set(fields), context)
+    _version(document, context)
+    if document["contract_version"] != F4_RETRIEVAL_CONTRACT_VERSION or document["ranking_method"] != "exhaustive_cosine":
+        raise SchemaValidationError("contrato o método de ranking F4 no soportado")
+    if not isinstance(document["embedding_dataset_id"], str) or not re.fullmatch(r"f4-madrid-embeddings-sha256-[0-9a-f]{64}", document["embedding_dataset_id"]):
+        raise SchemaValidationError("embedding_dataset_id de retrieval no válido")
+    query = document["query"]
+    if not isinstance(query, Mapping) or set(query) != {"query_id", "text", "language"}:
+        raise SchemaValidationError("f4_retrieval_result.query no válido")
+    for field in ("query_id", "text", "language"):
+        _non_empty_string(query[field], f"f4_retrieval_result.query.{field}")
+    if len(query["language"]) < 2:
+        raise SchemaValidationError("f4_retrieval_result.query.language no válido")
+    _positive_id(document["requested_k"], "f4_retrieval_result.requested_k")
+    results = document["results"]
+    if not isinstance(results, list) or len(results) > document["requested_k"]:
+        raise SchemaValidationError("f4_retrieval_result.results excede requested_k")
+    seen = set()
+    for index, result in enumerate(results, start=1):
+        if not isinstance(result, Mapping) or set(result) != {"rank", "candidate_id", "latitude", "longitude", "score"}:
+            raise SchemaValidationError("resultado Top-K no válido")
+        if result["rank"] != index:
+            raise SchemaValidationError("ranks Top-K deben ser consecutivos desde 1")
+        _non_empty_string(result["candidate_id"], "resultado.candidate_id")
+        if result["candidate_id"] in seen:
+            raise SchemaValidationError("candidate_id duplicado en Top-K")
+        seen.add(result["candidate_id"])
+        for field in ("latitude", "longitude", "score"):
+            _finite_number(result[field], f"resultado.{field}")
+        if not -90 <= result["latitude"] <= 90 or not -180 <= result["longitude"] <= 180 or not -1 <= result["score"] <= 1:
+            raise SchemaValidationError("resultado Top-K fuera de rango")
+    timings = document["timings_ms"]
+    if not isinstance(timings, Mapping) or set(timings) != {"text_encoding", "ranking", "total"}:
+        raise SchemaValidationError("f4_retrieval_result.timings_ms no válido")
+    for field, value in timings.items():
+        _finite_number(value, f"f4_retrieval_result.timings_ms.{field}", minimum=0)
+    if timings["total"] < timings["text_encoding"] + timings["ranking"]:
+        raise SchemaValidationError("tiempo total menor que sus componentes")
+
+
 def validate_document(document: Any, schema_name: str) -> None:
     if not isinstance(document, Mapping):
         raise SchemaValidationError("el documento raíz debe ser un objeto")
@@ -896,6 +1166,9 @@ def validate_document(document: Any, schema_name: str) -> None:
         "f3_association": _validate_f3_association,
         "f3_relation_context": _validate_f3_relation_context,
         "f3_provenance": _validate_f3_provenance,
+        "f4_visual_manifest": _validate_f4_visual_manifest,
+        "f4_embedding_manifest": _validate_f4_embedding_manifest,
+        "f4_retrieval_result": _validate_f4_retrieval_result,
         "experiment_parameters": _validate_experiment,
     }
     try:

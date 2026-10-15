@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f4_visual_manifest.schema.json",
+  "title": "F4 Madrid visual dataset manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "visual_dataset_id", "contract_version", "generator_version", "catalog", "profile", "source", "renderer", "style", "images"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "visual_dataset_id": {"type": "string", "pattern": "^f4-madrid-visual-sha256-[0-9a-f]{64}$"},
+    "contract_version": {"const": "f4-visual-dataset-v1"},
+    "generator_version": {"const": "phase4-visual-dataset-v1"},
+    "catalog": {"$ref": "#/$defs/catalog"},
+    "profile": {"$ref": "#/$defs/profile"},
+    "source": {"$ref": "#/$defs/source"},
+    "renderer": {"$ref": "#/$defs/renderer"},
+    "style": {"$ref": "#/$defs/style"},
+    "images": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/image"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "logicalPath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.{1,2}(?:[\\\\/]|$)).+$"},
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest_id", "manifest_sha256", "region_id", "catalog_version", "spacing_m", "cell_size_m", "grid_hash"],
+      "properties": {
+        "manifest_id": {"type": "string", "minLength": 1},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "region_id": {"const": "madrid_pilot"},
+        "catalog_version": {"type": "string", "minLength": 1},
+        "spacing_m": {"const": 50},
+        "cell_size_m": {"const": 50},
+        "grid_hash": {"type": "string", "pattern": "^[0-9a-f]{12}$"}
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "compatibility_status", "modality", "center_source", "render_crs", "orientation", "zoom_reference", "requested_half_extent_projected_m", "crop", "output", "model_preprocessing", "evidence"],
+      "properties": {
+        "profile_id": {"const": "crosstext2loc-osm-z18-crop256-resize512-exp-v1"},
+        "compatibility_status": {"const": "experimental_unconfirmed"},
+        "modality": {"const": "osm_raster_map"},
+        "center_source": {"const": "f1_candidate_center_wgs84"},
+        "render_crs": {"const": "EPSG:3857"},
+        "orientation": {"const": "north_up"},
+        "zoom_reference": {"const": 18},
+        "requested_half_extent_projected_m": {"const": 33.6256},
+        "crop": {
+          "type": "object", "additionalProperties": false,
+          "required": ["width_px", "height_px", "anchor"],
+          "properties": {"width_px": {"const": 256}, "height_px": {"const": 256}, "anchor": {"const": "candidate_projected_pixel"}}
+        },
+        "output": {
+          "type": "object", "additionalProperties": false,
+          "required": ["width_px", "height_px", "color_mode", "format", "resize_interpolation"],
+          "properties": {"width_px": {"const": 512}, "height_px": {"const": 512}, "color_mode": {"const": "RGB"}, "format": {"const": "PNG"}, "resize_interpolation": {"const": "bicubic"}}
+        },
+        "model_preprocessing": {
+          "type": "object", "additionalProperties": false,
+          "required": ["implementation", "model", "input_width_px", "input_height_px", "policy"],
+          "properties": {"implementation": {"const": "openai_clip"}, "model": {"const": "ViT-L/14@336px"}, "input_width_px": {"const": 336}, "input_height_px": {"const": 336}, "policy": {"const": "official_clip_preprocess"}}
+        },
+        "evidence": {
+          "type": "object", "additionalProperties": false,
+          "required": ["upstream_repository_commit", "upstream_script", "decision", "limitation"],
+          "properties": {
+            "upstream_repository_commit": {"const": "6910d2747a94fbe985309bde60cd4732bcbbf50f"},
+            "upstream_script": {"const": "external/CVG-Text/download_osm_street.py"},
+            "decision": {"const": "D007"},
+            "limitation": {"const": "upstream_script_saves_img_instead_of_computed_img_crop"}
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_id", "source_type", "data_sha256", "license", "attribution"],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "source_type": {"enum": ["osm_snapshot", "authorized_tile_provider", "synthetic_fixture"]},
+        "data_sha256": {"$ref": "#/$defs/sha256"},
+        "license": {"type": "string", "minLength": 1},
+        "attribution": {"type": "string", "minLength": 1}
+      }
+    },
+    "renderer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "version", "configuration_sha256"],
+      "properties": {"name": {"type": "string", "minLength": 1}, "version": {"type": "string", "minLength": 1}, "configuration_sha256": {"$ref": "#/$defs/sha256"}}
+    },
+    "style": {
+      "type": "object", "additionalProperties": false,
+      "required": ["style_id", "version", "sha256", "license"],
+      "properties": {"style_id": {"type": "string", "minLength": 1}, "version": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}, "license": {"type": "string", "minLength": 1}}
+    },
+    "bbox": {
+      "type": "object", "additionalProperties": false,
+      "required": ["crs", "min_x", "min_y", "max_x", "max_y"],
+      "properties": {"crs": {"type": "string", "minLength": 1}, "min_x": {"type": "number"}, "min_y": {"type": "number"}, "max_x": {"type": "number"}, "max_y": {"type": "number"}}
+    },
+    "transformations": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_width_px", "source_height_px", "crop_left_px", "crop_top_px", "crop_width_px", "crop_height_px", "output_width_px", "output_height_px", "resize_interpolation"],
+      "properties": {
+        "source_width_px": {"type": "integer", "minimum": 1}, "source_height_px": {"type": "integer", "minimum": 1},
+        "crop_left_px": {"type": "integer", "minimum": 0}, "crop_top_px": {"type": "integer", "minimum": 0},
+        "crop_width_px": {"const": 256}, "crop_height_px": {"const": 256},
+        "output_width_px": {"const": 512}, "output_height_px": {"const": 512},
+        "resize_interpolation": {"const": "bicubic"}
+      }
+    },
+    "image": {
+      "type": "object", "additionalProperties": false,
+      "required": ["candidate_id", "latitude", "longitude", "generation_status", "image_path", "image_sha256", "width_px", "height_px", "color_mode", "format", "requested_bbox", "rendered_bbox", "meters_per_pixel_x", "meters_per_pixel_y", "transformations", "error_code"],
+      "properties": {
+        "candidate_id": {"type": "string", "minLength": 1},
+        "latitude": {"type": "number", "minimum": -90, "maximum": 90},
+        "longitude": {"type": "number", "minimum": -180, "maximum": 180},
+        "generation_status": {"enum": ["generated", "failed", "insufficient_source"]},
+        "image_path": {"oneOf": [{"$ref": "#/$defs/logicalPath"}, {"type": "null"}]},
+        "image_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "width_px": {"type": ["integer", "null"], "minimum": 1}, "height_px": {"type": ["integer", "null"], "minimum": 1},
+        "color_mode": {"enum": ["RGB", null]}, "format": {"enum": ["PNG", null]},
+        "requested_bbox": {"$ref": "#/$defs/bbox"},
+        "rendered_bbox": {"oneOf": [{"$ref": "#/$defs/bbox"}, {"type": "null"}]},
+        "meters_per_pixel_x": {"type": ["number", "null"], "exclusiveMinimum": 0}, "meters_per_pixel_y": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "transformations": {"oneOf": [{"$ref": "#/$defs/transformations"}, {"type": "null"}]},
+        "error_code": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

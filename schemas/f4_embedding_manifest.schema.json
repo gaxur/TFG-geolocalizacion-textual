@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f4_embedding_manifest.schema.json",
+  "title": "F4 CrossText2Loc image embedding manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "embedding_dataset_id", "contract_version", "visual_dataset", "model", "checkpoint", "preprocessing", "embedding"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "embedding_dataset_id": {"type": "string", "pattern": "^f4-madrid-embeddings-sha256-[0-9a-f]{64}$"},
+    "contract_version": {"const": "f4-image-embeddings-v1"},
+    "visual_dataset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["visual_dataset_id", "manifest_sha256"],
+      "properties": {"visual_dataset_id": {"type": "string", "pattern": "^f4-madrid-visual-sha256-[0-9a-f]{64}$"}, "manifest_sha256": {"$ref": "#/$defs/sha256"}}
+    },
+    "model": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "architecture", "cvg_text_commit", "openai_clip_commit", "text_context_length"],
+      "properties": {
+        "name": {"const": "CLIP-L/14@336"}, "architecture": {"const": "ViT-L/14@336px"},
+        "cvg_text_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "openai_clip_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "text_context_length": {"const": 300}
+      }
+    },
+    "checkpoint": {
+      "type": "object", "additionalProperties": false,
+      "required": ["filename", "sha256", "selection_status"],
+      "properties": {"filename": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}, "selection_status": {"const": "provisional_d013"}}
+    },
+    "preprocessing": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policy", "input_width_px", "input_height_px"],
+      "properties": {"policy": {"const": "official_clip_preprocess"}, "input_width_px": {"const": 336}, "input_height_px": {"const": 336}}
+    },
+    "embedding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["matrix_path", "matrix_sha256", "candidate_ids_path", "candidate_ids_sha256", "count", "dimension", "dtype", "normalization", "row_order"],
+      "properties": {
+        "matrix_path": {"$ref": "#/$defs/logicalPath"}, "matrix_sha256": {"$ref": "#/$defs/sha256"},
+        "candidate_ids_path": {"$ref": "#/$defs/logicalPath"}, "candidate_ids_sha256": {"$ref": "#/$defs/sha256"},
+        "count": {"type": "integer", "minimum": 1}, "dimension": {"const": 768}, "dtype": {"const": "float32"},
+        "normalization": {"const": "l2"}, "row_order": {"const": "candidate_ids_file_order"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "logicalPath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.{1,2}(?:[\\\\/]|$)).+$"}
+  }
+}
