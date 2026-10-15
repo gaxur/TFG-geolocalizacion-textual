@@ -27,6 +27,7 @@ class Phase4GeometryTests(unittest.TestCase):
         write_manifest(build_catalog(cls.config, spacing_m=50), cls.manifest_path)
         cls.catalog = load_verified_f1_50m(cls.manifest_path, cls.config)
         cls.selection, cls.selection_hash = load_verified_selection(ROOT / "config/madrid_f4_visual_fixture.json", cls.catalog)
+        cls.full_selection, cls.full_selection_hash = load_verified_selection(ROOT / "config/madrid_f4_visual_gallery_50m.json", cls.catalog)
 
     @classmethod
     def tearDownClass(cls):
@@ -79,6 +80,17 @@ class Phase4GeometryTests(unittest.TestCase):
         self.assertFalse(self.selection["text_or_ground_truth_used"])
         self.assertEqual(len({item["candidate_id"] for item in self.selection["candidates"]}), 9)
         self.assertEqual(self.selection_hash, "40cd0cf8e684aea65f6c782971bae8b8152824587e8a009fbce072e4706ffa6e")
+
+    def test_full_selection_is_exact_catalog_order(self):
+        selected = [row["candidate_id"] for row in self.full_selection["candidates"]]
+        expected = [candidate.candidate_id for candidate in self.catalog.candidates]
+        self.assertEqual(selected, expected)
+        self.assertEqual(len(selected), 253)
+        self.assertEqual(len(set(selected)), 253)
+        self.assertTrue(selected[0].endswith("R0001_C0001"))
+        self.assertTrue(selected[-1].endswith("R0016_C0016"))
+        self.assertFalse(self.full_selection["text_or_ground_truth_used"])
+        self.assertEqual(self.full_selection_hash, "2758a291222646cc84ec1ee1bcbfd69759a066d968129d202f457754de712389")
 
 
 if __name__ == "__main__":

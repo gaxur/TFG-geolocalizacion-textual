@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Renderiza y publica la fixture visual F4 con Mapnik y OSM Carto."""
+"""Renderiza y publica galerías visuales F4 con Mapnik y OSM Carto."""
 
 from __future__ import annotations
 
@@ -75,6 +75,50 @@ def render_mosaic(style_path: Path, geometry: dict[str, object], output: Path) -
     mapnik.render_to_file(map_object, str(output), "png")
 
 
+def canonical_hash(value: object) -> str:
+    raw = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    return sha256_bytes(raw)
+
+
+def valid_cached_row(row_path: Path, image_path: Path, expected: dict[str, object]) -> dict[str, object] | None:
+    try:
+        row = json.loads(row_path.read_text(encoding="utf-8"))
+        if row.get("cache_identity") != expected or row.get("generation_status") != "generated":
+            return None
+        raw = image_path.read_bytes()
+        if sha256_bytes(raw) != row["image_sha256"]:
+            return None
+        with Image.open(image_path) as image:
+            image.verify()
+        with Image.open(image_path) as image:
+            if image.size != (512, 512) or image.mode != "RGB" or image.format != "PNG" or not any(low != high for low, high in image.getextrema()):
+                return None
+        return {key: value for key, value in row.items() if key != "cache_identity"}
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def publish_cached_row(row_path: Path, image_path: Path, row: dict[str, object], identity: dict[str, object]) -> None:
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    row_path.parent.mkdir(parents=True, exist_ok=True)
+    document = dict(row)
+    rendered_path = Path(document.pop("rendered_path"))
+    document["cache_identity"] = identity
+    raw = (json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    with tempfile.NamedTemporaryFile(dir=image_path.parent, prefix=f".{image_path.name}.", delete=False) as stream:
+        temporary_image = Path(stream.name)
+    with tempfile.NamedTemporaryFile(dir=row_path.parent, prefix=f".{row_path.name}.", delete=False) as stream:
+        stream.write(raw)
+        temporary_row = Path(stream.name)
+    try:
+        shutil.copyfile(rendered_path, temporary_image)
+        os.replace(temporary_image, image_path)
+        os.replace(temporary_row, row_path)
+    finally:
+        temporary_image.unlink(missing_ok=True)
+        temporary_row.unlink(missing_ok=True)
+
+
 def tree_hashes(root: Path) -> dict[str, str]:
     return {
         path.relative_to(root).as_posix(): sha256_bytes(path.read_bytes())
@@ -110,6 +154,8 @@ def main() -> int:
     parser.add_argument("--renderer-root", required=True, type=Path)
     parser.add_argument("--container-image-digest", required=True)
     parser.add_argument("--output-root", required=True, type=Path)
+    parser.add_argument("--resume-root", type=Path)
+    parser.add_argument("--reuse-bundle", type=Path)
     parser.add_argument("--only-candidate")
     args = parser.parse_args()
 
@@ -156,7 +202,56 @@ def main() -> int:
         renderer_config_raw = (json.dumps(renderer_config, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()
         renderer_config_path = publish_content_file(manifests_dir, "renderer-config", ".json", renderer_config_raw)
 
+        cache_inputs = {
+            "cache_version": "f4-render-cache-v1",
+            "profile": experimental_visual_profile(),
+            "source_sha256": source_provenance["raw_sha256"],
+            "container_image_digest": args.container_image_digest,
+            "renderer_configuration_sha256": sha256_bytes(renderer_config_raw),
+            "compiled_style_sha256": sha256_bytes(style_path.read_bytes()),
+            "assets_manifest_sha256": sha256_bytes(assets_path.read_bytes()),
+            "fonts_manifest_sha256": sha256_bytes(fonts_path.read_bytes()),
+        }
+        resume_root = ROOT / (args.resume_root or Path("data/processed/visual-staging")) / canonical_hash(cache_inputs)
+        cache_images = resume_root / "images"
+        cache_rows = resume_root / "rows"
+        cache_images.mkdir(parents=True, exist_ok=True)
+        cache_rows.mkdir(parents=True, exist_ok=True)
+
+        if args.reuse_bundle:
+            reuse_root = ROOT / args.reuse_bundle
+            reuse_manifest = json.loads((reuse_root / "manifest.json").read_text(encoding="utf-8"))
+            compatible = (
+                reuse_manifest.get("profile") == cache_inputs["profile"]
+                and reuse_manifest.get("source", {}).get("data_sha256") == cache_inputs["source_sha256"]
+                and reuse_manifest.get("renderer", {}).get("container_image_digest") == cache_inputs["container_image_digest"]
+                and reuse_manifest.get("renderer", {}).get("configuration_sha256") == cache_inputs["renderer_configuration_sha256"]
+                and reuse_manifest.get("style", {}).get("compiled_style_sha256") == cache_inputs["compiled_style_sha256"]
+                and reuse_manifest.get("style", {}).get("assets_manifest_sha256") == cache_inputs["assets_manifest_sha256"]
+                and reuse_manifest.get("style", {}).get("fonts_manifest_sha256") == cache_inputs["fonts_manifest_sha256"]
+            )
+            if not compatible:
+                raise RuntimeError("bundle de reutilización incompatible con los inputs efectivos")
+            for old_row in reuse_manifest["images"]:
+                if old_row["generation_status"] != "generated" or old_row["candidate_id"] not in candidates:
+                    continue
+                candidate = candidates[old_row["candidate_id"]]
+                identity = dict(cache_inputs, candidate_id=candidate.candidate_id, latitude=candidate.latitude, longitude=candidate.longitude, geometry=geometry_document(candidate.latitude, candidate.longitude))
+                if (
+                    old_row["latitude"] != candidate.latitude
+                    or old_row["longitude"] != candidate.longitude
+                    or old_row["geometry"] != identity["geometry"]
+                ):
+                    raise RuntimeError(f"fila a reutilizar incompatible: {candidate.candidate_id}")
+                source_image = reuse_root / old_row["image_path"]
+                if sha256_bytes(source_image.read_bytes()) != old_row["image_sha256"]:
+                    raise RuntimeError(f"imagen a reutilizar corrupta: {candidate.candidate_id}")
+                seeded = dict(old_row, rendered_path=str(source_image))
+                publish_cached_row(cache_rows / f"{candidate.candidate_id}.json", cache_images / f"{candidate.candidate_id}.png", seeded, identity)
+
         rows = []
+        cache_hits = 0
+        rendered = 0
         for selected in selection["candidates"]:
             candidate = candidates[selected["candidate_id"]]
             geometry = geometry_document(candidate.latitude, candidate.longitude)
@@ -172,6 +267,15 @@ def main() -> int:
             if args.only_candidate and candidate.candidate_id != args.only_candidate:
                 rows.append({"candidate_id": candidate.candidate_id, "latitude": candidate.latitude, "longitude": candidate.longitude, "generation_status": "failed", "geometry": geometry, "image_path": None, "image_sha256": None, "width_px": None, "height_px": None, "color_mode": None, "format": None, "error_code": "renderer_failed"})
                 continue
+            identity = dict(cache_inputs, candidate_id=candidate.candidate_id, latitude=candidate.latitude, longitude=candidate.longitude, geometry=geometry)
+            cached_image = cache_images / f"{candidate.candidate_id}.png"
+            cached_row_path = cache_rows / f"{candidate.candidate_id}.json"
+            cached = valid_cached_row(cached_row_path, cached_image, identity)
+            if cached is not None:
+                shutil.copyfile(cached_image, images_dir / f"{candidate.candidate_id}.png")
+                rows.append(cached)
+                cache_hits += 1
+                continue
             mosaic = temp / f"{candidate.candidate_id}.mosaic.png"
             render_mosaic(style_path, geometry, mosaic)
             with Image.open(mosaic) as source:
@@ -183,7 +287,10 @@ def main() -> int:
                 if all(low == high for low, high in extrema):
                     raise RuntimeError(f"render uniforme sin contenido cartográfico: {candidate.candidate_id}")
             mosaic.unlink()
-            rows.append({"candidate_id": candidate.candidate_id, "latitude": candidate.latitude, "longitude": candidate.longitude, "generation_status": "generated", "geometry": geometry, "image_path": f"images/{candidate.candidate_id}.png", "image_sha256": sha256_bytes(final_path.read_bytes()), "width_px": 512, "height_px": 512, "color_mode": "RGB", "format": "PNG", "error_code": None})
+            row = {"candidate_id": candidate.candidate_id, "latitude": candidate.latitude, "longitude": candidate.longitude, "generation_status": "generated", "geometry": geometry, "image_path": f"images/{candidate.candidate_id}.png", "image_sha256": sha256_bytes(final_path.read_bytes()), "width_px": 512, "height_px": 512, "color_mode": "RGB", "format": "PNG", "error_code": None}
+            publish_cached_row(cached_row_path, cached_image, dict(row, rendered_path=str(final_path)), identity)
+            rows.append(row)
+            rendered += 1
 
         source_raw = (source_dir / "source.osm.pbf").read_bytes()
         manifest = {
@@ -208,7 +315,7 @@ def main() -> int:
                 raise RuntimeError(f"dataset existente no es byte a byte reproducible: {final_dir}")
         else:
             temp.rename(final_dir)
-        print(final_dir.relative_to(ROOT))
+        print(json.dumps({"bundle": final_dir.relative_to(ROOT).as_posix(), "cache_hits": cache_hits, "rendered": rendered}, sort_keys=True))
     return 0
 
 

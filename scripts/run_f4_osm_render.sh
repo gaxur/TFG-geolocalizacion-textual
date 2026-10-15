@@ -4,9 +4,11 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 IMAGE_TAG=tfg-f4-osm-carto-arm64:ubuntu24.04
 
-docker build --pull --platform linux/arm64 \
+docker build --platform linux/arm64 \
   -f "$ROOT/docker/f4-osm-carto-arm64/Dockerfile" \
   -t "$IMAGE_TAG" "$ROOT"
+
+mkdir -p "$ROOT/data/processed/visual" "$ROOT/data/processed/visual-staging"
 
 export F4_RENDER_IMAGE_ID
 F4_RENDER_IMAGE_ID=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}')

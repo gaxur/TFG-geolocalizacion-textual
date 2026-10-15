@@ -55,6 +55,17 @@ class Phase4RetrievalTests(unittest.TestCase):
         self.assertEqual(matrix.shape, (9, 768))
         self.assertEqual(ids, self.ids)
 
+    def test_rejects_visual_and_checkpoint_incompatibility(self):
+        visual = copy.deepcopy(self.visual)
+        visual["visual_dataset_id"] = "f4-madrid-visual-sha256-" + "9" * 64
+        with self.assertRaises(F4ValidationError):
+            validate_embedding_bundle(self.document, self.root, visual, self.visual_raw, self.catalog)
+        document = copy.deepcopy(self.document)
+        document["checkpoint"]["sha256"] = "9" * 64
+        document["embedding_dataset_id"] = embedding_dataset_id(document)
+        with self.assertRaises(F4ValidationError):
+            validate_embedding_bundle(document, self.root, self.visual, self.visual_raw, self.catalog)
+
     def test_rejects_symlinked_embedding_artifact(self):
         matrix_path = self.root / "embeddings/image_embeddings.npy"
         target = self.root / "embeddings/matrix-target.npy"
@@ -108,7 +119,7 @@ class Phase4RetrievalTests(unittest.TestCase):
             query_id="fixture", text="description only", language="en",
             embedding_dataset_id=self.document["embedding_dataset_id"],
             checkpoint_sha256=self.document["checkpoint"]["sha256"], ranked=ranked,
-            catalog=self.catalog, requested_k=20,
+            catalog=self.catalog, gallery_count=len(self.ids), requested_k=20,
             timings_ms={"text_encoding": 1.0, "ranking": 1.0, "total": 2.0},
         )
         self.assertNotIn("ground_truth", result)
@@ -123,6 +134,25 @@ class Phase4RetrievalTests(unittest.TestCase):
                 invalid, self.catalog, embedding_manifest=self.document,
                 candidate_ids=self.ids, matrix=self.matrix, text_embedding=query,
             )
+
+    def test_full_gallery_ranking_scores_all_253_candidates(self):
+        ids = tuple(candidate.candidate_id for candidate in self.catalog.candidates)
+        matrix = np.zeros((253, 768), dtype="<f4")
+        for index in range(253):
+            matrix[index, index % 768] = 1.0
+        query = np.zeros(768, dtype=np.float32); query[252] = 1.0
+        ranked = exhaustive_rank(matrix, ids, query, 300)
+        self.assertEqual(len(ranked), 253)
+        self.assertEqual(ranked[0][0], ids[252])
+        result = build_retrieval_result(
+            query_id="full", text="description only", language="en",
+            embedding_dataset_id=self.document["embedding_dataset_id"],
+            checkpoint_sha256=self.document["checkpoint"]["sha256"], ranked=ranked,
+            catalog=self.catalog, gallery_count=253, requested_k=300,
+            timings_ms={"text_encoding": 1.0, "ranking": 1.0, "total": 2.0},
+        )
+        self.assertEqual(result["gallery_count"], 253)
+        self.assertEqual(result["effective_k"], 253)
 
 
 if __name__ == "__main__":

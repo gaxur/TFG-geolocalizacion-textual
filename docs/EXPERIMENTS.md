@@ -130,6 +130,42 @@ Estos resultados demuestran ejecución y reutilización del índice exacto, no
 acierto geográfico ni generalización. No existe ground truth para estas frases y
 los scores no son probabilidades. D007, D013 y D016 permanecen abiertas.
 
+## F4.2: galería completa F1 de 50 m
+
+### Artefactos y ejecución
+
+- Selección: `f4-full-50m-gallery-v1`, 253 candidatos en orden del manifest F1.
+- Cobertura Geofabrik previa: 253 cubiertos, 0 sin cobertura.
+- Bundle visual:
+  `f4-madrid-visual-sha256-15310268e0fed30180085c7ec1f14fce696c4ba94e83bf9727970451cc82f564`.
+- Manifest visual SHA-256:
+  `a31724ab8a5f8f9beb30f81fe50a36489214f898ec25ac8ad93f839871b90996`.
+- Imágenes: 253 PNG válidos, 52.222.622 bytes en total.
+- Render limpio: 253 renders, 0 hits, 355,39 s.
+- Reanudación: 0 renders, 253 hits, mismo ID, 164,67 s.
+- Bundle de embeddings:
+  `f4-madrid-embeddings-sha256-199dae0e3eb38b206004557f20fae0ef98f620621458fc64c2dfa3f7ef7f84c1`.
+- Matriz: `(253, 768)`, `float32`, normalizada L2, 777.344 bytes.
+- Extracción GPU observada: 16,52 s.
+
+Las tres consultas se redactaron como sondas cualitativas en inglés; no se
+derivan de un dataset con coordenada verdadera y no constituyen evaluación.
+
+| Query | Top-1 | Score coseno | Coordenada WGS84 |
+|---|---|---:|---|
+| `A large urban square surrounded by buildings and narrow streets` | `...R0013_C0012` | 0,21134724 | 40,4180647717; -3,7016966714 |
+| `A broad avenue next to a green park` | `...R0012_C0013` | 0,20875248 | 40,4176179232; -3,7011026735 |
+| `A dense block with a major road intersection and many buildings` | `...R0002_C0003` | 0,21027139 | 40,4130778027; -3,7069487074 |
+
+Los JSON canónicos permanecen fuera de Git en
+`results/generated/f4/madrid-f42-final-en-001.json`,
+`madrid-f42-final-en-002.json` y `madrid-f42-final-en-003.json`. Todos
+referencian el bundle final `199dae0e...`, declaran `gallery_count: 253`,
+`ranking_method: exhaustive_cosine` y el mismo checkpoint. El archivo
+`madrid-f42-final-en-001-repeat.json` repite la primera consulta y conserva el
+mismo ranking y scores. Las puntuaciones no son probabilidades ni prueban que el
+candidato sea geográficamente correcto. D007, D013 y D016 permanecen abiertas.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

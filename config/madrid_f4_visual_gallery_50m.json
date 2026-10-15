@@ -1,0 +1,11 @@
+{
+  "schema_version": "2.0",
+  "selection_id": "f4-full-50m-gallery-v1",
+  "selection_policy": "full_verified_catalog_order_v1",
+  "source_manifest_id": "madrid-pilot-grid-v1-s50-l50",
+  "source_manifest_sha256": "ad35d5cb3b602a9ce313e06e10f913f169430d62a948c0f5e77b396bc810f2aa",
+  "evaluation_use": false,
+  "text_or_ground_truth_used": false,
+  "candidate_count": 253,
+  "order": "catalog_manifest_order"
+}

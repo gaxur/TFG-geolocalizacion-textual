@@ -60,6 +60,7 @@ def build_retrieval_result(
     checkpoint_sha256: str,
     ranked: Sequence[tuple[str, float]],
     catalog: CatalogInput,
+    gallery_count: int,
     requested_k: int,
     timings_ms: Mapping[str, float],
 ) -> dict[str, Any]:
@@ -72,7 +73,7 @@ def build_retrieval_result(
         "checkpoint_sha256": checkpoint_sha256,
         "ranking_method": "exhaustive_cosine",
         "tie_break": "candidate_id_ascending",
-        "gallery_count": len(candidates) if len(candidates) < 9 else 9,
+        "gallery_count": gallery_count,
         "requested_k": requested_k,
         "effective_k": len(ranked),
         "results": [

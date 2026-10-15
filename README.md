@@ -21,9 +21,10 @@ modelos. F1, F2 y F3 proporcionan el catálogo geométrico, el snapshot OSM y lo
 bundles de asociaciones de Madrid; su cierre está en
 [PHASE3_CLOSURE.md](docs/PHASE3_CLOSURE.md). La reproducción oficial
 NewYork-mixed OSM de CrossText2Loc se completó en la NVIDIA GB10. F4 ya dispone
-de una fixture local de nueve imágenes OSM de Madrid y sus embeddings visuales
-CrossText2Loc. La recuperación textual exhaustiva sobre esa fixture ya tiene una
-prueba técnica; la evaluación formal de Madrid sigue pendiente.
+de una fixture local de nueve imágenes OSM y de una galería completa para los
+253 candidatos F1 de 50 m, ambas con embeddings visuales CrossText2Loc. La
+recuperación textual exhaustiva sobre 253 candidatos ya tiene una prueba
+técnica; la evaluación formal de Madrid sigue pendiente.
 
 El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 

@@ -13,6 +13,8 @@ import zlib
 from .f3_inputs import CatalogInput, F3InputError, load_verified_catalog
 from .f4_contracts import (
     F4_EMBEDDING_DIMENSION,
+    F4_FULL_CANDIDATE_COUNT,
+    F4_FULL_SELECTION_VERSION,
     F4_SELECTED_CANDIDATES,
     F4_SELECTION_SHA256,
     F4_SELECTION_VERSION,
@@ -151,25 +153,34 @@ def validate_visual_manifest(
     }
     if dict(document["catalog"]) != expected_catalog:
         raise F4ValidationError("referencia al manifest F1 inconsistente")
+    selection_contract = dict(selection)
+    if selection_contract.get("selection_id") == F4_FULL_SELECTION_VERSION:
+        selection_contract.pop("candidates", None)
     try:
-        validate_document(selection, "f4_visual_selection")
+        validate_document(selection_contract, "f4_visual_selection")
     except SchemaValidationError as error:
         raise F4ValidationError("selección F4 inválida") from error
     actual_selection = tuple((item["candidate_id"], item["role"]) for item in selection["candidates"])
-    if actual_selection != F4_SELECTED_CANDIDATES or selection_sha256 != F4_SELECTION_SHA256:
-        raise F4ValidationError("selección F4 no corresponde a la fixture fija versionada")
+    if selection["selection_id"] == F4_SELECTION_VERSION:
+        if actual_selection != F4_SELECTED_CANDIDATES or selection_sha256 != F4_SELECTION_SHA256:
+            raise F4ValidationError("selección F4 no corresponde a la fixture fija versionada")
+    elif selection["selection_id"] == F4_FULL_SELECTION_VERSION:
+        expected_full = tuple((candidate.candidate_id, "full_catalog") for candidate in catalog.candidates)
+        if len(expected_full) != F4_FULL_CANDIDATE_COUNT or actual_selection != expected_full:
+            raise F4ValidationError("selección F4.2 no corresponde al catálogo F1 completo")
+    else:
+        raise F4ValidationError("selección F4 no soportada")
     if (
         selection["source_manifest_id"] != catalog.manifest_id
         or selection["source_manifest_sha256"] != catalog.sha256
-        or selection["selection_id"] != F4_SELECTION_VERSION
-        or document["selection"]["selection_id"] != F4_SELECTION_VERSION
+        or document["selection"]["selection_id"] != selection["selection_id"]
         or document["selection"]["sha256"] != selection_sha256
     ):
         raise F4ValidationError("referencia a la selección F4 inconsistente")
     expected_ids = [item["candidate_id"] for item in selection["candidates"]]
     actual_ids = [item["candidate_id"] for item in document["images"]]
     if actual_ids != expected_ids:
-        raise F4ValidationError("el manifest debe incluir exactamente los nueve candidatos seleccionados")
+        raise F4ValidationError("el manifest debe incluir exactamente los candidatos seleccionados")
 
     candidates = {candidate.candidate_id: candidate for candidate in catalog.candidates}
     source_bbox = _bbox_from_document(document["source"]["coverage_bbox_epsg3857"])
@@ -183,6 +194,10 @@ def validate_visual_manifest(
         expected_source_id = f"osm-madrid-pilot-osmxml-sha256-{document['source']['data_sha256']}"
         if document["source"]["source_id"] != expected_source_id:
             raise F4ValidationError("source_id OSM no corresponde a data_sha256")
+    elif document["source"]["source_type"] == "osm_render_extract":
+        expected_source_id = f"f4-osm-madrid-geofabrik-sha256-{document['source']['data_sha256']}"
+        if document["source"]["source_id"] != expected_source_id:
+            raise F4ValidationError("source_id Geofabrik no corresponde a data_sha256")
     seen_ids: set[str] = set()
     seen_paths: set[str] = set()
     for image in document["images"]:
@@ -331,7 +346,11 @@ def validate_retrieval_result(
             raise F4ValidationError("resultado referencia otro bundle de embeddings")
         if document["checkpoint_sha256"] != embedding_manifest["checkpoint"]["sha256"]:
             raise F4ValidationError("resultado referencia otro checkpoint")
+        if document["gallery_count"] != embedding_manifest["embedding"]["count"]:
+            raise F4ValidationError("gallery_count no corresponde al bundle de embeddings")
     if candidate_ids is not None:
+        if document["gallery_count"] != len(candidate_ids):
+            raise F4ValidationError("gallery_count no corresponde a candidate_ids")
         if any(row["candidate_id"] not in candidate_ids for row in document["results"]):
             raise F4ValidationError("resultado contiene candidate_id ajeno a la galería")
     if matrix is not None and text_embedding is not None and candidate_ids is not None:
@@ -540,7 +559,10 @@ def validate_visual_bundle(
         validate_document(stored_selection, "f4_visual_selection")
     except (UnicodeDecodeError, json.JSONDecodeError, SchemaValidationError) as error:
         raise F4ValidationError("selección visual almacenada inválida") from error
-    if stored_selection != selection:
+    expected_stored_selection = dict(selection)
+    if expected_stored_selection.get("selection_id") == F4_FULL_SELECTION_VERSION:
+        expected_stored_selection.pop("candidates", None)
+    if stored_selection != expected_stored_selection:
         raise F4ValidationError("selección suministrada no coincide con el fichero verificado")
     source_raw = verified_file(document["source"]["data_path"], document["source"]["data_sha256"], "datos de fuente")
     provenance_raw = verified_file(document["source"]["provenance_path"], document["source"]["provenance_sha256"], "provenance de fuente")

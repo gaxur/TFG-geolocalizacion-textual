@@ -154,10 +154,13 @@ def command_embed(args) -> int:
     import torchvision
     from PIL import Image
     catalog, visual, visual_raw = common_inputs(args)
+    generated = [row for row in visual["images"] if row["generation_status"] == "generated"]
+    if len(generated) != len(visual["images"]):
+        raise RuntimeError("el bundle visual debe estar completo antes de generar embeddings")
     model, preprocess = build_model(args.cvg_text_root, args.checkpoint, args.clip_weights, args.device)
     rows = []
     with torch.inference_mode():
-        for image_row in visual["images"]:
+        for image_row in generated:
             with Image.open(args.visual_bundle / image_row["image_path"]) as image:
                 tensor = preprocess(image.convert("RGB")).unsqueeze(0).to(args.device)
             if tuple(tensor.shape) != (1, 3, 336, 336):
@@ -185,7 +188,7 @@ def command_rank(args) -> int:
     ranked = exhaustive_rank(matrix, candidate_ids, text_feature, args.k)
     ranked_at = time.perf_counter()
     timings = {"text_encoding": (encoded - start) * 1000, "ranking": (ranked_at - encoded) * 1000, "total": (ranked_at - start) * 1000}
-    result = build_retrieval_result(query_id=args.query_id, text=args.text, language=args.language, embedding_dataset_id=embedding["embedding_dataset_id"], checkpoint_sha256=EXPECTED_CHECKPOINT_SHA256, ranked=ranked, catalog=catalog, requested_k=args.k, timings_ms=timings)
+    result = build_retrieval_result(query_id=args.query_id, text=args.text, language=args.language, embedding_dataset_id=embedding["embedding_dataset_id"], checkpoint_sha256=EXPECTED_CHECKPOINT_SHA256, ranked=ranked, catalog=catalog, gallery_count=len(candidate_ids), requested_k=args.k, timings_ms=timings)
     validate_retrieval_result(result, catalog, embedding_manifest=embedding, candidate_ids=candidate_ids, matrix=matrix, text_embedding=normalize_l2(text_feature))
     output = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
     if args.output:

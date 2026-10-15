@@ -8,7 +8,15 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .f3_inputs import CatalogInput
-from .f4_contracts import F4_SELECTED_CANDIDATES, F4_SELECTION_SHA256, F4_SELECTION_VERSION
+from .f4_contracts import (
+    F4_FULL_CANDIDATE_COUNT,
+    F4_FULL_SELECTION_POLICY,
+    F4_FULL_SELECTION_SHA256,
+    F4_FULL_SELECTION_VERSION,
+    F4_SELECTED_CANDIDATES,
+    F4_SELECTION_SHA256,
+    F4_SELECTION_VERSION,
+)
 from .f4_geometry import bbox_contains, bbox_wgs84_to_epsg3857, candidate_raster_geometry
 from .osm_snapshot import SnapshotConflictError, validate_local_snapshot
 from .validation import SchemaValidationError, validate_document
@@ -70,26 +78,34 @@ def load_verified_selection(path: str | Path, catalog: CatalogInput) -> tuple[Ma
         validate_document(document, "f4_visual_selection")
     except SchemaValidationError as error:
         raise F4PreflightError("selección F4 incompatible") from error
-    if (
-        document["schema_version"] != "1.0"
-        or document["selection_id"] != F4_SELECTION_VERSION
-        or document["selection_policy"] != "fixed_spatial_coverage_v1"
-        or document["evaluation_use"] is not False
-        or document["text_or_ground_truth_used"] is not False
-    ):
+    if document["evaluation_use"] is not False or document["text_or_ground_truth_used"] is not False:
         raise F4PreflightError("política de selección F4 no válida")
     if document["source_manifest_id"] != catalog.manifest_id or document["source_manifest_sha256"] != catalog.sha256:
         raise F4PreflightError("selección F4 no corresponde al manifest F1")
-    actual = tuple((item.get("candidate_id"), item.get("role")) for item in document["candidates"] if isinstance(item, dict))
-    if actual != F4_SELECTED_CANDIDATES:
-        raise F4PreflightError("la selección fija de nueve candidatos ha cambiado")
-    known = {candidate.candidate_id for candidate in catalog.candidates}
-    if any(candidate_id not in known for candidate_id, _ in actual):
-        raise F4PreflightError("selección F4 contiene candidate_id ajeno a F1")
     digest = sha256_bytes(raw)
-    if digest != F4_SELECTION_SHA256:
-        raise F4PreflightError("hash de la selección fija F4 no reconocido")
-    return document, digest
+    if document["selection_id"] == F4_SELECTION_VERSION:
+        actual = tuple((item.get("candidate_id"), item.get("role")) for item in document["candidates"] if isinstance(item, dict))
+        if actual != F4_SELECTED_CANDIDATES or digest != F4_SELECTION_SHA256:
+            raise F4PreflightError("la selección fija de nueve candidatos ha cambiado")
+        known = {candidate.candidate_id for candidate in catalog.candidates}
+        if any(candidate_id not in known for candidate_id, _ in actual):
+            raise F4PreflightError("selección F4 contiene candidate_id ajeno a F1")
+        return document, digest
+    if (
+        document["selection_id"] != F4_FULL_SELECTION_VERSION
+        or document["selection_policy"] != F4_FULL_SELECTION_POLICY
+        or document["candidate_count"] != F4_FULL_CANDIDATE_COUNT
+        or document["order"] != "catalog_manifest_order"
+        or len(catalog.candidates) != F4_FULL_CANDIDATE_COUNT
+        or digest != F4_FULL_SELECTION_SHA256
+    ):
+        raise F4PreflightError("selección de galería completa F4 no válida")
+    expanded = dict(document)
+    expanded["candidates"] = [
+        {"candidate_id": candidate.candidate_id, "role": "full_catalog"}
+        for candidate in catalog.candidates
+    ]
+    return expanded, digest
 
 
 def build_coverage_preflight(
@@ -124,7 +140,7 @@ def build_coverage_preflight(
         "schema_version": "1.0",
         "profile_id": "crosstext2loc-osm-z18-crop256-resize512-exp-v2",
         "selection_id": selection["selection_id"],
-        "source_id": source_provenance["osm_snapshot_id"],
+        "source_id": source_provenance.get("osm_snapshot_id", source_provenance.get("source_id")),
         "source_bbox_wgs84": dict(source_provenance["bbox"]),
         "source_bbox_epsg3857": source_bbox.as_document(),
         "covered_count": sum(row["covered"] for row in rows),

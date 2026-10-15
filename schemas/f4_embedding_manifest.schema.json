@@ -64,7 +64,7 @@
         "matrix_path": {"$ref": "#/$defs/logicalPath"}, "matrix_sha256": {"$ref": "#/$defs/sha256"},
         "candidate_ids_path": {"$ref": "#/$defs/logicalPath"}, "candidate_ids_sha256": {"$ref": "#/$defs/sha256"},
         "candidate_ids_format": {"const": "jsonl_object_candidate_id_v1"},
-        "count": {"const": 9}, "dimension": {"const": 768}, "dtype": {"const": "float32"}, "byte_order": {"const": "little"},
+        "count": {"type": "integer", "minimum": 1, "maximum": 253}, "dimension": {"const": 768}, "dtype": {"const": "float32"}, "byte_order": {"const": "little"},
         "normalization": {"const": "l2"}, "row_order": {"const": "visual_manifest_order"}
       }
     }

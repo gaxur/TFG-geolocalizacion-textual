@@ -39,20 +39,25 @@ find /usr/share/fonts -type f \( -name '*.ttf' -o -name '*.otf' \) -exec cp -n {
 carto -a 3.0.22 "$CARTO_ROOT/project.mml" > "$CARTO_ROOT/project.xml"
 render_args=(
   --manifest data/processed/catalog/manifest-50m.json
-  --selection config/madrid_f4_visual_fixture.json
+  --selection "$F4_SELECTION"
   --source-dir data/raw/osm/f4_sources/madrid-geofabrik-20261014
   --carto-root external/openstreetmap-carto-v5.9.0
   --renderer-root data/raw/osm/f4_renderer/osm-carto-v5.9.0
   --container-image-digest "$F4_CONTAINER_IMAGE_DIGEST"
   --output-root data/processed/visual
+  --resume-root data/processed/visual-staging
 )
 if [[ -n "${F4_ONLY_CANDIDATE:-}" ]]; then
   render_args+=(--only-candidate "$F4_ONLY_CANDIDATE")
+fi
+if [[ -n "${F4_REUSE_BUNDLE:-}" ]]; then
+  render_args+=(--reuse-bundle "$F4_REUSE_BUNDLE")
 fi
 python3 scripts/render_f4_osm_images.py "${render_args[@]}"
 
 chown -R "$F4_HOST_UID:$F4_HOST_GID" \
   "$ROOT/data/processed/visual" \
+  "$ROOT/data/processed/visual-staging" \
   "$RENDER_ROOT" \
   "$CARTO_ROOT/fonts" \
   "$CARTO_ROOT/project.xml"

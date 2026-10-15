@@ -965,7 +965,7 @@ def _validate_f4_visual_manifest(document: Mapping[str, Any]) -> None:
     selection = document["selection"]
     if not isinstance(selection, Mapping) or set(selection) != {"selection_id", "logical_path", "sha256"}:
         raise SchemaValidationError("f4_visual_manifest.selection no válida")
-    if selection["selection_id"] != "f4-nine-candidates-v1":
+    if selection["selection_id"] not in {"f4-nine-candidates-v1", "f4-full-50m-gallery-v1"}:
         raise SchemaValidationError("f4_visual_manifest.selection_id no soportado")
     _logical_path(selection["logical_path"], "f4_visual_manifest.selection.logical_path")
     _sha256(selection["sha256"], "f4_visual_manifest.selection.sha256")
@@ -1030,8 +1030,8 @@ def _validate_f4_visual_manifest(document: Mapping[str, Any]) -> None:
         _sha256(style[field], f"style.{field}")
 
     images = document["images"]
-    if not isinstance(images, list) or len(images) != 9:
-        raise SchemaValidationError("f4_visual_manifest.images debe contener nueve entradas")
+    if not isinstance(images, list) or not 1 <= len(images) <= 253:
+        raise SchemaValidationError("f4_visual_manifest.images debe contener entre 1 y 253 entradas")
     image_fields = (
         "candidate_id", "latitude", "longitude", "generation_status", "geometry",
         "image_path", "image_sha256", "width_px", "height_px", "color_mode", "format", "error_code",
@@ -1154,27 +1154,30 @@ def _validate_f4_embedding_manifest(document: Mapping[str, Any]) -> None:
     for field in ("matrix_sha256", "candidate_ids_sha256"):
         _sha256(embedding[field], f"f4_embedding_manifest.embedding.{field}")
     _positive_id(embedding["count"], "f4_embedding_manifest.embedding.count")
-    expected_embedding = {"count": 9, "dimension": F4_EMBEDDING_DIMENSION, "dtype": "float32", "byte_order": "little", "normalization": "l2", "row_order": "visual_manifest_order", "candidate_ids_format": "jsonl_object_candidate_id_v1"}
+    expected_embedding = {"dimension": F4_EMBEDDING_DIMENSION, "dtype": "float32", "byte_order": "little", "normalization": "l2", "row_order": "visual_manifest_order", "candidate_ids_format": "jsonl_object_candidate_id_v1"}
     if any(embedding[field] != value for field, value in expected_embedding.items()):
         raise SchemaValidationError("representación de embeddings no válida")
 
 
 def _validate_f4_visual_selection(document: Mapping[str, Any]) -> None:
-    fields = {
-        "schema_version", "selection_id", "selection_policy", "source_manifest_id",
-        "source_manifest_sha256", "evaluation_use", "text_or_ground_truth_used", "candidates",
-    }
-    if set(document) != fields or document["schema_version"] != "1.0":
+    common = {"schema_version", "selection_id", "selection_policy", "source_manifest_id", "source_manifest_sha256", "evaluation_use", "text_or_ground_truth_used"}
+    fixture = common | {"candidates"}
+    full = common | {"candidate_count", "order"}
+    if frozenset(document) not in {frozenset(fixture), frozenset(full)}:
         raise SchemaValidationError("f4_visual_selection incompatible")
-    if document["selection_id"] != "f4-nine-candidates-v1" or document["selection_policy"] != "fixed_spatial_coverage_v1":
-        raise SchemaValidationError("política de selección F4 no soportada")
     _non_empty_string(document["source_manifest_id"], "selection.source_manifest_id")
     _sha256(document["source_manifest_sha256"], "selection.source_manifest_sha256")
     if document["evaluation_use"] is not False or document["text_or_ground_truth_used"] is not False:
         raise SchemaValidationError("la selección F4 no puede depender de evaluación, texto o ground truth")
+    if document["selection_id"] == "f4-full-50m-gallery-v1":
+        if document["schema_version"] != "2.0" or document["selection_policy"] != "full_verified_catalog_order_v1" or document["candidate_count"] != 253 or document["order"] != "catalog_manifest_order":
+            raise SchemaValidationError("selección de galería completa F4 no soportada")
+        return
+    if document["schema_version"] != "1.0" or document["selection_id"] != "f4-nine-candidates-v1" or document["selection_policy"] != "fixed_spatial_coverage_v1":
+        raise SchemaValidationError("política de selección F4 no soportada")
     candidates = document["candidates"]
     if not isinstance(candidates, list) or len(candidates) != 9:
-        raise SchemaValidationError("la selección F4 debe contener nueve candidatos")
+        raise SchemaValidationError("la fixture F4 debe contener nueve candidatos")
     seen = set()
     for item in candidates:
         if not isinstance(item, Mapping) or set(item) != {"candidate_id", "role"}:
@@ -1277,7 +1280,7 @@ def _validate_f4_retrieval_result(document: Mapping[str, Any]) -> None:
     if len(query["language"]) < 2:
         raise SchemaValidationError("f4_retrieval_result.query.language no válido")
     _positive_id(document["requested_k"], "f4_retrieval_result.requested_k")
-    if document["checkpoint_sha256"] != "d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d" or document["tie_break"] != "candidate_id_ascending" or document["gallery_count"] != 9:
+    if document["checkpoint_sha256"] != "d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d" or document["tie_break"] != "candidate_id_ascending" or not 1 <= document["gallery_count"] <= 253:
         raise SchemaValidationError("identidad o política de ranking no válida")
     results = document["results"]
     expected_k = min(document["requested_k"], document["gallery_count"])

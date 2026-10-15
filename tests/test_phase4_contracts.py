@@ -192,6 +192,29 @@ class Phase4ContractTests(unittest.TestCase):
         with self.assertRaises(F4ValidationError):
             load_verified_f1_50m(f1_25m, self.config)
 
+    def test_full_gallery_manifest_requires_all_253_in_catalog_order(self):
+        selection, selection_hash = load_verified_selection(ROOT / "config/madrid_f4_visual_gallery_50m.json", self.catalog)
+        full = copy.deepcopy(self.visual)
+        full["selection"] = {"selection_id": selection["selection_id"], "logical_path": "config/madrid_f4_visual_gallery_50m.json", "sha256": selection_hash}
+        full["images"] = []
+        coverage_wgs84 = {"north": 41.0, "south": 40.0, "east": -3.0, "west": -4.0}
+        source_bbox = bbox_wgs84_to_epsg3857(coverage_wgs84)
+        full["source"]["coverage_bbox_wgs84"] = coverage_wgs84
+        full["source"]["coverage_bbox_epsg3857"] = source_bbox.as_document()
+        for candidate in self.catalog.candidates:
+            full["images"].append({
+                "candidate_id": candidate.candidate_id, "latitude": candidate.latitude, "longitude": candidate.longitude,
+                "generation_status": "generated", "geometry": geometry_document(candidate.latitude, candidate.longitude),
+                "image_path": f"images/{candidate.candidate_id}.png", "image_sha256": ZERO_HASH,
+                "width_px": 512, "height_px": 512, "color_mode": "RGB", "format": "PNG", "error_code": None,
+            })
+        full["visual_dataset_id"] = visual_dataset_id(full)
+        validate_visual_manifest(full, self.catalog, selection=selection, selection_sha256=selection_hash)
+        full["images"].pop()
+        full["visual_dataset_id"] = visual_dataset_id(full)
+        with self.assertRaises(F4ValidationError):
+            validate_visual_manifest(full, self.catalog, selection=selection, selection_sha256=selection_hash)
+
     def test_visual_manifest_validates_geometry_and_identity(self):
         validate_visual_manifest(self.visual, self.catalog, selection=self.selection, selection_sha256=self.selection_hash)
         for field in ("center_x", "global_pixel_y", "crop_left_px", "native_meters_per_pixel"):

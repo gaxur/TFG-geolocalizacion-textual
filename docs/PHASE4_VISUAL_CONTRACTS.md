@@ -409,3 +409,81 @@ Las consultas de desarrollo realizadas no constituyen evaluación: no hay
 ground truth independiente ni se calcula Recall@K. Una consulta repetida produjo
 los mismos candidatos y scores; los tiempos se conservan como telemetría
 operacional y pueden variar.
+
+## Galería completa F4.2
+
+F4.2 amplía la misma cadena a todos los candidatos del catálogo F1 de 50 m. La
+selección `config/madrid_f4_visual_gallery_50m.json` no enumera manualmente los
+IDs: declara `full_verified_catalog_order_v1` y el loader deriva exactamente los
+253 candidatos del manifest F1 verificado, en su orden canónico. No intervienen
+asociaciones F3, texto ni ground truth.
+
+### Galería visual
+
+El bundle canónico observado es:
+
+```text
+data/processed/visual/
+  f4-madrid-visual-sha256-15310268e0fed30180085c7ec1f14fce696c4ba94e83bf9727970451cc82f564/
+```
+
+Contiene 253 PNG RGB de 512 x 512, todos no uniformes y con SHA-256 validado. Los
+PNG suman 52.222.622 bytes y el manifest 345.192 bytes. El manifest conserva la
+fuente Geofabrik, Mapnik, OSM Carto, assets, fuentes, geometría y perfil visual.
+
+La ejecución limpia renderizó 253 imágenes en 355,39 s. Una segunda ejecución
+produjo el mismo `visual_dataset_id`, recuperó 253 filas del staging y renderizó
+0 imágenes en 164,67 s; ese tiempo incluye todavía la preparación e importación
+de PostGIS. El cache por candidato incluye la configuración efectiva completa,
+PBF, imagen Docker, estilo, assets, fuentes, perfil, coordenadas y geometría. Un
+staging incompleto nunca se publica como bundle final.
+
+Comando:
+
+```bash
+F4_SELECTION=config/madrid_f4_visual_gallery_50m.json \
+  bash scripts/run_f4_osm_render.sh
+```
+
+Validación independiente:
+
+```bash
+./.venv-geo/bin/python scripts/validate_f4_visual_bundle.py \
+  --bundle data/processed/visual/f4-madrid-visual-sha256-15310268e0fed30180085c7ec1f14fce696c4ba94e83bf9727970451cc82f564 \
+  --selection config/madrid_f4_visual_gallery_50m.json
+```
+
+### Embeddings y consulta
+
+El bundle de embeddings canónico es:
+
+```text
+data/embeddings/
+  f4-madrid-embeddings-sha256-199dae0e3eb38b206004557f20fae0ef98f620621458fc64c2dfa3f7ef7f84c1/
+```
+
+Su matriz es `(253, 768)`, little-endian `float32`, C-contiguous, finita y
+normalizada L2. La matriz ocupa 777.344 bytes. Las normas observadas están entre
+`0,99999988` y `1,00000012`. La generación GPU medida tardó 16,52 s, incluido el
+arranque y carga del modelo. Una segunda ejecución obtuvo el mismo ID y aceptó el
+bundle existente por igualdad byte a byte.
+
+Validación:
+
+```bash
+./.venv-geo/bin/python scripts/validate_f4_embedding_bundle.py \
+  --bundle data/embeddings/f4-madrid-embeddings-sha256-199dae0e3eb38b206004557f20fae0ef98f620621458fc64c2dfa3f7ef7f84c1 \
+  --visual-bundle data/processed/visual/f4-madrid-visual-sha256-15310268e0fed30180085c7ec1f14fce696c4ba94e83bf9727970451cc82f564 \
+  --selection config/madrid_f4_visual_gallery_50m.json
+```
+
+La consulta sigue usando `rank` como en F4.1c, sustituyendo los dos IDs de
+bundle y la selección por los de F4.2. El resultado declara
+`gallery_count: 253`; primero calcula las 253 similitudes y después recorta
+Top-K. No utiliza `evaluate.py`, `cal_score()`, coordenadas de consulta ni el
+filtro de 100 vecinos del protocolo oficial.
+
+F4.2 demuestra ejecución técnica sobre la bbox piloto D004, no precisión del
+modelo en Madrid. El perfil continúa `experimental_unconfirmed`, el checkpoint
+continúa provisional y las licencias de CVG-Text siguen pendientes: D007, D013
+y D016 permanecen abiertas.
