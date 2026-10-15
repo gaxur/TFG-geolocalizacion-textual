@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f4_osm_source.schema.json",
+  "title": "F4 OSM rendering source provenance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "source_id", "source_type", "data_path", "data_sha256", "provenance_path", "provenance_sha256", "coverage_bbox_wgs84", "coverage_bbox_epsg3857", "selection", "closure", "license", "attribution"],
+  "properties": {
+    "contract_version": {"const": "f4-osm-source-v1"}, "source_id": {"type": "string", "minLength": 1},
+    "source_type": {"enum": ["osm_snapshot", "synthetic_fixture"]},
+    "data_path": {"$ref": "#/$defs/logicalPath"}, "data_sha256": {"$ref": "#/$defs/sha256"},
+    "provenance_path": {"$ref": "#/$defs/logicalPath"}, "provenance_sha256": {"$ref": "#/$defs/sha256"},
+    "coverage_bbox_wgs84": {
+      "type": "object", "additionalProperties": false, "required": ["north", "south", "east", "west"],
+      "properties": {"north": {"type": "number", "minimum": -90, "maximum": 90}, "south": {"type": "number", "minimum": -90, "maximum": 90}, "east": {"type": "number", "minimum": -180, "maximum": 180}, "west": {"type": "number", "minimum": -180, "maximum": 180}}
+    },
+    "coverage_bbox_epsg3857": {
+      "type": "object", "additionalProperties": false, "required": ["crs", "min_x", "min_y", "max_x", "max_y"],
+      "properties": {"crs": {"const": "EPSG:3857"}, "min_x": {"type": "number", "minimum": -20037508.342789244, "maximum": 20037508.342789244}, "min_y": {"type": "number", "minimum": -20037508.342789244, "maximum": 20037508.342789244}, "max_x": {"type": "number", "minimum": -20037508.342789244, "maximum": 20037508.342789244}, "max_y": {"type": "number", "minimum": -20037508.342789244, "maximum": 20037508.342789244}}
+    },
+    "selection": {"type": "object"}, "closure": {"type": "object"},
+    "license": {"type": "string", "minLength": 1}, "attribution": {"type": "string", "minLength": 1}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "logicalPath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.{1,2}(?:[\\\\/]|$)).+$"}
+  }
+}

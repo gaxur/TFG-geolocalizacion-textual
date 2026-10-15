@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f4_visual_selection.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "selection_id", "selection_policy", "source_manifest_id", "source_manifest_sha256", "evaluation_use", "text_or_ground_truth_used", "candidates"],
+  "properties": {
+    "schema_version": {"const": "1.0"}, "selection_id": {"const": "f4-nine-candidates-v1"},
+    "selection_policy": {"const": "fixed_spatial_coverage_v1"}, "source_manifest_id": {"type": "string", "minLength": 1},
+    "source_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "evaluation_use": {"const": false},
+    "text_or_ground_truth_used": {"const": false},
+    "candidates": {
+      "type": "array", "minItems": 9, "maxItems": 9,
+      "items": {"type": "object", "additionalProperties": false, "required": ["candidate_id", "role"], "properties": {"candidate_id": {"type": "string", "minLength": 1}, "role": {"type": "string", "minLength": 1}}}
+    }
+  }
+}

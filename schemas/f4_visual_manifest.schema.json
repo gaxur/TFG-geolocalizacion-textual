@@ -1,66 +1,52 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "f4_visual_manifest.schema.json",
-  "title": "F4 Madrid visual dataset manifest",
+  "title": "F4 Madrid visual dataset manifest v2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "visual_dataset_id", "contract_version", "generator_version", "catalog", "profile", "source", "renderer", "style", "images"],
+  "required": ["schema_version", "visual_dataset_id", "contract_version", "generator_version", "catalog", "selection", "profile", "source", "renderer", "style", "images"],
   "properties": {
-    "schema_version": {"const": "1.0"},
+    "schema_version": {"const": "2.0"},
     "visual_dataset_id": {"type": "string", "pattern": "^f4-madrid-visual-sha256-[0-9a-f]{64}$"},
-    "contract_version": {"const": "f4-visual-dataset-v1"},
-    "generator_version": {"const": "phase4-visual-dataset-v1"},
+    "contract_version": {"const": "f4-visual-dataset-v2"},
+    "generator_version": {"const": "phase4-visual-dataset-v2"},
     "catalog": {"$ref": "#/$defs/catalog"},
+    "selection": {"$ref": "#/$defs/selection"},
     "profile": {"$ref": "#/$defs/profile"},
     "source": {"$ref": "#/$defs/source"},
     "renderer": {"$ref": "#/$defs/renderer"},
     "style": {"$ref": "#/$defs/style"},
-    "images": {
-      "type": "array",
-      "minItems": 1,
-      "items": {"$ref": "#/$defs/image"}
-    }
+    "images": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"$ref": "#/$defs/image"}}
   },
   "$defs": {
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "logicalPath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.{1,2}(?:[\\\\/]|$)).+$"},
     "catalog": {
-      "type": "object",
-      "additionalProperties": false,
+      "type": "object", "additionalProperties": false,
       "required": ["manifest_id", "manifest_sha256", "region_id", "catalog_version", "spacing_m", "cell_size_m", "grid_hash"],
       "properties": {
-        "manifest_id": {"type": "string", "minLength": 1},
-        "manifest_sha256": {"$ref": "#/$defs/sha256"},
-        "region_id": {"const": "madrid_pilot"},
-        "catalog_version": {"type": "string", "minLength": 1},
-        "spacing_m": {"const": 50},
-        "cell_size_m": {"const": 50},
-        "grid_hash": {"type": "string", "pattern": "^[0-9a-f]{12}$"}
+        "manifest_id": {"type": "string", "minLength": 1}, "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "region_id": {"const": "madrid_pilot"}, "catalog_version": {"type": "string", "minLength": 1},
+        "spacing_m": {"const": 50}, "cell_size_m": {"const": 50}, "grid_hash": {"type": "string", "pattern": "^[0-9a-f]{12}$"}
       }
     },
+    "selection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["selection_id", "logical_path", "sha256"],
+      "properties": {"selection_id": {"const": "f4-nine-candidates-v1"}, "logical_path": {"$ref": "#/$defs/logicalPath"}, "sha256": {"$ref": "#/$defs/sha256"}}
+    },
     "profile": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["profile_id", "compatibility_status", "modality", "center_source", "render_crs", "orientation", "zoom_reference", "requested_half_extent_projected_m", "crop", "output", "model_preprocessing", "evidence"],
+      "type": "object", "additionalProperties": false,
+      "required": ["profile_id", "compatibility_status", "modality", "center_source", "render_crs", "orientation", "zoom", "tile_size_px", "upstream_requested_half_extent_projected_m", "native_crop_width_px", "native_crop_height_px", "crop_anchor", "output_width_px", "output_height_px", "output_color_mode", "output_format", "resize_interpolation", "model_preprocessing", "evidence"],
       "properties": {
-        "profile_id": {"const": "crosstext2loc-osm-z18-crop256-resize512-exp-v1"},
-        "compatibility_status": {"const": "experimental_unconfirmed"},
-        "modality": {"const": "osm_raster_map"},
-        "center_source": {"const": "f1_candidate_center_wgs84"},
-        "render_crs": {"const": "EPSG:3857"},
-        "orientation": {"const": "north_up"},
-        "zoom_reference": {"const": 18},
-        "requested_half_extent_projected_m": {"const": 33.6256},
-        "crop": {
-          "type": "object", "additionalProperties": false,
-          "required": ["width_px", "height_px", "anchor"],
-          "properties": {"width_px": {"const": 256}, "height_px": {"const": 256}, "anchor": {"const": "candidate_projected_pixel"}}
-        },
-        "output": {
-          "type": "object", "additionalProperties": false,
-          "required": ["width_px", "height_px", "color_mode", "format", "resize_interpolation"],
-          "properties": {"width_px": {"const": 512}, "height_px": {"const": 512}, "color_mode": {"const": "RGB"}, "format": {"const": "PNG"}, "resize_interpolation": {"const": "bicubic"}}
-        },
+        "profile_id": {"const": "crosstext2loc-osm-z18-crop256-resize512-exp-v2"},
+        "compatibility_status": {"const": "experimental_unconfirmed"}, "modality": {"const": "osm_raster_map"},
+        "center_source": {"const": "f1_candidate_center_wgs84"}, "render_crs": {"const": "EPSG:3857"},
+        "orientation": {"const": "north_up"}, "zoom": {"const": 18}, "tile_size_px": {"const": 256},
+        "upstream_requested_half_extent_projected_m": {"const": 33.6256}, "native_crop_width_px": {"const": 256},
+        "native_crop_height_px": {"const": 256}, "crop_anchor": {"const": "candidate_global_pixel_subpixel"},
+        "output_width_px": {"const": 512}, "output_height_px": {"const": 512}, "output_color_mode": {"const": "RGB"},
+        "output_format": {"const": "PNG"}, "resize_interpolation": {"const": "bicubic"},
         "model_preprocessing": {
           "type": "object", "additionalProperties": false,
           "required": ["implementation", "model", "input_width_px", "input_height_px", "policy"],
@@ -68,70 +54,86 @@
         },
         "evidence": {
           "type": "object", "additionalProperties": false,
-          "required": ["upstream_repository_commit", "upstream_script", "decision", "limitation"],
+          "required": ["upstream_repository_commit", "upstream_script", "decision", "limitation", "interpretation"],
           "properties": {
             "upstream_repository_commit": {"const": "6910d2747a94fbe985309bde60cd4732bcbbf50f"},
-            "upstream_script": {"const": "external/CVG-Text/download_osm_street.py"},
-            "decision": {"const": "D007"},
-            "limitation": {"const": "upstream_script_saves_img_instead_of_computed_img_crop"}
+            "upstream_script": {"const": "external/CVG-Text/download_osm_street.py"}, "decision": {"const": "D007"},
+            "limitation": {"const": "upstream_script_saves_img_instead_of_computed_img_crop"},
+            "interpretation": {"const": "experimental_native_z18_crop_not_confirmed_training_profile"}
           }
         }
       }
     },
+    "bbox3857": {
+      "type": "object", "additionalProperties": false,
+      "required": ["crs", "min_x", "min_y", "max_x", "max_y"],
+      "properties": {"crs": {"const": "EPSG:3857"}, "min_x": {"type": "number", "minimum": -20037508.342789244, "maximum": 20037508.342789244}, "min_y": {"type": "number", "minimum": -20037508.342789244, "maximum": 20037508.342789244}, "max_x": {"type": "number", "minimum": -20037508.342789244, "maximum": 20037508.342789244}, "max_y": {"type": "number", "minimum": -20037508.342789244, "maximum": 20037508.342789244}}
+    },
+    "bboxWgs84": {
+      "type": "object", "additionalProperties": false,
+      "required": ["north", "south", "east", "west"],
+      "properties": {"north": {"type": "number", "minimum": -90, "maximum": 90}, "south": {"type": "number", "minimum": -90, "maximum": 90}, "east": {"type": "number", "minimum": -180, "maximum": 180}, "west": {"type": "number", "minimum": -180, "maximum": 180}}
+    },
     "source": {
       "type": "object", "additionalProperties": false,
-      "required": ["source_id", "source_type", "data_sha256", "license", "attribution"],
+      "required": ["contract_version", "source_id", "source_type", "data_path", "data_sha256", "provenance_path", "provenance_sha256", "coverage_bbox_wgs84", "coverage_bbox_epsg3857", "selection", "closure", "license", "attribution"],
       "properties": {
-        "source_id": {"type": "string", "minLength": 1},
-        "source_type": {"enum": ["osm_snapshot", "authorized_tile_provider", "synthetic_fixture"]},
-        "data_sha256": {"$ref": "#/$defs/sha256"},
-        "license": {"type": "string", "minLength": 1},
-        "attribution": {"type": "string", "minLength": 1}
+        "contract_version": {"const": "f4-osm-source-v1"}, "source_id": {"type": "string", "minLength": 1},
+        "source_type": {"enum": ["osm_snapshot", "synthetic_fixture"]}, "data_path": {"$ref": "#/$defs/logicalPath"},
+        "data_sha256": {"$ref": "#/$defs/sha256"}, "provenance_path": {"$ref": "#/$defs/logicalPath"},
+        "provenance_sha256": {"$ref": "#/$defs/sha256"}, "coverage_bbox_wgs84": {"$ref": "#/$defs/bboxWgs84"},
+        "coverage_bbox_epsg3857": {"$ref": "#/$defs/bbox3857"},
+        "selection": {"type": "object"}, "closure": {"type": "object"},
+        "license": {"type": "string", "minLength": 1}, "attribution": {"type": "string", "minLength": 1}
       }
     },
     "renderer": {
       "type": "object", "additionalProperties": false,
-      "required": ["name", "version", "configuration_sha256"],
-      "properties": {"name": {"type": "string", "minLength": 1}, "version": {"type": "string", "minLength": 1}, "configuration_sha256": {"$ref": "#/$defs/sha256"}}
+      "required": ["contract_version", "renderer_id", "name", "version", "configuration_path", "configuration_sha256", "container_image_digest", "license"],
+      "properties": {
+        "contract_version": {"const": "f4-renderer-provenance-v1"}, "renderer_id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1}, "version": {"type": "string", "minLength": 1},
+        "configuration_path": {"$ref": "#/$defs/logicalPath"}, "configuration_sha256": {"$ref": "#/$defs/sha256"},
+        "container_image_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+        "license": {"type": "string", "minLength": 1}
+      }
     },
     "style": {
       "type": "object", "additionalProperties": false,
-      "required": ["style_id", "version", "sha256", "license"],
-      "properties": {"style_id": {"type": "string", "minLength": 1}, "version": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}, "license": {"type": "string", "minLength": 1}}
-    },
-    "bbox": {
-      "type": "object", "additionalProperties": false,
-      "required": ["crs", "min_x", "min_y", "max_x", "max_y"],
-      "properties": {"crs": {"type": "string", "minLength": 1}, "min_x": {"type": "number"}, "min_y": {"type": "number"}, "max_x": {"type": "number"}, "max_y": {"type": "number"}}
-    },
-    "transformations": {
-      "type": "object", "additionalProperties": false,
-      "required": ["source_width_px", "source_height_px", "crop_left_px", "crop_top_px", "crop_width_px", "crop_height_px", "output_width_px", "output_height_px", "resize_interpolation"],
+      "required": ["style_id", "version", "repository_commit", "compiled_style_path", "compiled_style_sha256", "assets_manifest_path", "assets_manifest_sha256", "fonts_manifest_path", "fonts_manifest_sha256", "license"],
       "properties": {
-        "source_width_px": {"type": "integer", "minimum": 1}, "source_height_px": {"type": "integer", "minimum": 1},
-        "crop_left_px": {"type": "integer", "minimum": 0}, "crop_top_px": {"type": "integer", "minimum": 0},
-        "crop_width_px": {"const": 256}, "crop_height_px": {"const": 256},
-        "output_width_px": {"const": 512}, "output_height_px": {"const": 512},
-        "resize_interpolation": {"const": "bicubic"}
+        "style_id": {"type": "string", "minLength": 1}, "version": {"type": "string", "minLength": 1},
+        "repository_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "compiled_style_path": {"$ref": "#/$defs/logicalPath"}, "compiled_style_sha256": {"$ref": "#/$defs/sha256"},
+        "assets_manifest_path": {"$ref": "#/$defs/logicalPath"}, "assets_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "fonts_manifest_path": {"$ref": "#/$defs/logicalPath"}, "fonts_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "license": {"type": "string", "minLength": 1}
+      }
+    },
+    "rasterGeometry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["center_x", "center_y", "global_pixel_x", "global_pixel_y", "request_bbox", "source_mosaic_bbox", "output_bbox", "tile_min_x", "tile_min_y", "tile_max_x", "tile_max_y", "mosaic_width_px", "mosaic_height_px", "candidate_pixel_x", "candidate_pixel_y", "crop_left_px", "crop_top_px", "native_meters_per_pixel", "output_meters_per_pixel"],
+      "properties": {
+        "center_x": {"type": "number"}, "center_y": {"type": "number"}, "global_pixel_x": {"type": "number"}, "global_pixel_y": {"type": "number"},
+        "request_bbox": {"$ref": "#/$defs/bbox3857"}, "source_mosaic_bbox": {"$ref": "#/$defs/bbox3857"}, "output_bbox": {"$ref": "#/$defs/bbox3857"},
+        "tile_min_x": {"type": "integer", "minimum": 0}, "tile_min_y": {"type": "integer", "minimum": 0},
+        "tile_max_x": {"type": "integer", "minimum": 0}, "tile_max_y": {"type": "integer", "minimum": 0},
+        "mosaic_width_px": {"type": "integer", "minimum": 256}, "mosaic_height_px": {"type": "integer", "minimum": 256},
+        "candidate_pixel_x": {"type": "number"}, "candidate_pixel_y": {"type": "number"},
+        "crop_left_px": {"type": "number"}, "crop_top_px": {"type": "number"},
+        "native_meters_per_pixel": {"type": "number", "exclusiveMinimum": 0}, "output_meters_per_pixel": {"type": "number", "exclusiveMinimum": 0}
       }
     },
     "image": {
       "type": "object", "additionalProperties": false,
-      "required": ["candidate_id", "latitude", "longitude", "generation_status", "image_path", "image_sha256", "width_px", "height_px", "color_mode", "format", "requested_bbox", "rendered_bbox", "meters_per_pixel_x", "meters_per_pixel_y", "transformations", "error_code"],
+      "required": ["candidate_id", "latitude", "longitude", "generation_status", "geometry", "image_path", "image_sha256", "width_px", "height_px", "color_mode", "format", "error_code"],
       "properties": {
-        "candidate_id": {"type": "string", "minLength": 1},
-        "latitude": {"type": "number", "minimum": -90, "maximum": 90},
-        "longitude": {"type": "number", "minimum": -180, "maximum": 180},
-        "generation_status": {"enum": ["generated", "failed", "insufficient_source"]},
-        "image_path": {"oneOf": [{"$ref": "#/$defs/logicalPath"}, {"type": "null"}]},
+        "candidate_id": {"type": "string", "minLength": 1}, "latitude": {"type": "number", "minimum": -90, "maximum": 90},
+        "longitude": {"type": "number", "minimum": -180, "maximum": 180}, "generation_status": {"enum": ["generated", "failed", "insufficient_source"]},
+        "geometry": {"$ref": "#/$defs/rasterGeometry"}, "image_path": {"oneOf": [{"$ref": "#/$defs/logicalPath"}, {"type": "null"}]},
         "image_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
-        "width_px": {"type": ["integer", "null"], "minimum": 1}, "height_px": {"type": ["integer", "null"], "minimum": 1},
-        "color_mode": {"enum": ["RGB", null]}, "format": {"enum": ["PNG", null]},
-        "requested_bbox": {"$ref": "#/$defs/bbox"},
-        "rendered_bbox": {"oneOf": [{"$ref": "#/$defs/bbox"}, {"type": "null"}]},
-        "meters_per_pixel_x": {"type": ["number", "null"], "exclusiveMinimum": 0}, "meters_per_pixel_y": {"type": ["number", "null"], "exclusiveMinimum": 0},
-        "transformations": {"oneOf": [{"$ref": "#/$defs/transformations"}, {"type": "null"}]},
-        "error_code": {"type": ["string", "null"]}
+        "width_px": {"enum": [512, null]}, "height_px": {"enum": [512, null]}, "color_mode": {"enum": ["RGB", null]},
+        "format": {"enum": ["PNG", null]}, "error_code": {"enum": ["source_does_not_cover_output_bbox", "renderer_failed", "invalid_rendered_mosaic", null]}
       }
     }
   }

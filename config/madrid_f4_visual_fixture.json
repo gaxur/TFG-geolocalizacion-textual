@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "selection_id": "f4-nine-candidates-v1",
+  "selection_policy": "fixed_spatial_coverage_v1",
+  "source_manifest_id": "madrid-pilot-grid-v1-s50-l50",
+  "source_manifest_sha256": "ad35d5cb3b602a9ce313e06e10f913f169430d62a948c0f5e77b396bc810f2aa",
+  "evaluation_use": false,
+  "text_or_ground_truth_used": false,
+  "candidates": [
+    {"candidate_id": "MADP_MADRID_PILOT_GRID_V1_GA467049559FD_S050_L050_R0001_C0001", "role": "edge_southwest"},
+    {"candidate_id": "MADP_MADRID_PILOT_GRID_V1_GA467049559FD_S050_L050_R0004_C0008", "role": "interior_south"},
+    {"candidate_id": "MADP_MADRID_PILOT_GRID_V1_GA467049559FD_S050_L050_R0004_C0016", "role": "edge_east"},
+    {"candidate_id": "MADP_MADRID_PILOT_GRID_V1_GA467049559FD_S050_L050_R0008_C0001", "role": "edge_west"},
+    {"candidate_id": "MADP_MADRID_PILOT_GRID_V1_GA467049559FD_S050_L050_R0008_C0004", "role": "interior_west"},
+    {"candidate_id": "MADP_MADRID_PILOT_GRID_V1_GA467049559FD_S050_L050_R0008_C0008", "role": "interior_center"},
+    {"candidate_id": "MADP_MADRID_PILOT_GRID_V1_GA467049559FD_S050_L050_R0008_C0012", "role": "interior_east"},
+    {"candidate_id": "MADP_MADRID_PILOT_GRID_V1_GA467049559FD_S050_L050_R0013_C0008", "role": "interior_north"},
+    {"candidate_id": "MADP_MADRID_PILOT_GRID_V1_GA467049559FD_S050_L050_R0016_C0008", "role": "edge_north"}
+  ]
+}

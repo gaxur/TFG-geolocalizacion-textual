@@ -905,7 +905,8 @@ def _validate_render_bbox(value: Any, field: str) -> None:
     fields = ("crs", "min_x", "min_y", "max_x", "max_y")
     _required(value, fields, field)
     _no_unknown(value, set(fields), field)
-    _non_empty_string(value["crs"], f"{field}.crs")
+    if value["crs"] != "EPSG:3857":
+        raise SchemaValidationError(f"{field}.crs debe ser EPSG:3857")
     for coordinate in fields[1:]:
         _finite_number(value[coordinate], f"{field}.{coordinate}")
     if value["min_x"] >= value["max_x"] or value["min_y"] >= value["max_y"]:
@@ -927,11 +928,12 @@ def _validate_f4_visual_manifest(document: Mapping[str, Any]) -> None:
     context = "f4_visual_manifest"
     fields = (
         "schema_version", "visual_dataset_id", "contract_version", "generator_version",
-        "catalog", "profile", "source", "renderer", "style", "images",
+        "catalog", "selection", "profile", "source", "renderer", "style", "images",
     )
     _required(document, fields, context)
     _no_unknown(document, set(fields), context)
-    _version(document, context)
+    if document["schema_version"] != "2.0":
+        raise SchemaValidationError("f4_visual_manifest.schema_version debe ser '2.0'")
     if document["contract_version"] != F4_VISUAL_CONTRACT_VERSION:
         raise SchemaValidationError("f4_visual_manifest.contract_version no soportada")
     if document["generator_version"] != F4_VISUAL_GENERATOR_VERSION:
@@ -959,43 +961,80 @@ def _validate_f4_visual_manifest(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("f4_visual_manifest requiere el catálogo experimental de 50 m")
     if not isinstance(catalog["grid_hash"], str) or not re.fullmatch(r"[0-9a-f]{12}", catalog["grid_hash"]):
         raise SchemaValidationError("f4_visual_manifest.catalog.grid_hash no válido")
+
+    selection = document["selection"]
+    if not isinstance(selection, Mapping) or set(selection) != {"selection_id", "logical_path", "sha256"}:
+        raise SchemaValidationError("f4_visual_manifest.selection no válida")
+    if selection["selection_id"] != "f4-nine-candidates-v1":
+        raise SchemaValidationError("f4_visual_manifest.selection_id no soportado")
+    _logical_path(selection["logical_path"], "f4_visual_manifest.selection.logical_path")
+    _sha256(selection["sha256"], "f4_visual_manifest.selection.sha256")
     _validate_f4_profile(document["profile"])
 
     source = document["source"]
-    source_fields = ("source_id", "source_type", "data_sha256", "license", "attribution")
+    source_fields = (
+        "contract_version", "source_id", "source_type", "data_path", "data_sha256",
+        "provenance_path", "provenance_sha256", "coverage_bbox_wgs84",
+        "coverage_bbox_epsg3857", "selection", "closure", "license", "attribution",
+    )
     if not isinstance(source, Mapping):
         raise SchemaValidationError("f4_visual_manifest.source debe ser un objeto")
     _required(source, source_fields, "f4_visual_manifest.source")
     _no_unknown(source, set(source_fields), "f4_visual_manifest.source")
+    if source["contract_version"] != "f4-osm-source-v1":
+        raise SchemaValidationError("f4_visual_manifest.source.contract_version no soportada")
     for field in ("source_id", "license", "attribution"):
         _non_empty_string(source[field], f"f4_visual_manifest.source.{field}")
-    if source["source_type"] not in {"osm_snapshot", "authorized_tile_provider", "synthetic_fixture"}:
+    if source["source_type"] not in {"osm_snapshot", "synthetic_fixture"}:
         raise SchemaValidationError("f4_visual_manifest.source.source_type no válido")
+    _logical_path(source["data_path"], "f4_visual_manifest.source.data_path")
+    _logical_path(source["provenance_path"], "f4_visual_manifest.source.provenance_path")
     _sha256(source["data_sha256"], "f4_visual_manifest.source.data_sha256")
+    _sha256(source["provenance_sha256"], "f4_visual_manifest.source.provenance_sha256")
+    _validate_bbox(source["coverage_bbox_wgs84"], "f4_visual_manifest.source.coverage_bbox_wgs84")
+    _validate_render_bbox(source["coverage_bbox_epsg3857"], "f4_visual_manifest.source.coverage_bbox_epsg3857")
+    if not isinstance(source["selection"], Mapping) or not isinstance(source["closure"], Mapping):
+        raise SchemaValidationError("f4_visual_manifest.source requiere selection y closure")
 
-    for group, group_fields in (
-        ("renderer", ("name", "version", "configuration_sha256")),
-        ("style", ("style_id", "version", "sha256", "license")),
-    ):
-        value = document[group]
-        if not isinstance(value, Mapping):
-            raise SchemaValidationError(f"f4_visual_manifest.{group} debe ser un objeto")
-        _required(value, group_fields, f"f4_visual_manifest.{group}")
-        _no_unknown(value, set(group_fields), f"f4_visual_manifest.{group}")
-        for field in group_fields:
-            if field.endswith("sha256") or field == "sha256":
-                _sha256(value[field], f"f4_visual_manifest.{group}.{field}")
-            else:
-                _non_empty_string(value[field], f"f4_visual_manifest.{group}.{field}")
+    renderer = document["renderer"]
+    renderer_fields = {
+        "contract_version", "renderer_id", "name", "version", "configuration_path",
+        "configuration_sha256", "container_image_digest", "license",
+    }
+    if not isinstance(renderer, Mapping) or set(renderer) != renderer_fields:
+        raise SchemaValidationError("f4_visual_manifest.renderer no válido")
+    if renderer["contract_version"] != "f4-renderer-provenance-v1":
+        raise SchemaValidationError("renderer.contract_version no soportada")
+    for field in ("renderer_id", "name", "version", "license"):
+        _non_empty_string(renderer[field], f"renderer.{field}")
+    _logical_path(renderer["configuration_path"], "renderer.configuration_path")
+    _sha256(renderer["configuration_sha256"], "renderer.configuration_sha256")
+    if renderer["container_image_digest"] is not None and not re.fullmatch(r"sha256:[0-9a-f]{64}", renderer["container_image_digest"]):
+        raise SchemaValidationError("renderer.container_image_digest no válido")
+
+    style = document["style"]
+    style_fields = {
+        "style_id", "version", "repository_commit", "compiled_style_path",
+        "compiled_style_sha256", "assets_manifest_path", "assets_manifest_sha256",
+        "fonts_manifest_path", "fonts_manifest_sha256", "license",
+    }
+    if not isinstance(style, Mapping) or set(style) != style_fields:
+        raise SchemaValidationError("f4_visual_manifest.style no válido")
+    for field in ("style_id", "version", "license"):
+        _non_empty_string(style[field], f"style.{field}")
+    if not isinstance(style["repository_commit"], str) or not re.fullmatch(r"[0-9a-f]{40}", style["repository_commit"]):
+        raise SchemaValidationError("style.repository_commit no válido")
+    for field in ("compiled_style_path", "assets_manifest_path", "fonts_manifest_path"):
+        _logical_path(style[field], f"style.{field}")
+    for field in ("compiled_style_sha256", "assets_manifest_sha256", "fonts_manifest_sha256"):
+        _sha256(style[field], f"style.{field}")
 
     images = document["images"]
-    if not isinstance(images, list) or not images:
-        raise SchemaValidationError("f4_visual_manifest.images debe ser una lista no vacía")
+    if not isinstance(images, list) or len(images) != 9:
+        raise SchemaValidationError("f4_visual_manifest.images debe contener nueve entradas")
     image_fields = (
-        "candidate_id", "latitude", "longitude", "generation_status", "image_path",
-        "image_sha256", "width_px", "height_px", "color_mode", "format",
-        "requested_bbox", "rendered_bbox", "meters_per_pixel_x", "meters_per_pixel_y",
-        "transformations", "error_code",
+        "candidate_id", "latitude", "longitude", "generation_status", "geometry",
+        "image_path", "image_sha256", "width_px", "height_px", "color_mode", "format", "error_code",
     )
     seen = set()
     for index, image in enumerate(images):
@@ -1014,14 +1053,28 @@ def _validate_f4_visual_manifest(document: Mapping[str, Any]) -> None:
             raise SchemaValidationError(f"{label} contiene coordenadas fuera de rango")
         if image["generation_status"] not in F4_IMAGE_STATUSES:
             raise SchemaValidationError(f"{label}.generation_status no válido")
-        _validate_render_bbox(image["requested_bbox"], f"{label}.requested_bbox")
+
+        geometry = image["geometry"]
+        geometry_fields = {
+            "center_x", "center_y", "global_pixel_x", "global_pixel_y", "request_bbox",
+            "source_mosaic_bbox", "output_bbox", "tile_min_x", "tile_min_y", "tile_max_x",
+            "tile_max_y", "mosaic_width_px", "mosaic_height_px", "candidate_pixel_x",
+            "candidate_pixel_y", "crop_left_px", "crop_top_px", "native_meters_per_pixel",
+            "output_meters_per_pixel",
+        }
+        if not isinstance(geometry, Mapping) or set(geometry) != geometry_fields:
+            raise SchemaValidationError(f"{label}.geometry no válida")
+        for field in ("center_x", "center_y", "global_pixel_x", "global_pixel_y", "candidate_pixel_x", "candidate_pixel_y", "crop_left_px", "crop_top_px", "native_meters_per_pixel", "output_meters_per_pixel"):
+            _finite_number(geometry[field], f"{label}.geometry.{field}")
+        for field in ("request_bbox", "source_mosaic_bbox", "output_bbox"):
+            _validate_render_bbox(geometry[field], f"{label}.geometry.{field}")
+        for field in ("tile_min_x", "tile_min_y", "tile_max_x", "tile_max_y"):
+            _non_negative_integer(geometry[field], f"{label}.geometry.{field}")
+        for field in ("mosaic_width_px", "mosaic_height_px"):
+            _positive_id(geometry[field], f"{label}.geometry.{field}")
 
         generated = image["generation_status"] == "generated"
-        generated_fields = (
-            "image_path", "image_sha256", "width_px", "height_px", "color_mode",
-            "format", "rendered_bbox", "meters_per_pixel_x", "meters_per_pixel_y",
-            "transformations",
-        )
+        generated_fields = ("image_path", "image_sha256", "width_px", "height_px", "color_mode", "format")
         if generated:
             if any(image[field] is None for field in generated_fields) or image["error_code"] is not None:
                 raise SchemaValidationError(f"{label} generado tiene metadatos incompletos")
@@ -1031,34 +1084,13 @@ def _validate_f4_visual_manifest(document: Mapping[str, Any]) -> None:
                 raise SchemaValidationError(f"{label} debe medir 512 x 512")
             if image["color_mode"] != "RGB" or image["format"] != "PNG":
                 raise SchemaValidationError(f"{label} debe ser PNG RGB")
-            _validate_render_bbox(image["rendered_bbox"], f"{label}.rendered_bbox")
-            _finite_number(image["meters_per_pixel_x"], f"{label}.meters_per_pixel_x", minimum=0)
-            _finite_number(image["meters_per_pixel_y"], f"{label}.meters_per_pixel_y", minimum=0)
-            if image["meters_per_pixel_x"] == 0 or image["meters_per_pixel_y"] == 0:
-                raise SchemaValidationError(f"{label} requiere resolución espacial positiva")
-            transforms = image["transformations"]
-            transform_fields = (
-                "source_width_px", "source_height_px", "crop_left_px", "crop_top_px",
-                "crop_width_px", "crop_height_px", "output_width_px", "output_height_px",
-                "resize_interpolation",
-            )
-            if not isinstance(transforms, Mapping):
-                raise SchemaValidationError(f"{label}.transformations debe ser un objeto")
-            _required(transforms, transform_fields, f"{label}.transformations")
-            _no_unknown(transforms, set(transform_fields), f"{label}.transformations")
-            for field in transform_fields[:-1]:
-                minimum = 0 if field in {"crop_left_px", "crop_top_px"} else 1
-                if isinstance(transforms[field], bool) or not isinstance(transforms[field], int) or transforms[field] < minimum:
-                    raise SchemaValidationError(f"{label}.transformations.{field} no válido")
-            expected = {"crop_width_px": 256, "crop_height_px": 256, "output_width_px": 512, "output_height_px": 512}
-            if any(transforms[field] != value for field, value in expected.items()) or transforms["resize_interpolation"] != "bicubic":
-                raise SchemaValidationError(f"{label}.transformations no corresponde al perfil")
-            if transforms["crop_left_px"] + 256 > transforms["source_width_px"] or transforms["crop_top_px"] + 256 > transforms["source_height_px"]:
-                raise SchemaValidationError(f"{label}.transformations recorta fuera del raster fuente")
         else:
             if any(image[field] is not None for field in generated_fields):
                 raise SchemaValidationError(f"{label} fallido no debe declarar artefactos generados")
-            _non_empty_string(image["error_code"], f"{label}.error_code")
+            if image["error_code"] not in {
+                "source_does_not_cover_output_bbox", "renderer_failed", "invalid_rendered_mosaic",
+            }:
+                raise SchemaValidationError(f"{label}.error_code no válido")
 
 
 def _validate_f4_embedding_manifest(document: Mapping[str, Any]) -> None:
@@ -1107,6 +1139,105 @@ def _validate_f4_embedding_manifest(document: Mapping[str, Any]) -> None:
     expected_embedding = {"dimension": F4_EMBEDDING_DIMENSION, "dtype": "float32", "normalization": "l2", "row_order": "candidate_ids_file_order"}
     if any(embedding[field] != value for field, value in expected_embedding.items()):
         raise SchemaValidationError("representación de embeddings no válida")
+
+
+def _validate_f4_visual_selection(document: Mapping[str, Any]) -> None:
+    fields = {
+        "schema_version", "selection_id", "selection_policy", "source_manifest_id",
+        "source_manifest_sha256", "evaluation_use", "text_or_ground_truth_used", "candidates",
+    }
+    if set(document) != fields or document["schema_version"] != "1.0":
+        raise SchemaValidationError("f4_visual_selection incompatible")
+    if document["selection_id"] != "f4-nine-candidates-v1" or document["selection_policy"] != "fixed_spatial_coverage_v1":
+        raise SchemaValidationError("política de selección F4 no soportada")
+    _non_empty_string(document["source_manifest_id"], "selection.source_manifest_id")
+    _sha256(document["source_manifest_sha256"], "selection.source_manifest_sha256")
+    if document["evaluation_use"] is not False or document["text_or_ground_truth_used"] is not False:
+        raise SchemaValidationError("la selección F4 no puede depender de evaluación, texto o ground truth")
+    candidates = document["candidates"]
+    if not isinstance(candidates, list) or len(candidates) != 9:
+        raise SchemaValidationError("la selección F4 debe contener nueve candidatos")
+    seen = set()
+    for item in candidates:
+        if not isinstance(item, Mapping) or set(item) != {"candidate_id", "role"}:
+            raise SchemaValidationError("entrada de selección F4 no válida")
+        _non_empty_string(item["candidate_id"], "selection.candidate_id")
+        _non_empty_string(item["role"], "selection.role")
+        if item["candidate_id"] in seen:
+            raise SchemaValidationError("candidate_id duplicado en selección F4")
+        seen.add(item["candidate_id"])
+
+
+def _validate_f4_assets_manifest(document: Mapping[str, Any]) -> None:
+    if set(document) != {"schema_version", "manifest_id", "kind", "files"} or document["schema_version"] != "1.0":
+        raise SchemaValidationError("f4_assets_manifest incompatible")
+    _non_empty_string(document["manifest_id"], "assets.manifest_id")
+    if document["kind"] not in {"renderer_assets", "fonts"}:
+        raise SchemaValidationError("assets.kind no válido")
+    files = document["files"]
+    if not isinstance(files, list) or not files:
+        raise SchemaValidationError("assets.files debe ser una lista no vacía")
+    seen = set()
+    for item in files:
+        if not isinstance(item, Mapping) or set(item) != {"logical_path", "sha256", "size_bytes", "source", "license"}:
+            raise SchemaValidationError("entrada de assets no válida")
+        _logical_path(item["logical_path"], "assets.logical_path")
+        if item["logical_path"] in seen:
+            raise SchemaValidationError("path duplicado en assets")
+        seen.add(item["logical_path"])
+        _sha256(item["sha256"], "assets.sha256")
+        _positive_id(item["size_bytes"], "assets.size_bytes")
+        _non_empty_string(item["source"], "assets.source")
+        _non_empty_string(item["license"], "assets.license")
+
+
+def _validate_f4_osm_source(document: Mapping[str, Any]) -> None:
+    fields = {
+        "contract_version", "source_id", "source_type", "data_path", "data_sha256",
+        "provenance_path", "provenance_sha256", "coverage_bbox_wgs84",
+        "coverage_bbox_epsg3857", "selection", "closure", "license", "attribution",
+    }
+    if set(document) != fields or document["contract_version"] != "f4-osm-source-v1":
+        raise SchemaValidationError("f4_osm_source incompatible")
+    for field in ("source_id", "license", "attribution"):
+        _non_empty_string(document[field], f"source.{field}")
+    if document["source_type"] not in {"osm_snapshot", "synthetic_fixture"}:
+        raise SchemaValidationError("source.source_type no válido")
+    for field in ("data_path", "provenance_path"):
+        _logical_path(document[field], f"source.{field}")
+    for field in ("data_sha256", "provenance_sha256"):
+        _sha256(document[field], f"source.{field}")
+    _validate_bbox(document["coverage_bbox_wgs84"], "source.coverage_bbox_wgs84")
+    _validate_render_bbox(document["coverage_bbox_epsg3857"], "source.coverage_bbox_epsg3857")
+    if not isinstance(document["selection"], Mapping) or not isinstance(document["closure"], Mapping):
+        raise SchemaValidationError("source requiere selection y closure")
+
+
+def _validate_f4_renderer_provenance(document: Mapping[str, Any]) -> None:
+    if set(document) != {"renderer", "style"}:
+        raise SchemaValidationError("f4_renderer_provenance incompatible")
+    renderer = document["renderer"]
+    renderer_fields = {"contract_version", "renderer_id", "name", "version", "configuration_path", "configuration_sha256", "container_image_digest", "license"}
+    if not isinstance(renderer, Mapping) or set(renderer) != renderer_fields or renderer["contract_version"] != "f4-renderer-provenance-v1":
+        raise SchemaValidationError("renderer provenance no válida")
+    for field in ("renderer_id", "name", "version", "license"):
+        _non_empty_string(renderer[field], f"renderer.{field}")
+    _logical_path(renderer["configuration_path"], "renderer.configuration_path")
+    _sha256(renderer["configuration_sha256"], "renderer.configuration_sha256")
+    if renderer["container_image_digest"] is not None and not re.fullmatch(r"sha256:[0-9a-f]{64}", renderer["container_image_digest"]):
+        raise SchemaValidationError("renderer.container_image_digest no válido")
+    style = document["style"]
+    style_fields = {"style_id", "version", "repository_commit", "compiled_style_path", "compiled_style_sha256", "assets_manifest_path", "assets_manifest_sha256", "fonts_manifest_path", "fonts_manifest_sha256", "license"}
+    if not isinstance(style, Mapping) or set(style) != style_fields:
+        raise SchemaValidationError("style provenance no válida")
+    for field in ("style_id", "version", "license"):
+        _non_empty_string(style[field], f"style.{field}")
+    if not isinstance(style["repository_commit"], str) or not re.fullmatch(r"[0-9a-f]{40}", style["repository_commit"]):
+        raise SchemaValidationError("style.repository_commit no válido")
+    for field in ("compiled_style_path", "assets_manifest_path", "fonts_manifest_path"):
+        _logical_path(style[field], f"style.{field}")
+    for field in ("compiled_style_sha256", "assets_manifest_sha256", "fonts_manifest_sha256"):
+        _sha256(style[field], f"style.{field}")
 
 
 def _validate_f4_retrieval_result(document: Mapping[str, Any]) -> None:
@@ -1167,6 +1298,10 @@ def validate_document(document: Any, schema_name: str) -> None:
         "f3_relation_context": _validate_f3_relation_context,
         "f3_provenance": _validate_f3_provenance,
         "f4_visual_manifest": _validate_f4_visual_manifest,
+        "f4_visual_selection": _validate_f4_visual_selection,
+        "f4_assets_manifest": _validate_f4_assets_manifest,
+        "f4_osm_source": _validate_f4_osm_source,
+        "f4_renderer_provenance": _validate_f4_renderer_provenance,
         "f4_embedding_manifest": _validate_f4_embedding_manifest,
         "f4_retrieval_result": _validate_f4_retrieval_result,
         "experiment_parameters": _validate_experiment,
