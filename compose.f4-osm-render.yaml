@@ -1,0 +1,26 @@
+services:
+  f4-osm-render:
+    image: ${F4_RENDER_IMAGE_ID:?set F4_RENDER_IMAGE_ID with scripts/run_f4_osm_render.sh}
+    build:
+      context: .
+      dockerfile: docker/f4-osm-carto-arm64/Dockerfile
+    network_mode: none
+    working_dir: /workspace/project
+    volumes:
+      - .:/workspace/project:ro
+      - ./external/openstreetmap-carto-v5.9.0:/workspace/project/external/openstreetmap-carto-v5.9.0
+      - ./data/raw/osm/f4_renderer:/workspace/project/data/raw/osm/f4_renderer
+      - ./data/processed/visual:/workspace/project/data/processed/visual
+    tmpfs:
+      - /tmp:size=2g
+      - /var/lib/postgresql:size=12g
+      - /var/run/postgresql:size=64m
+    environment:
+      PGDATABASE: gis
+      PGUSER: root
+      PYTHONPATH: /workspace/project
+      F4_CONTAINER_IMAGE_DIGEST: ${F4_RENDER_IMAGE_ID:?set F4_RENDER_IMAGE_ID with scripts/run_f4_osm_render.sh}
+      F4_ONLY_CANDIDATE: ${F4_ONLY_CANDIDATE:-}
+      F4_HOST_UID: ${F4_HOST_UID:?set F4_HOST_UID with scripts/run_f4_osm_render.sh}
+      F4_HOST_GID: ${F4_HOST_GID:?set F4_HOST_GID with scripts/run_f4_osm_render.sh}
+    command: ["bash", "scripts/run_f4_osm_carto.sh"]

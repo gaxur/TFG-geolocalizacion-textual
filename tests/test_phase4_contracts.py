@@ -18,7 +18,7 @@ from src.tfg_phase0.f4_preflight import load_verified_selection
 from src.tfg_phase0.f4_validation import (
     F4ValidationError, embedding_dataset_id, geometry_document, load_verified_f1_50m,
     validate_embedding_manifest, validate_retrieval_result, validate_visual_bundle,
-    validate_visual_manifest, visual_dataset_id,
+    validate_render_extract_provenance, validate_visual_manifest, visual_dataset_id,
 )
 from src.tfg_phase0.validation import SchemaValidationError, validate_document
 
@@ -33,7 +33,13 @@ def png_rgb(width=512, height=512):
     def chunk(kind, payload):
         body = kind + payload
         return struct.pack(">I", len(payload)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
-    pixels = b"".join(b"\x00" + b"\x00\x00\x00" * width for _ in range(height))
+    rows = []
+    for row in range(height):
+        pixels = bytearray(b"\x00\x00\x00" * width)
+        if row == 0:
+            pixels[:3] = b"\xff\xff\xff"
+        rows.append(b"\x00" + bytes(pixels))
+    pixels = b"".join(rows)
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(pixels)) + chunk(b"IEND", b"")
 
 
@@ -235,7 +241,20 @@ class Phase4ContractTests(unittest.TestCase):
         self.visual["source"]["data_sha256"] = hashlib.sha256(source_raw).hexdigest()
         self.visual["source"]["provenance_sha256"] = hashlib.sha256(provenance_raw).hexdigest()
         (self.root / "renderer").mkdir()
-        renderer_config = b"renderer fixture"
+        effective_raw = b"effective renderer input"
+        (self.root / "renderer/effective.py").write_bytes(effective_raw)
+        renderer_config_document = {
+            "schema_version": "1.0",
+            "container_image_digest": None,
+            "files": [{
+                "logical_path": "renderer/effective.py",
+                "sha256": hashlib.sha256(effective_raw).hexdigest(),
+                "size_bytes": len(effective_raw),
+                "source": "fixture",
+                "license": "fixture-only",
+            }],
+        }
+        renderer_config = json.dumps(renderer_config_document, sort_keys=True).encode()
         (self.root / "renderer/config.json").write_bytes(renderer_config)
         self.visual["renderer"]["configuration_sha256"] = hashlib.sha256(renderer_config).hexdigest()
         (self.root / "style/symbols").mkdir(parents=True)
@@ -287,6 +306,35 @@ class Phase4ContractTests(unittest.TestCase):
         self.visual["visual_dataset_id"] = visual_dataset_id(self.visual)
         with self.assertRaises(F4ValidationError):
             validate_visual_bundle(self.visual, self.catalog, selection=self.selection, selection_sha256=self.selection_hash, dataset_root=self.root, project_root=self.root)
+
+    def test_render_extract_provenance_is_verified(self):
+        source_raw = b"pbf fixture"
+        provenance = {
+            "acquired_at_utc": "2026-10-15T08:35:22Z",
+            "attribution": self.visual["source"]["attribution"],
+            "bbox": self.visual["source"]["coverage_bbox_wgs84"],
+            "closure": self.visual["source"]["closure"],
+            "data_timestamp_utc": "2026-10-14T20:21:12Z",
+            "http": {"etag": "fixture", "last_modified": "2026-10-15T02:08:42Z"},
+            "license": self.visual["source"]["license"],
+            "raw_format": "osmpbf",
+            "raw_sha256": hashlib.sha256(source_raw).hexdigest(),
+            "raw_size_bytes": len(source_raw),
+            "resolved_filename": "fixture.osm.pbf",
+            "selection": self.visual["source"]["selection"],
+            "source_id": "f4-source-fixture",
+            "source_url": "https://example.test/fixture.osm.pbf",
+        }
+        source = copy.deepcopy(self.visual["source"])
+        source.update(
+            source_id=provenance["source_id"],
+            source_type="osm_render_extract",
+            data_sha256=provenance["raw_sha256"],
+        )
+        validate_render_extract_provenance(provenance, source_raw, source)
+        provenance["raw_size_bytes"] += 1
+        with self.assertRaises(F4ValidationError):
+            validate_render_extract_provenance(provenance, source_raw, source)
 
     def test_embedding_and_top_k_contracts_remain_separate(self):
         embedding = self._embedding_manifest()

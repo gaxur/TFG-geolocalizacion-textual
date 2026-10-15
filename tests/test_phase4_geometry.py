@@ -52,6 +52,8 @@ class Phase4GeometryTests(unittest.TestCase):
         geometry = candidate_raster_geometry(40.4157983231, -3.7040304835)
         expected_mpp = 2 * math.pi * 6_378_137 / (256 * 2**18)
         self.assertAlmostEqual(meters_per_pixel(18), expected_mpp, places=12)
+        self.assertAlmostEqual(geometry.request_bbox.max_x - geometry.request_bbox.min_x, expected_mpp * 256, places=8)
+        self.assertAlmostEqual(geometry.request_bbox.max_y - geometry.request_bbox.min_y, expected_mpp * 256, places=8)
         self.assertAlmostEqual(geometry.output_bbox.max_x - geometry.output_bbox.min_x, expected_mpp * 256, places=8)
         self.assertAlmostEqual(geometry.crop_left_px + 128, geometry.candidate_pixel_x, places=10)
         self.assertAlmostEqual(geometry.crop_top_px + 128, geometry.candidate_pixel_y, places=10)

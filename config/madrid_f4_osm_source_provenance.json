@@ -1,0 +1,16 @@
+{
+  "acquired_at_utc": "2026-10-15T08:35:22Z",
+  "attribution": "© OpenStreetMap contributors. Datos disponibles bajo la Open Database License (ODbL). https://www.openstreetmap.org/copyright",
+  "bbox": {"east": -3.050423, "north": 41.16864, "south": 39.881157, "west": -4.589539},
+  "closure": {"relations": "geofabrik_regional_extract", "ways": "reference_complete_within_extract"},
+  "data_timestamp_utc": "2026-10-14T20:21:12Z",
+  "http": {"etag": "515ac92-65dd786d9fac0", "last_modified": "2026-10-15T02:08:42Z"},
+  "license": "ODbL-1.0",
+  "raw_format": "osmpbf",
+  "raw_sha256": "9ef85f5c728a26995712a835a68f0cb30e01a32af6d2a7facd6744f3a3840db8",
+  "raw_size_bytes": 85306514,
+  "resolved_filename": "madrid-261014.osm.pbf",
+  "selection": {"provider_extract": "madrid", "scope": "Geofabrik Madrid regional extract"},
+  "source_id": "f4-osm-madrid-geofabrik-sha256-9ef85f5c728a26995712a835a68f0cb30e01a32af6d2a7facd6744f3a3840db8",
+  "source_url": "https://download.geofabrik.de/europe/spain/madrid-261014.osm.pbf"
+}

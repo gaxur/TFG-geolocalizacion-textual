@@ -1,4 +1,4 @@
-# F4.1a: contratos del dataset visual de Madrid
+# F4: dataset visual y renderizado cartográfico de Madrid
 
 ## Alcance
 
@@ -123,10 +123,180 @@ Con F2, ocho candidatos están cubiertos y
 `MADP_MADRID_PILOT_GRID_V1_GA467049559FD_S050_L050_R0004_C0016` requiere margen
 adicional al este.
 
-## Límites para F4.1b-B
+## Generación real F4.1b-B
 
-Antes de materializar imágenes reales deben adquirirse una fuente con margen y
-los recursos de un renderizador y estilo con versiones, hashes y condiciones de
-uso verificadas. D007, D013 y D016 permanecen abiertas; el contrato corregido no
-genera evidencia de compatibilidad visual, transferencia zero-shot ni permiso
-de redistribución.
+### Por qué se necesitan imágenes OSM
+
+F1 define las celdas candidatas y sus centros. F3 asocia geometrías y objetos
+OSM a esas celdas, pero CrossText2Loc no consume directamente esas asociaciones:
+su rama visual recibe imágenes cartográficas raster. Por ello F4 genera una
+imagen OSM por `candidate_id` y mantiene separado este dataset derivado.
+
+Las imágenes son la futura galería visual. F4.1c calculará sus embeddings una
+sola vez y los almacenará asociados a `candidate_id`. En consulta, el encoder
+textual producirá otro vector normalizado; el producto escalar entre vectores
+normalizados —similitud coseno— permitirá ordenar exhaustivamente los candidatos
+y devolver un Top-K con las coordenadas resueltas desde F1. F4.1b-B no calcula
+embeddings, no ejecuta retrieval y no proporciona métricas de recuperación.
+
+### Renderer utilizado
+
+La ejecución real utiliza:
+
+| Componente | Versión efectiva | Función |
+|---|---|---|
+| Mapnik | 3.1.0 | Convierte consultas geográficas y reglas de estilo en raster |
+| OpenStreetMap Carto | v5.9.0, commit `491bd4a4675a94f3950ff45843d0c4696d8ae420` | Apariencia de calles, edificios, parques, etiquetas y símbolos |
+| osm2pgsql | 1.11.0 | Importa el PBF OSM en el schema `pgsql` esperado por el estilo |
+| PostgreSQL | 16.15 | Almacena las tablas de renderizado |
+| PostGIS | 3.4.2 | Proporciona geometrías y consultas espaciales |
+| CartoCSS | 1.2.0 | Compila `project.mml` a XML de Mapnik |
+| Pillow | 10.2.0 | Crop subpíxel, resize bicúbico y PNG RGB |
+| Contenedor | `sha256:70e20b64458b562342c9c9534151e7a6bf7dceffba23326bbda87cbc42f4d5b7` | Entorno Ubuntu 24.04 ARM64 aislado |
+
+El Compose no publica puertos, no usa GPU y mantiene PostgreSQL en `tmpfs`.
+El proyecto se monta en solo lectura; únicamente el clon OSM Carto, los
+metadatos del renderer y la salida visual se montan con escritura.
+No se despliega un servidor de tiles permanente. OSM Carto v5.9.0 fue la última
+release identificada anterior al script CVG-Text publicado en julio de 2025.
+Esta proximidad temporal no demuestra que sea el estilo exacto de entrenamiento.
+
+La descarga histórica de las faces monocromas `Noto Emoji Regular/Bold` ya no
+funciona. Se aplica el parche versionado
+`docker/f4-osm-carto-arm64/osm-carto-v5.9.0-emoji-fallback.patch`, autorizado
+para sustituir únicamente esas faces por `Noto Sans Symbols2 Regular` y
+`Noto Sans Symbols Bold`. Es una desviación explícita del estilo upstream.
+
+### Fuente cartográfica
+
+La fuente independiente de F4 es el extracto Geofabrik Madrid resuelto como
+`madrid-261014.osm.pbf`, fechado internamente el 14 de octubre de 2026:
+
+```text
+size: 85.306.514 bytes
+sha256: 9ef85f5c728a26995712a835a68f0cb30e01a32af6d2a7facd6744f3a3840db8
+bbox header: -4.589539,39.881157,-3.050423,41.168640
+```
+
+El extracto cubre holgadamente los nueve footprints, incluido el caso oriental
+que F2 no cubría. F2 no se modifica ni se usa como base de render: su adquisición
+estaba limitada a D004 y sus relations son parciales. La provenance completa de
+la fuente F4 se materializa desde `config/madrid_f4_osm_source_provenance.json`.
+
+Los datos OSM y los water/ice polygons están bajo ODbL 1.0; el dataset Natural
+Earth usado por el estilo es dominio público; OSM Carto declara CC0 1.0. La
+atribución OSM se conserva en el manifest. Las imágenes permanecen fuera de Git
+y su eventual publicación requerirá revisar el paquete concreto.
+
+### Pipeline ejecutado
+
+```mermaid
+flowchart LR
+    OSM[PBF Madrid congelado] --> PG[osm2pgsql]
+    PG --> DB[(PostgreSQL/PostGIS)]
+    STYLE[OSM Carto v5.9.0] --> CARTO[CartoCSS]
+    CARTO --> XML[XML Mapnik]
+    DB --> MAPNIK[Mapnik]
+    XML --> MAPNIK
+    MAPNIK --> MOSAIC[Canvas alineado con tiles XYZ z18]
+    MOSAIC --> CROP[Crop 256 x 256 subpíxel]
+    CROP --> RESIZE[Resize bicúbico 512 x 512]
+    RESIZE --> PNG[PNG RGB + SHA-256]
+    PNG --> MANIFEST[Manifest visual v2]
+```
+
+Parámetros efectivos:
+
+- coordenadas de candidato en WGS84;
+- render y footprints en EPSG:3857;
+- orientación norte arriba;
+- zoom 18 y tile de 256 píxeles;
+- resolución nativa `0,5971642834779395` m proyectados/píxel;
+- footprint de salida `152,87405657035252` m proyectados por lado;
+- crop nativo 256 x 256 centrado con offsets subpíxel;
+- resize bicúbico a 512 x 512;
+- salida PNG RGB.
+
+La celda F1 mide 50 x 50 m, pero el raster representa un contexto mayor. La
+celda define la unidad candidata; no define el footprint visual.
+
+Mapnik renderiza un canvas continuo cuya bbox coincide con la unión de tiles
+XYZ necesaria. No se descargan ni concatenan tiles HTTP individuales. Esta
+elección conserva escala, orientación y alineación z18, pero la colocación de
+etiquetas puede diferir del pipeline `contextily` y de los metatiles del servidor
+OSM original.
+
+### Resultado real
+
+Se generaron nueve imágenes, una por candidato de la selección fija. Todas son
+PNG RGB de 512 x 512, se decodifican completamente y contienen variación de
+color no nula. El bundle local es:
+
+```text
+data/processed/visual/
+  f4-madrid-visual-sha256-40ed367c74e29ab271308f1f2df0349b1fc423d8e64ba7dc19da60d7d40be915/
+```
+
+El candidato central se validó primero y obtuvo SHA-256:
+
+```text
+3043d9982aa62a80cc9aae99006b61d8693843f88eb26fd7a03c884196034667
+```
+
+Una segunda ejecución completa produjo el mismo `visual_dataset_id` y el
+publicador comprobó igualdad byte a byte del árbol completo.
+
+### Comandos reproducibles
+
+La adquisición requiere red y solo debe repetirse tras revisar las políticas y
+autorizarla explícitamente:
+
+```bash
+bash scripts/acquire_f4_render_inputs.sh
+```
+
+Construcción del entorno ARM64:
+
+```bash
+docker build --platform linux/arm64 \
+  -f docker/f4-osm-carto-arm64/Dockerfile \
+  -t tfg-f4-osm-carto-arm64:ubuntu24.04 .
+```
+
+Render de los nueve candidatos, sin red:
+
+```bash
+bash scripts/run_f4_osm_render.sh
+```
+
+Validación independiente:
+
+```bash
+./.venv-geo/bin/python scripts/validate_f4_visual_bundle.py \
+  --bundle data/processed/visual/f4-madrid-visual-sha256-40ed367c74e29ab271308f1f2df0349b1fc423d8e64ba7dc19da60d7d40be915
+```
+
+El wrapper resuelve el ID de la imagen local y ordena a Compose ejecutar ese ID
+exacto; el manifest no acepta un digest introducido independientemente del
+runtime. Repetir el comando de render comprueba reproducibilidad: si el mismo ID ya
+existe, el script compara cada fichero por SHA-256 y falla ante cualquier
+diferencia.
+
+El Dockerfile fija la base por digest y CartoCSS por versión, pero APT resuelve
+los paquetes disponibles al construir. Por ello una reconstrucción futura puede
+producir otro ID y debe considerarse otro entorno hasta validar de nuevo sus
+versiones y raster.
+
+## Límites para F4.1c
+
+La ampliación de esta fixture o su distribución requiere conservar una fuente
+con margen y los recursos del renderer y estilo con versiones, hashes y
+condiciones de uso verificadas. D007, D013 y D016 permanecen abiertas; el
+contrato y las imágenes no demuestran compatibilidad visual exacta,
+transferencia zero-shot ni permiso de redistribución.
+
+La fuente y el renderer ya se han materializado para este piloto, pero D007
+permanece abierta: ni OSM Carto v5.9.0 ni el fallback tipográfico prueban
+equivalencia exacta con las imágenes de entrenamiento. F4.1c deberá tratar la
+galería como experimental, cargar el checkpoint solo tras las comprobaciones
+previstas y separar sus resultados del protocolo oficial de Nueva York.

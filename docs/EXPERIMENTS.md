@@ -12,6 +12,70 @@ entorno, dataset, checkpoint y hash, configuración, comando, resultados,
 métricas, tiempo, memoria, problemas y cambios realizados. Solo se sustituirán
 valores pendientes por observaciones reales.
 
+## F4.1b-B: galería visual OSM de Madrid
+
+### Objetivo y resultado
+
+Generar una galería pequeña de imágenes cartográficas reales para nueve
+candidatos F1 de 50 m, sin cargar CrossText2Loc, calcular embeddings ni ejecutar
+retrieval. La ejecución terminó el 15 de octubre de 2026 con nueve PNG válidos
+y un bundle content-addressed:
+
+```text
+f4-madrid-visual-sha256-40ed367c74e29ab271308f1f2df0349b1fc423d8e64ba7dc19da60d7d40be915
+```
+
+### Entorno y entradas
+
+- Equipo: Lenovo ThinkStation PGX, Linux ARM64.
+- Imagen efectiva: `sha256:70e20b64458b562342c9c9534151e7a6bf7dceffba23326bbda87cbc42f4d5b7`.
+- Mapnik 3.1.0; osm2pgsql 1.11.0; PostgreSQL 16.15; PostGIS 3.4.2.
+- CartoCSS 1.2.0; Pillow 10.2.0.
+- OpenStreetMap Carto v5.9.0, commit
+  `491bd4a4675a94f3950ff45843d0c4696d8ae420`.
+- Fuente: Geofabrik `madrid-261014.osm.pbf`, 85.306.514 bytes.
+- Fuente SHA-256:
+  `9ef85f5c728a26995712a835a68f0cb30e01a32af6d2a7facd6744f3a3840db8`.
+- Datos OSM: ODbL 1.0; estilo OSM Carto: CC0 1.0.
+
+El estilo aplica el parche versionado de fallback emoji porque las faces
+monocromas históricas `Noto Emoji Regular/Bold` ya no estaban disponibles en el
+endpoint upstream. La sustitución por Noto Symbols está registrada y mantiene
+el perfil como `experimental_unconfirmed`.
+
+### Parámetros y comandos
+
+- EPSG:3857, norte arriba, zoom 18.
+- Crop nativo 256 x 256 centrado con precisión subpíxel.
+- Footprint: 152,87405657035252 m proyectados por lado.
+- Resize bicúbico a PNG RGB 512 x 512.
+
+```bash
+bash scripts/acquire_f4_render_inputs.sh
+docker build --platform linux/arm64 \
+  -f docker/f4-osm-carto-arm64/Dockerfile \
+  -t tfg-f4-osm-carto-arm64:ubuntu24.04 .
+bash scripts/run_f4_osm_render.sh
+./.venv-geo/bin/python scripts/validate_f4_visual_bundle.py \
+  --bundle data/processed/visual/f4-madrid-visual-sha256-40ed367c74e29ab271308f1f2df0349b1fc423d8e64ba7dc19da60d7d40be915
+```
+
+### Validación y límites
+
+- 9/9 candidatos con estado `generated`.
+- Todos los ficheros son PNG RGB 512 x 512, completamente decodificables y no
+  uniformes.
+- SHA-256 central (`R0008_C0008`):
+  `3043d9982aa62a80cc9aae99006b61d8693843f88eb26fd7a03c884196034667`.
+- Una segunda ejecución completa produjo el mismo ID y el publicador comprobó
+  igualdad byte a byte del árbol.
+- No se usó GPU, checkpoint, descripción textual ni ground truth.
+- No se obtuvieron métricas de recuperación.
+- D007 continúa abierta: la escala, el estilo y la generación exactos del
+  entrenamiento original no están confirmados.
+- La base Ubuntu está fijada por digest, pero APT resuelve paquetes al construir;
+  una reconstrucción con otro ID deberá validarse como otro entorno.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

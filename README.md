@@ -20,8 +20,9 @@ Ya existen contratos propios de Fase 0 (`src/tfg_phase0/`, `schemas/`,
 modelos. F1, F2 y F3 proporcionan el catálogo geométrico, el snapshot OSM y los
 bundles de asociaciones de Madrid; su cierre está en
 [PHASE3_CLOSURE.md](docs/PHASE3_CLOSURE.md). La reproducción oficial
-NewYork-mixed OSM de CrossText2Loc se completó en la NVIDIA GB10. El catálogo
-visual de imágenes, embeddings y recuperación pertenece a F4 y sigue pendiente.
+NewYork-mixed OSM de CrossText2Loc se completó en la NVIDIA GB10. F4 ya dispone
+de una fixture local de nueve imágenes OSM de Madrid generadas con Mapnik y OSM
+Carto; los embeddings y la recuperación textual siguen pendientes.
 
 El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 

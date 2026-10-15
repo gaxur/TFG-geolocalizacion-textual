@@ -79,7 +79,7 @@
       "required": ["contract_version", "source_id", "source_type", "data_path", "data_sha256", "provenance_path", "provenance_sha256", "coverage_bbox_wgs84", "coverage_bbox_epsg3857", "selection", "closure", "license", "attribution"],
       "properties": {
         "contract_version": {"const": "f4-osm-source-v1"}, "source_id": {"type": "string", "minLength": 1},
-        "source_type": {"enum": ["osm_snapshot", "synthetic_fixture"]}, "data_path": {"$ref": "#/$defs/logicalPath"},
+        "source_type": {"enum": ["osm_snapshot", "osm_render_extract", "synthetic_fixture"]}, "data_path": {"$ref": "#/$defs/logicalPath"},
         "data_sha256": {"$ref": "#/$defs/sha256"}, "provenance_path": {"$ref": "#/$defs/logicalPath"},
         "provenance_sha256": {"$ref": "#/$defs/sha256"}, "coverage_bbox_wgs84": {"$ref": "#/$defs/bboxWgs84"},
         "coverage_bbox_epsg3857": {"$ref": "#/$defs/bbox3857"},

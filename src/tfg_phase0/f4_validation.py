@@ -323,6 +323,43 @@ def _validate_png(raw: bytes, expected_width: int, expected_height: int) -> None
         raise F4ValidationError("datos de píxeles PNG incompletos")
     if any(pixels[row * row_size] > 4 for row in range(expected_height)):
         raise F4ValidationError("filtro PNG no válido")
+    previous = bytearray(expected_width * 3)
+    first_pixel = None
+    varied = False
+    for row_index in range(expected_height):
+        offset = row_index * row_size
+        filter_type = pixels[offset]
+        encoded = pixels[offset + 1:offset + row_size]
+        decoded = bytearray(len(encoded))
+        for index, value in enumerate(encoded):
+            left = decoded[index - 3] if index >= 3 else 0
+            up = previous[index]
+            upper_left = previous[index - 3] if index >= 3 else 0
+            if filter_type == 0:
+                predictor = 0
+            elif filter_type == 1:
+                predictor = left
+            elif filter_type == 2:
+                predictor = up
+            elif filter_type == 3:
+                predictor = (left + up) // 2
+            else:
+                estimate = left + up - upper_left
+                distances = (abs(estimate - left), abs(estimate - up), abs(estimate - upper_left))
+                predictor = (left, up, upper_left)[distances.index(min(distances))]
+            decoded[index] = (value + predictor) & 0xFF
+        for index in range(0, len(decoded), 3):
+            pixel = bytes(decoded[index:index + 3])
+            if first_pixel is None:
+                first_pixel = pixel
+            elif pixel != first_pixel:
+                varied = True
+                break
+        previous = decoded
+        if varied:
+            break
+    if not varied:
+        raise F4ValidationError("PNG uniforme sin contenido cartográfico")
 
 
 def verify_visual_image_files(document: Mapping[str, Any], dataset_root: str | Path) -> None:
@@ -345,6 +382,30 @@ def verify_visual_image_files(document: Mapping[str, Any], dataset_root: str | P
             _validate_png(raw, image["width_px"], image["height_px"])
         except F4ValidationError as error:
             raise F4ValidationError(f"PNG inválido para {image['candidate_id']}: {error}") from error
+
+
+def validate_render_extract_provenance(
+    provenance: Mapping[str, Any], source_raw: bytes, source: Mapping[str, Any]
+) -> None:
+    required = {
+        "acquired_at_utc", "attribution", "bbox", "closure", "data_timestamp_utc",
+        "http", "license", "raw_format", "raw_sha256", "raw_size_bytes",
+        "resolved_filename", "selection", "source_id", "source_url",
+    }
+    if not isinstance(provenance, Mapping) or set(provenance) != required:
+        raise F4ValidationError("provenance del extracto de render no cumple su contrato")
+    if (
+        provenance["source_id"] != source["source_id"]
+        or provenance["raw_sha256"] != source["data_sha256"]
+        or provenance["raw_size_bytes"] != len(source_raw)
+        or provenance["bbox"] != source["coverage_bbox_wgs84"]
+        or provenance["selection"] != source["selection"]
+        or provenance["closure"] != source["closure"]
+        or provenance["license"] != source["license"]
+        or provenance["attribution"] != source["attribution"]
+        or provenance["raw_format"] != "osmpbf"
+    ):
+        raise F4ValidationError("provenance del extracto de render no corresponde al manifest")
 
 
 def validate_visual_bundle(
@@ -382,7 +443,34 @@ def validate_visual_bundle(
         raise F4ValidationError("selección suministrada no coincide con el fichero verificado")
     source_raw = verified_file(document["source"]["data_path"], document["source"]["data_sha256"], "datos de fuente")
     provenance_raw = verified_file(document["source"]["provenance_path"], document["source"]["provenance_sha256"], "provenance de fuente")
-    verified_file(document["renderer"]["configuration_path"], document["renderer"]["configuration_sha256"], "configuración del renderer")
+    try:
+        provenance = json.loads(provenance_raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise F4ValidationError("provenance de fuente no es JSON UTF-8") from error
+    renderer_config_raw = verified_file(document["renderer"]["configuration_path"], document["renderer"]["configuration_sha256"], "configuración del renderer")
+    try:
+        renderer_config = json.loads(renderer_config_raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise F4ValidationError("configuración del renderer no es JSON UTF-8") from error
+    if (
+        not isinstance(renderer_config, Mapping)
+        or set(renderer_config) != {"schema_version", "container_image_digest", "files"}
+        or renderer_config["schema_version"] != "1.0"
+        or renderer_config["container_image_digest"] != document["renderer"]["container_image_digest"]
+        or not isinstance(renderer_config["files"], list)
+        or not renderer_config["files"]
+    ):
+        raise F4ValidationError("configuración efectiva del renderer inválida")
+    seen_renderer_paths = set()
+    for entry in renderer_config["files"]:
+        if not isinstance(entry, Mapping) or set(entry) != {"logical_path", "sha256", "size_bytes", "source", "license"}:
+            raise F4ValidationError("entrada de configuración efectiva inválida")
+        if entry["logical_path"] in seen_renderer_paths:
+            raise F4ValidationError("path duplicado en configuración efectiva")
+        seen_renderer_paths.add(entry["logical_path"])
+        effective_raw = verified_file(entry["logical_path"], entry["sha256"], f"input efectivo {entry['logical_path']}")
+        if len(effective_raw) != entry["size_bytes"]:
+            raise F4ValidationError(f"tamaño de input efectivo no coincide: {entry['logical_path']}")
     verified_file(document["style"]["compiled_style_path"], document["style"]["compiled_style_sha256"], "estilo compilado")
     for kind in ("assets", "fonts"):
         raw = verified_file(document["style"][f"{kind}_manifest_path"], document["style"][f"{kind}_manifest_sha256"], f"manifest de {kind}")
@@ -401,10 +489,9 @@ def validate_visual_bundle(
 
     if document["source"]["source_type"] == "osm_snapshot":
         try:
-            provenance = json.loads(provenance_raw.decode("utf-8"))
             validate_document(provenance, "osm_snapshot")
-        except (UnicodeDecodeError, json.JSONDecodeError, SchemaValidationError) as error:
-            raise F4ValidationError("provenance OSM no es JSON UTF-8") from error
+        except SchemaValidationError as error:
+            raise F4ValidationError("provenance OSM no cumple su contrato") from error
         if (
             provenance.get("osm_snapshot_id") != document["source"]["source_id"]
             or provenance.get("raw_sha256") != document["source"]["data_sha256"]
@@ -423,4 +510,6 @@ def validate_visual_bundle(
             raise F4ValidationError("fuente OSM estructuralmente inválida") from error
         if counts != provenance["counts"]:
             raise F4ValidationError("conteos de fuente OSM no corresponden a provenance")
+    elif document["source"]["source_type"] == "osm_render_extract":
+        validate_render_extract_provenance(provenance, source_raw, document["source"])
     verify_visual_image_files(document, dataset_root)

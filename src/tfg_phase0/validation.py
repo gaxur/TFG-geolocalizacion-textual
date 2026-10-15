@@ -985,7 +985,7 @@ def _validate_f4_visual_manifest(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("f4_visual_manifest.source.contract_version no soportada")
     for field in ("source_id", "license", "attribution"):
         _non_empty_string(source[field], f"f4_visual_manifest.source.{field}")
-    if source["source_type"] not in {"osm_snapshot", "synthetic_fixture"}:
+    if source["source_type"] not in {"osm_snapshot", "osm_render_extract", "synthetic_fixture"}:
         raise SchemaValidationError("f4_visual_manifest.source.source_type no válido")
     _logical_path(source["data_path"], "f4_visual_manifest.source.data_path")
     _logical_path(source["provenance_path"], "f4_visual_manifest.source.provenance_path")
@@ -1201,7 +1201,7 @@ def _validate_f4_osm_source(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("f4_osm_source incompatible")
     for field in ("source_id", "license", "attribution"):
         _non_empty_string(document[field], f"source.{field}")
-    if document["source_type"] not in {"osm_snapshot", "synthetic_fixture"}:
+    if document["source_type"] not in {"osm_snapshot", "osm_render_extract", "synthetic_fixture"}:
         raise SchemaValidationError("source.source_type no válido")
     for field in ("data_path", "provenance_path"):
         _logical_path(document[field], f"source.{field}")

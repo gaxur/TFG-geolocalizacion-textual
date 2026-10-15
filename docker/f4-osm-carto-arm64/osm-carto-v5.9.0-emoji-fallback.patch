@@ -1,0 +1,8 @@
+--- a/style/fonts.mss
++++ b/style/fonts.mss
+@@
+-                "Noto Emoji Regular",
++                "Noto Sans Symbols2 Regular",
+@@
+-                "Noto Emoji Bold",
++                "Noto Sans Symbols Bold",
