@@ -1124,6 +1124,35 @@ def _validate_f4_gallery_comparison(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("comparison_id no corresponde al contenido")
 
 
+def _validate_f4_linguistic_query_set(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "query_set_id", "protocol_version", "partition", "provenance", "groups"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f4-linguistic-query-set-v1" or document["protocol_version"] != "f4-linguistic-robustness-v1" or document["partition"] != "development":
+        raise SchemaValidationError("f4_linguistic_query_set incompatible")
+    if not isinstance(document["query_set_id"], str) or not re.fullmatch(r"f4-madrid-linguistic-queries-sha256-[0-9a-f]{64}", document["query_set_id"]):
+        raise SchemaValidationError("query_set_id lingüístico no válido")
+    provenance = document["provenance"]
+    if provenance != {"source_type": "technical_controlled", "independent_environment_observation": False, "ground_truth_available": False, "description": provenance.get("description")}:
+        raise SchemaValidationError("provenance lingüística no válida")
+    _non_empty_string(provenance["description"], "linguistic.provenance.description")
+    if not isinstance(document["groups"], list) or not document["groups"]:
+        raise SchemaValidationError("groups lingüísticos vacíos")
+
+
+def _validate_f4_linguistic_robustness_result(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "robustness_result_id", "query_set_id", "query_set_sha256", "gallery", "checkpoint_sha256", "ranking_set_id", "ranking_set_sha256", "top_k", "comparisons", "aggregates", "geographic_accuracy_available", "limitations"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f4-linguistic-robustness-result-v1" or document["top_k"] != 10 or document["geographic_accuracy_available"] is not False:
+        raise SchemaValidationError("f4_linguistic_robustness_result incompatible")
+    if not isinstance(document["robustness_result_id"], str) or not re.fullmatch(r"f4-madrid-linguistic-robustness-sha256-[0-9a-f]{64}", document["robustness_result_id"]):
+        raise SchemaValidationError("robustness_result_id no válido")
+    for field in ("query_set_sha256", "checkpoint_sha256", "ranking_set_sha256"):
+        _sha256(document[field], f"robustness.{field}")
+    if not isinstance(document["gallery"], Mapping) or not isinstance(document["comparisons"], list) or not isinstance(document["aggregates"], list) or not isinstance(document["limitations"], list):
+        raise SchemaValidationError("estructura de robustez no válida")
+    from .f4_robustness import robustness_result_id
+    if document["robustness_result_id"] != robustness_result_id(document):
+        raise SchemaValidationError("robustness_result_id no corresponde al contenido")
+
+
 def _non_empty_string(value: Any, field: str) -> None:
     if not isinstance(value, str) or not value:
         raise SchemaValidationError(f"{field} debe ser texto no vacío")
@@ -1555,6 +1584,8 @@ def validate_document(document: Any, schema_name: str) -> None:
         "f4_evaluation_result": _validate_f4_evaluation_result,
         "f4_ranking_set": _validate_f4_ranking_set,
         "f4_gallery_comparison": _validate_f4_gallery_comparison,
+        "f4_linguistic_query_set": _validate_f4_linguistic_query_set,
+        "f4_linguistic_robustness_result": _validate_f4_linguistic_robustness_result,
         "manifest": _validate_manifest,
         "osm_snapshot": _validate_osm_snapshot,
         "f3_osm_object": _validate_f3_osm_object,

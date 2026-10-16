@@ -31,6 +31,10 @@ F4.3 ya dispone de contratos, control de particiones, asignación geográfica y
 métricas reproducibles. No existen todavía consultas humanas con referencias
 validadas suficientes, por lo que no se publican métricas empíricas de Madrid.
 
+F4.5 añade un experimento técnico de robustez lingüística con 27 variantes
+controladas en inglés y español sobre ambas galerías. Sus métricas describen
+estabilidad de ranking, no precisión geográfica.
+
 El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 
 ```text

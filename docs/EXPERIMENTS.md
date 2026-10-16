@@ -227,6 +227,36 @@ acepta los dos Top-10 y registra cero referencias validadas; por tanto Recall,
 GeoRecall y errores empíricos continúan no disponibles. No se infiere mejora o
 empeoramiento a partir de estos tres ejemplos.
 
+## F4.5: estabilidad lingüística controlada
+
+El query set `0f202067...` contiene tres anchors y 24 variantes técnicas:
+paráfrasis, sinónimos, expansión, acortamiento, eliminación, ambigüedad,
+contradicción y traducción al español. Se ejecutaron 27 Top-10 sobre cada
+galería, sin ground truth.
+
+```text
+ranking set 50 m: 2f400901...
+ranking set 25 m: 6d3bd2f0...
+informe 50 m: 2421b0fc...
+informe 25 m: 923677b8...
+```
+
+| Galería | Relación | n | Top-1 igual | Jaccard@10 | Distancia de salida Top-1 |
+|---|---|---:|---:|---:|---:|
+| 50 m | Equivalencia aproximada | 12 | 0,167 | 0,184 | 314,9 m |
+| 50 m | Pérdida de información | 9 | 0,000 | 0,067 | 387,6 m |
+| 50 m | Cambio semántico | 3 | 0,333 | 0,578 | 192,5 m |
+| 25 m | Equivalencia aproximada | 12 | 0,000 | 0,085 | 434,5 m |
+| 25 m | Pérdida de información | 9 | 0,000 | 0,006 | 484,6 m |
+| 25 m | Cambio semántico | 3 | 0,667 | 0,356 | 37,2 m |
+
+Las tres traducciones ES no conservaron Top-1. Su Jaccard@10 medio fue 0,055 en
+50 m y 0,000 en 25 m. Esto no mide precisión del español: son tres sondas
+controladas, sin ubicación verdadera y con checkpoint de Nueva York.
+
+Los batches tardaron 8,29 s en 50 m y 10,28 s en 25 m, incluida una carga de
+modelo por galería. `geographic_accuracy_available` permanece `false`.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f4_linguistic_robustness_result.schema.json",
+  "title": "F4.5 linguistic robustness result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "robustness_result_id", "query_set_id", "query_set_sha256", "gallery", "checkpoint_sha256", "ranking_set_id", "ranking_set_sha256", "top_k", "comparisons", "aggregates", "geographic_accuracy_available", "limitations"],
+  "properties": {
+    "schema_version": {"const": "1.0"}, "contract_version": {"const": "f4-linguistic-robustness-result-v1"},
+    "robustness_result_id": {"type": "string", "pattern": "^f4-madrid-linguistic-robustness-sha256-[0-9a-f]{64}$"},
+    "query_set_id": {"type": "string", "minLength": 1}, "query_set_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gallery": {"type": "object"}, "checkpoint_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "ranking_set_id": {"type": "string", "minLength": 1}, "ranking_set_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "top_k": {"const": 10}, "comparisons": {"type": "array"}, "aggregates": {"type": "array"},
+    "geographic_accuracy_available": {"const": false}, "limitations": {"type": "array", "items": {"type": "string"}}
+  }
+}

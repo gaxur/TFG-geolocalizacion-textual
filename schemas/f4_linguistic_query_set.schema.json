@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f4_linguistic_query_set.schema.json",
+  "title": "F4.5 controlled linguistic robustness queries",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "query_set_id", "protocol_version", "partition", "provenance", "groups"],
+  "properties": {
+    "schema_version": {"const": "1.0"}, "contract_version": {"const": "f4-linguistic-query-set-v1"},
+    "query_set_id": {"type": "string", "pattern": "^f4-madrid-linguistic-queries-sha256-[0-9a-f]{64}$"},
+    "protocol_version": {"const": "f4-linguistic-robustness-v1"}, "partition": {"const": "development"},
+    "provenance": {"type": "object", "additionalProperties": false, "required": ["source_type", "independent_environment_observation", "ground_truth_available", "description"], "properties": {"source_type": {"const": "technical_controlled"}, "independent_environment_observation": {"const": false}, "ground_truth_available": {"const": false}, "description": {"type": "string", "minLength": 1}}},
+    "groups": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/group"}}
+  },
+  "$defs": {
+    "group": {"type": "object", "additionalProperties": false, "required": ["group_id", "semantic_units", "variants"], "properties": {"group_id": {"type": "string", "minLength": 1}, "semantic_units": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "variants": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/variant"}}}},
+    "variant": {"type": "object", "additionalProperties": false, "required": ["query_id", "parent_query_id", "language", "transformation", "semantic_relation", "text", "word_count", "character_count", "attribute_count", "preserved_units", "removed_units", "changed_units", "validation_status"], "properties": {"query_id": {"type": "string", "minLength": 1}, "parent_query_id": {"type": ["string", "null"]}, "language": {"enum": ["en", "es"]}, "transformation": {"enum": ["anchor", "paraphrase", "synonym_substitution", "detail_expansion", "shortening", "attribute_removal", "ambiguity_increase", "contradiction", "translation"]}, "semantic_relation": {"enum": ["reference", "approximately_equivalent", "information_loss", "semantic_change"]}, "text": {"type": "string", "minLength": 1}, "word_count": {"type": "integer", "minimum": 1}, "character_count": {"type": "integer", "minimum": 1}, "attribute_count": {"type": "integer", "minimum": 0}, "preserved_units": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}, "removed_units": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}, "changed_units": {"type": "array", "uniqueItems": true, "items": {"type": "object", "additionalProperties": false, "required": ["from", "to"], "properties": {"from": {"type": "string", "minLength": 1}, "to": {"type": "string", "minLength": 1}}}}, "validation_status": {"const": "manually_reviewed_technical"}}}
+  }
+}

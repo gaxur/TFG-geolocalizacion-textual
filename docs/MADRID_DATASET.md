@@ -20,6 +20,10 @@ F4.3 incorpora el contrato y evaluador reproducible descritos en
 sondas técnicas de desarrollo y cero referencias geográficas validadas; no es un
 dataset de evaluación empírica.
 
+Las variantes lingüísticas controladas de F4.5 se documentan en
+[PHASE4_LINGUISTIC_ROBUSTNESS.md](PHASE4_LINGUISTIC_ROBUSTNESS.md). Permanecen
+separadas del futuro dataset humano de evaluación.
+
 ## 1. Separación de recursos
 
 ### Catálogo offline de referencia
