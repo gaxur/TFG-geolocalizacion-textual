@@ -166,6 +166,32 @@ referencian el bundle final `199dae0e...`, declaran `gallery_count: 253`,
 mismo ranking y scores. Las puntuaciones no son probabilidades ni prueban que el
 candidato sea geográficamente correcto. D007, D013 y D016 permanecen abiertas.
 
+## F4.3: infraestructura de evaluación
+
+El borrador `madrid-f43-draft-v1` contiene tres sondas técnicas de F4.2 en la
+partición `development`. Ninguna tiene coordenada de referencia verificada:
+
+```text
+consultas: 3
+rankings reales disponibles: 3
+referencias validadas: 0
+referencias evaluables: 0
+metrics_available: false
+```
+
+El evaluador produjo localmente:
+
+```text
+f4-madrid-evaluation-sha256-627b2b29155d2762b096771f895aaaaa5af88f298353c3babfd75d271eca7b79
+```
+
+Los tres rankings Top-5 quedan fijados por SHA-256, pero ninguno está preparado
+para Recall@10. Recall@1/5/10, errores y GeoRecall permanecen `null`; no se
+transformó ausencia de datos en ceros. Las pruebas sintéticas cubren posiciones exactas 1, 5 y 10,
+ausencia de Top-K, Haversine, huecos F1, bordes, referencias pendientes y
+contaminación entre particiones. Sus resultados validan software y no son
+rendimiento de CrossText2Loc.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

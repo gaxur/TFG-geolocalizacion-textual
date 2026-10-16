@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f4_query_dataset.schema.json",
+  "title": "F4.3 Madrid query dataset",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "dataset_id", "dataset_version", "region", "catalog", "partition_policy", "queries"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "f4-query-dataset-v1"},
+    "dataset_id": {"type": "string", "pattern": "^f4-madrid-queries-sha256-[0-9a-f]{64}$"},
+    "dataset_version": {"type": "string", "minLength": 1},
+    "region": {"type": "object", "additionalProperties": false, "required": ["region_id", "bbox_wgs84"], "properties": {"region_id": {"const": "madrid_pilot"}, "bbox_wgs84": {"type": "object", "additionalProperties": false, "required": ["north", "south", "east", "west"], "properties": {"north": {"type": "number"}, "south": {"type": "number"}, "east": {"type": "number"}, "west": {"type": "number"}}}}},
+    "catalog": {"type": "object", "additionalProperties": false, "required": ["manifest_id", "manifest_sha256", "candidate_count", "assignment_policy"], "properties": {"manifest_id": {"type": "string", "minLength": 1}, "manifest_sha256": {"$ref": "#/$defs/sha256"}, "candidate_count": {"const": 253}, "assignment_policy": {"const": "projected_cell_interior_boundary_ambiguous_v1"}}},
+    "partition_policy": {"type": "object", "additionalProperties": false, "required": ["version", "group_by", "evaluation_frozen", "evaluation_use_restriction", "near_duplicate_token_jaccard_threshold"], "properties": {"version": {"const": "location-and-derivation-group-v1"}, "group_by": {"const": ["location_id", "derivation_group_id"]}, "evaluation_frozen": {"type": "boolean"}, "evaluation_use_restriction": {"const": "no_parameter_prompt_checkpoint_or_pipeline_selection"}, "near_duplicate_token_jaccard_threshold": {"type": "number", "minimum": 0, "maximum": 1}}},
+    "queries": {"type": "array", "items": {"$ref": "#/$defs/query"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "query": {
+      "type": "object", "additionalProperties": false,
+      "required": ["query_id", "location_id", "derivation_group_id", "partition", "description", "provenance", "reference", "ambiguity", "validation_status"],
+      "properties": {
+        "query_id": {"type": "string", "minLength": 1}, "location_id": {"type": ["string", "null"], "minLength": 1}, "derivation_group_id": {"type": "string", "minLength": 1},
+        "partition": {"enum": ["development", "evaluation"]},
+        "description": {"type": "object", "additionalProperties": false, "required": ["text", "language", "contains_coordinates"], "properties": {"text": {"type": "string", "minLength": 1}, "language": {"type": "string", "minLength": 2}, "contains_coordinates": {"const": false}}},
+        "provenance": {"type": "object", "additionalProperties": false, "required": ["source_type", "description", "independent_environment_observation", "instructions_version", "collected_at_utc"], "properties": {"source_type": {"enum": ["human_in_situ", "osm_map_observed", "synthetic", "model_assisted", "technical_probe", "existing_dataset"]}, "description": {"type": "string", "minLength": 1}, "independent_environment_observation": {"type": "boolean"}, "instructions_version": {"type": "string", "minLength": 1}, "collected_at_utc": {"type": ["string", "null"]}}},
+        "reference": {"type": "object", "additionalProperties": false, "required": ["status", "latitude", "longitude", "crs", "capture_method", "reported_accuracy_m", "validation_method", "catalog_assignment"], "properties": {"status": {"enum": ["pending", "validated", "rejected"]}, "latitude": {"type": ["number", "null"], "minimum": -90, "maximum": 90}, "longitude": {"type": ["number", "null"], "minimum": -180, "maximum": 180}, "crs": {"enum": ["EPSG:4326", null]}, "capture_method": {"type": ["string", "null"]}, "reported_accuracy_m": {"type": ["number", "null"], "minimum": 0}, "validation_method": {"type": ["string", "null"]}, "catalog_assignment": {"oneOf": [{"$ref": "#/$defs/assignment"}, {"type": "null"}]}}},
+        "ambiguity": {"type": "object", "additionalProperties": false, "required": ["status", "notes"], "properties": {"status": {"enum": ["unreviewed", "not_ambiguous", "ambiguous"]}, "notes": {"type": ["string", "null"]}}},
+        "validation_status": {"enum": ["pending", "validated", "rejected"]}
+      }
+    },
+    "assignment": {
+      "type": "object",
+      "required": ["status", "candidate_id", "center_distance_m", "distance_to_cell_boundary_m", "boundary_ambiguous"],
+      "properties": {
+        "status": {"enum": ["assigned", "outside_region", "outside_catalog_coverage", "boundary_ambiguous", "accuracy_insufficient"]},
+        "candidate_id": {"type": ["string", "null"]},
+        "candidate_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "center_distance_m": {"type": ["number", "null"], "minimum": 0},
+        "distance_to_cell_boundary_m": {"type": ["number", "null"], "minimum": 0},
+        "boundary_ambiguous": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

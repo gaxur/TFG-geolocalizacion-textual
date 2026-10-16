@@ -14,6 +14,11 @@ técnica de retrieval exhaustivo, documentada en
 de Madrid sigue pendiente. El piloto utiliza la bounding box fijada en D004; la
 extensión definitiva de Madrid continúa pendiente.
 
+F4.3 incorpora el contrato y evaluador reproducible descritos en
+[PHASE4_EVALUATION.md](PHASE4_EVALUATION.md). El borrador actual registra tres
+sondas técnicas de desarrollo y cero referencias geográficas validadas; no es un
+dataset de evaluación empírica.
+
 ## 1. Separación de recursos
 
 ### Catálogo offline de referencia

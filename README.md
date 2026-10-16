@@ -26,6 +26,10 @@ de una fixture local de nueve imágenes OSM y de una galería completa para los
 recuperación textual exhaustiva sobre 253 candidatos ya tiene una prueba
 técnica; la evaluación formal de Madrid sigue pendiente.
 
+F4.3 ya dispone de contratos, control de particiones, asignación geográfica y
+métricas reproducibles. No existen todavía consultas humanas con referencias
+validadas suficientes, por lo que no se publican métricas empíricas de Madrid.
+
 El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 
 ```text

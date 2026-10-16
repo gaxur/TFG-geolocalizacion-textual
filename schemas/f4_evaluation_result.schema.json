@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f4_evaluation_result.schema.json",
+  "title": "F4.3 Madrid evaluation result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "evaluation_id", "protocol", "inputs", "coverage", "metrics", "per_query"],
+  "properties": {
+    "schema_version": {"const": "1.0"}, "contract_version": {"const": "f4-evaluation-result-v1"},
+    "evaluation_id": {"type": "string", "pattern": "^f4-madrid-evaluation-sha256-[0-9a-f]{64}$"},
+    "protocol": {"type": "object"}, "inputs": {"type": "object"}, "coverage": {"type": "object"}, "metrics": {"type": "object"},
+    "per_query": {"type": "array", "items": {"type": "object"}}
+  }
+}

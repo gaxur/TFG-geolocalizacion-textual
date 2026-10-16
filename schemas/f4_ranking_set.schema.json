@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f4_ranking_set.schema.json",
+  "title": "F4.3 frozen ranking set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "ranking_set_id", "query_inputs_sha256", "embedding_dataset_id", "checkpoint_sha256", "partition", "frozen_before_reference_access", "rankings"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "f4-ranking-set-v1"},
+    "ranking_set_id": {"type": "string", "pattern": "^f4-madrid-rankings-sha256-[0-9a-f]{64}$"},
+    "query_inputs_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "embedding_dataset_id": {"type": "string", "pattern": "^f4-madrid-embeddings-sha256-[0-9a-f]{64}$"},
+    "checkpoint_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "partition": {"enum": ["development", "evaluation"]},
+    "frozen_before_reference_access": {"type": "boolean"},
+    "rankings": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["query_id", "logical_path", "sha256", "effective_k"],
+        "properties": {"query_id": {"type": "string", "minLength": 1}, "logical_path": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "effective_k": {"type": "integer", "minimum": 1, "maximum": 253}}
+      }
+    }
+  }
+}

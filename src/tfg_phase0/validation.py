@@ -894,6 +894,211 @@ def _validate_evaluation(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("ground_truth.crs debe ser EPSG:4326")
 
 
+def _validate_f4_query_dataset(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "dataset_id", "dataset_version", "region", "catalog", "partition_policy", "queries"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f4-query-dataset-v1":
+        raise SchemaValidationError("f4_query_dataset incompatible")
+    if not isinstance(document["dataset_id"], str) or not re.fullmatch(r"f4-madrid-queries-sha256-[0-9a-f]{64}", document["dataset_id"]):
+        raise SchemaValidationError("f4_query_dataset.dataset_id no válido")
+    _non_empty_string(document["dataset_version"], "f4_query_dataset.dataset_version")
+    region = document["region"]
+    if not isinstance(region, Mapping) or set(region) != {"region_id", "bbox_wgs84"} or region["region_id"] != "madrid_pilot":
+        raise SchemaValidationError("región del dataset F4.3 no válida")
+    _validate_bbox(region["bbox_wgs84"], "f4_query_dataset.region.bbox_wgs84")
+    catalog = document["catalog"]
+    if not isinstance(catalog, Mapping) or set(catalog) != {"manifest_id", "manifest_sha256", "candidate_count", "assignment_policy"}:
+        raise SchemaValidationError("catálogo del dataset F4.3 no válido")
+    _non_empty_string(catalog["manifest_id"], "f4_query_dataset.catalog.manifest_id")
+    _sha256(catalog["manifest_sha256"], "f4_query_dataset.catalog.manifest_sha256")
+    if catalog["candidate_count"] != 253 or catalog["assignment_policy"] != "projected_cell_interior_boundary_ambiguous_v1":
+        raise SchemaValidationError("política de asignación F4.3 no válida")
+    policy = document["partition_policy"]
+    if not isinstance(policy, Mapping) or set(policy) != {"version", "group_by", "evaluation_frozen", "evaluation_use_restriction", "near_duplicate_token_jaccard_threshold"}:
+        raise SchemaValidationError("política de partición F4.3 no válida")
+    if policy["version"] != "location-and-derivation-group-v1" or policy["group_by"] != ["location_id", "derivation_group_id"] or policy["evaluation_use_restriction"] != "no_parameter_prompt_checkpoint_or_pipeline_selection":
+        raise SchemaValidationError("política de partición F4.3 no soportada")
+    if not isinstance(policy["evaluation_frozen"], bool):
+        raise SchemaValidationError("evaluation_frozen debe ser booleano")
+    _finite_number(policy["near_duplicate_token_jaccard_threshold"], "near_duplicate_token_jaccard_threshold", minimum=0)
+    if policy["near_duplicate_token_jaccard_threshold"] > 1:
+        raise SchemaValidationError("umbral Jaccard fuera de rango")
+    if not isinstance(document["queries"], list):
+        raise SchemaValidationError("queries debe ser una lista")
+    for index, query in enumerate(document["queries"]):
+        _validate_f4_query(query, f"queries[{index}]")
+
+
+def _validate_f4_query(query: Any, label: str) -> None:
+    fields = {"query_id", "location_id", "derivation_group_id", "partition", "description", "provenance", "reference", "ambiguity", "validation_status"}
+    if not isinstance(query, Mapping) or set(query) != fields:
+        raise SchemaValidationError(f"{label} incompatible")
+    _non_empty_string(query["query_id"], f"{label}.query_id")
+    if query["location_id"] is not None:
+        _non_empty_string(query["location_id"], f"{label}.location_id")
+    _non_empty_string(query["derivation_group_id"], f"{label}.derivation_group_id")
+    if query["partition"] not in {"development", "evaluation"} or query["validation_status"] not in {"pending", "validated", "rejected"}:
+        raise SchemaValidationError(f"{label} contiene estado o partición no válidos")
+    description = query["description"]
+    if not isinstance(description, Mapping) or set(description) != {"text", "language", "contains_coordinates"}:
+        raise SchemaValidationError(f"{label}.description no válida")
+    _non_empty_string(description["text"], f"{label}.description.text")
+    _non_empty_string(description["language"], f"{label}.description.language")
+    if description["contains_coordinates"] is not False:
+        raise SchemaValidationError("las consultas ordinarias F4.3 no contienen coordenadas")
+    provenance = query["provenance"]
+    provenance_fields = {"source_type", "description", "independent_environment_observation", "instructions_version", "collected_at_utc"}
+    if not isinstance(provenance, Mapping) or set(provenance) != provenance_fields or provenance["source_type"] not in {"human_in_situ", "osm_map_observed", "synthetic", "model_assisted", "technical_probe", "existing_dataset"}:
+        raise SchemaValidationError(f"{label}.provenance no válida")
+    for field in ("description", "instructions_version"):
+        _non_empty_string(provenance[field], f"{label}.provenance.{field}")
+    if not isinstance(provenance["independent_environment_observation"], bool) or (provenance["collected_at_utc"] is not None and not isinstance(provenance["collected_at_utc"], str)):
+        raise SchemaValidationError(f"{label}.provenance incompleta")
+    reference = query["reference"]
+    reference_fields = {"status", "latitude", "longitude", "crs", "capture_method", "reported_accuracy_m", "validation_method", "catalog_assignment"}
+    if not isinstance(reference, Mapping) or set(reference) != reference_fields or reference["status"] not in {"pending", "validated", "rejected"}:
+        raise SchemaValidationError(f"{label}.reference no válida")
+    if reference["latitude"] is not None:
+        _finite_number(reference["latitude"], f"{label}.reference.latitude", minimum=-90)
+        if reference["latitude"] > 90:
+            raise SchemaValidationError("latitud fuera de rango")
+    if reference["longitude"] is not None:
+        _finite_number(reference["longitude"], f"{label}.reference.longitude", minimum=-180)
+        if reference["longitude"] > 180:
+            raise SchemaValidationError("longitud fuera de rango")
+    if reference["crs"] not in {None, "EPSG:4326"} or (reference["reported_accuracy_m"] is not None and (not isinstance(reference["reported_accuracy_m"], (int, float)) or reference["reported_accuracy_m"] < 0)):
+        raise SchemaValidationError(f"{label}.reference contiene CRS o precisión no válidos")
+    assignment = reference["catalog_assignment"]
+    if assignment is not None:
+        base_assignment_fields = {"status", "candidate_id", "center_distance_m", "distance_to_cell_boundary_m", "boundary_ambiguous"}
+        allowed_assignment_fields = base_assignment_fields | {"candidate_ids"}
+        if not isinstance(assignment, Mapping) or not base_assignment_fields <= set(assignment) or not set(assignment) <= allowed_assignment_fields:
+            raise SchemaValidationError(f"{label}.reference.catalog_assignment no válida")
+        if assignment["status"] not in {"assigned", "outside_region", "outside_catalog_coverage", "boundary_ambiguous", "accuracy_insufficient"} or not isinstance(assignment["boundary_ambiguous"], bool):
+            raise SchemaValidationError(f"{label}.reference.catalog_assignment contiene estado no válido")
+    ambiguity = query["ambiguity"]
+    if not isinstance(ambiguity, Mapping) or set(ambiguity) != {"status", "notes"} or ambiguity["status"] not in {"unreviewed", "not_ambiguous", "ambiguous"}:
+        raise SchemaValidationError(f"{label}.ambiguity no válida")
+
+
+def _validate_f4_evaluation_result(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "evaluation_id", "protocol", "inputs", "coverage", "metrics", "per_query"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f4-evaluation-result-v1":
+        raise SchemaValidationError("f4_evaluation_result incompatible")
+    if not isinstance(document["evaluation_id"], str) or not re.fullmatch(r"f4-madrid-evaluation-sha256-[0-9a-f]{64}", document["evaluation_id"]):
+        raise SchemaValidationError("evaluation_id no válido")
+    for field in ("protocol", "inputs", "coverage", "metrics"):
+        if not isinstance(document[field], Mapping):
+            raise SchemaValidationError(f"f4_evaluation_result.{field} debe ser objeto")
+    if not isinstance(document["per_query"], list):
+        raise SchemaValidationError("per_query debe ser lista")
+    protocol = document["protocol"]
+    protocol_fields = {"version", "partition", "exact_match", "distance", "distance_summary_scope", "percentile_method", "percentile_minimum_sample", "ks", "distance_thresholds_m", "ground_truth_ranking_use", "ranking_validation"}
+    if set(protocol) != protocol_fields or protocol["version"] != "f4-madrid-exhaustive-evaluation-v1" or protocol["partition"] not in {"development", "evaluation"} or protocol["exact_match"] != "assigned_f1_candidate_id_with_catalog_gaps_as_failures" or protocol["distance"] != "haversine_mean_earth_radius_6371008.8m" or protocol["distance_summary_scope"] != "conditional_on_ranking" or protocol["percentile_method"] != "linear_n_minus_1" or protocol["percentile_minimum_sample"] != 20 or protocol["ks"] != [1, 5, 10] or protocol["distance_thresholds_m"] != [25, 50, 100, 500] or protocol["ground_truth_ranking_use"] is not False or protocol["ranking_validation"] != "producer_contract_and_artifact_sha256":
+        raise SchemaValidationError("protocolo F4.3 no válido")
+    inputs = document["inputs"]
+    input_fields = {"query_dataset_id", "query_dataset_sha256", "catalog_manifest_id", "catalog_manifest_sha256", "visual_dataset_id", "visual_manifest_sha256", "embedding_dataset_id", "embedding_manifest_sha256", "checkpoint_sha256", "ranking_set_id", "ranking_set_sha256", "rankings_frozen_before_reference_access", "ranking_artifacts"}
+    if set(inputs) != input_fields:
+        raise SchemaValidationError("inputs F4.3 no válidos")
+    for field in ("query_dataset_sha256", "catalog_manifest_sha256", "visual_manifest_sha256", "embedding_manifest_sha256", "checkpoint_sha256", "ranking_set_sha256"):
+        _sha256(inputs[field], f"f4_evaluation_result.inputs.{field}")
+    for field in ("query_dataset_id", "catalog_manifest_id", "visual_dataset_id", "embedding_dataset_id"):
+        _non_empty_string(inputs[field], f"f4_evaluation_result.inputs.{field}")
+    if not isinstance(inputs["ranking_set_id"], str) or not re.fullmatch(r"f4-madrid-rankings-sha256-[0-9a-f]{64}", inputs["ranking_set_id"]) or not isinstance(inputs["rankings_frozen_before_reference_access"], bool):
+        raise SchemaValidationError("referencia al ranking_set no válida")
+    if not isinstance(inputs["ranking_artifacts"], list):
+        raise SchemaValidationError("ranking_artifacts debe ser lista")
+    ranking_ids = set()
+    for item in inputs["ranking_artifacts"]:
+        if not isinstance(item, Mapping) or set(item) != {"query_id", "logical_path", "sha256"}:
+            raise SchemaValidationError("ranking_artifact no válido")
+        _non_empty_string(item["query_id"], "ranking_artifact.query_id")
+        _logical_path(item["logical_path"], "ranking_artifact.logical_path")
+        _sha256(item["sha256"], "ranking_artifact.sha256")
+        if item["query_id"] in ranking_ids:
+            raise SchemaValidationError("ranking_artifact duplicado")
+        ranking_ids.add(item["query_id"])
+    coverage = document["coverage"]
+    coverage_fields = {"partition_queries", "validated_references", "exact_denominator", "geographic_denominator", "rankings_found", "rankings_top10_ready", "exact_metrics_available", "geographic_metrics_available"}
+    if set(coverage) != coverage_fields:
+        raise SchemaValidationError("coverage F4.3 no válida")
+    for field in coverage_fields - {"exact_metrics_available", "geographic_metrics_available"}:
+        _non_negative_integer(coverage[field], f"coverage.{field}")
+    if coverage["exact_metrics_available"] != (coverage["exact_denominator"] > 0) or coverage["geographic_metrics_available"] != (coverage["geographic_denominator"] > 0):
+        raise SchemaValidationError("disponibilidad de métricas no corresponde a denominadores")
+    if coverage["validated_references"] > coverage["partition_queries"] or coverage["exact_denominator"] > coverage["validated_references"] or coverage["geographic_denominator"] > coverage["validated_references"] or coverage["rankings_found"] > coverage["partition_queries"] or coverage["rankings_top10_ready"] > coverage["rankings_found"]:
+        raise SchemaValidationError("conteos de cobertura F4.3 inconsistentes")
+    metrics = document["metrics"]
+    if set(metrics) != {"exact_available", "geographic_available", "exact_recall_at_k", "top1_error_m_conditional_on_ranking", "minimum_error_at_k_m_conditional_on_ranking", "geo_recall_at_k"} or metrics["exact_available"] != coverage["exact_metrics_available"] or metrics["geographic_available"] != coverage["geographic_metrics_available"]:
+        raise SchemaValidationError("metrics F4.3 no válidas")
+    for value in metrics["exact_recall_at_k"].values():
+        if value is not None:
+            _finite_number(value, "exact_recall_at_k", minimum=0)
+            if value > 1:
+                raise SchemaValidationError("Recall fuera de rango")
+    if set(metrics["exact_recall_at_k"]) != {"1", "5", "10"} or set(metrics["minimum_error_at_k_m_conditional_on_ranking"]) != {"1", "5", "10"} or set(metrics["geo_recall_at_k"]) != {"1", "5", "10"}:
+        raise SchemaValidationError("claves K de métricas no válidas")
+    summaries = [metrics["top1_error_m_conditional_on_ranking"], *metrics["minimum_error_at_k_m_conditional_on_ranking"].values()]
+    for summary in summaries:
+        fields = {"eligible_count", "observed_count", "missing_count", "mean", "median", "p90", "p95", "percentiles_available"}
+        if not isinstance(summary, Mapping) or set(summary) != fields:
+            raise SchemaValidationError("resumen de distancia no válido")
+        for field in ("eligible_count", "observed_count", "missing_count"):
+            _non_negative_integer(summary[field], f"distance_summary.{field}")
+        if summary["observed_count"] + summary["missing_count"] != summary["eligible_count"] or not isinstance(summary["percentiles_available"], bool):
+            raise SchemaValidationError("conteos del resumen de distancia inconsistentes")
+        for field in ("mean", "median", "p90", "p95"):
+            if summary[field] is not None:
+                _finite_number(summary[field], f"distance_summary.{field}", minimum=0)
+    for by_threshold in metrics["geo_recall_at_k"].values():
+        if set(by_threshold) != {"25", "50", "100", "500"}:
+            raise SchemaValidationError("umbrales GeoRecall no válidos")
+        for value in by_threshold.values():
+            if value is not None:
+                _finite_number(value, "geo_recall_at_k", minimum=0)
+                if value > 1:
+                    raise SchemaValidationError("GeoRecall fuera de rango")
+    if len(document["per_query"]) != coverage["partition_queries"]:
+        raise SchemaValidationError("per_query no corresponde a partition_queries")
+    seen_queries = set()
+    for row in document["per_query"]:
+        if not isinstance(row, Mapping) or "query_id" not in row or "status" not in row or row["status"] not in {"reference_unavailable", "outside_region", "missing_ranking", "evaluated"}:
+            raise SchemaValidationError("fila per_query no válida")
+        if row["query_id"] in seen_queries:
+            raise SchemaValidationError("query_id duplicado en per_query")
+        seen_queries.add(row["query_id"])
+    from .f4_evaluation import evaluation_id
+    if document["evaluation_id"] != evaluation_id(document):
+        raise SchemaValidationError("evaluation_id no corresponde al contenido")
+
+
+def _validate_f4_ranking_set(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "ranking_set_id", "query_inputs_sha256", "embedding_dataset_id", "checkpoint_sha256", "partition", "frozen_before_reference_access", "rankings"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f4-ranking-set-v1":
+        raise SchemaValidationError("f4_ranking_set incompatible")
+    if not isinstance(document["ranking_set_id"], str) or not re.fullmatch(r"f4-madrid-rankings-sha256-[0-9a-f]{64}", document["ranking_set_id"]):
+        raise SchemaValidationError("ranking_set_id no válido")
+    _sha256(document["query_inputs_sha256"], "ranking_set.query_inputs_sha256")
+    _sha256(document["checkpoint_sha256"], "ranking_set.checkpoint_sha256")
+    if not isinstance(document["embedding_dataset_id"], str) or not re.fullmatch(r"f4-madrid-embeddings-sha256-[0-9a-f]{64}", document["embedding_dataset_id"]):
+        raise SchemaValidationError("ranking_set.embedding_dataset_id no válido")
+    if document["partition"] not in {"development", "evaluation"} or not isinstance(document["frozen_before_reference_access"], bool) or not isinstance(document["rankings"], list):
+        raise SchemaValidationError("ranking_set contiene partición o freeze no válidos")
+    seen = set()
+    for item in document["rankings"]:
+        if not isinstance(item, Mapping) or set(item) != {"query_id", "logical_path", "sha256", "effective_k"}:
+            raise SchemaValidationError("entrada de ranking_set no válida")
+        _non_empty_string(item["query_id"], "ranking_set.query_id")
+        _logical_path(item["logical_path"], "ranking_set.logical_path")
+        _sha256(item["sha256"], "ranking_set.sha256")
+        _positive_id(item["effective_k"], "ranking_set.effective_k")
+        if item["effective_k"] > 253 or item["query_id"] in seen:
+            raise SchemaValidationError("ranking_set contiene K o query_id no válido")
+        seen.add(item["query_id"])
+    from .f4_evaluation import ranking_set_id
+    if document["ranking_set_id"] != ranking_set_id(document):
+        raise SchemaValidationError("ranking_set_id no corresponde al contenido")
+
+
 def _non_empty_string(value: Any, field: str) -> None:
     if not isinstance(value, str) or not value:
         raise SchemaValidationError(f"{field} debe ser texto no vacío")
@@ -1320,6 +1525,9 @@ def validate_document(document: Any, schema_name: str) -> None:
         "region_config": _validate_region_config,
         "llm_geo_query": _validate_llm,
         "evaluation_example": _validate_evaluation,
+        "f4_query_dataset": _validate_f4_query_dataset,
+        "f4_evaluation_result": _validate_f4_evaluation_result,
+        "f4_ranking_set": _validate_f4_ranking_set,
         "manifest": _validate_manifest,
         "osm_snapshot": _validate_osm_snapshot,
         "f3_osm_object": _validate_f3_osm_object,
