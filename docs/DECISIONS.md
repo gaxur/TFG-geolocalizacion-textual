@@ -69,6 +69,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D051 | Limitar la provenance de cada artefacto a sus inputs efectivos | ACEPTADA | Provenance / catálogo F1 |
 | D052 | Fijar la serialización, identidad y publicación canónica de F3 | ACEPTADA | OSM / publicación F3 |
 | D053 | Usar FastAPI como capa HTTP fina con un único worker y runtime F4.6 residente | ACEPTADA | MVP / backend |
+| D054 | Integrar el frontend real con contratos F4.6 y Leaflet, conservando demo explícita | ACEPTADA | MVP / frontend |
 
 ## D053 — API HTTP interna del MVP
 
@@ -124,6 +125,40 @@ F4.6 y sus contratos request/response.
 
 MVP.2 conectará el frontend; MVP.3 definirá el despliegue conjunto. No se aprueba
 exposición pública en Internet mediante esta decisión.
+
+## D054 — Integración web real del MVP
+
+**Estado:** ACEPTADA
+**Componente:** MVP / frontend
+**Fecha:** 2026-10-16
+**Origen:** Implementación solicitada expresamente para MVP.2.
+
+### Decisión
+
+El frontend existente conserva JavaScript/Vite y adopta la API MVP.1 como modo
+predeterminado. Leaflet representa coordenadas WGS84; la simulación queda
+aislada en `?mode=demo` y nunca actúa como fallback de errores.
+
+### Justificación
+
+Evita una migración de framework y reutiliza el diseño responsive existente,
+manteniendo separados resultados contractuales y escenarios ficticios.
+
+### Alternativas consideradas
+
+- Migración a React/Vue: descartada por no aportar valor al incremento.
+- Mantener el SVG como mapa real: descartado porque no es una proyección
+  geográfica.
+- Mezclar demo y resultados reales: descartado por riesgo metodológico.
+
+### Dependencias
+
+MVP.1 y contratos F4.6.
+
+### Pendiente
+
+MVP.3 validará despliegue conjunto y navegador en un entorno con Chromium. La
+fuente de teselas definitiva y sus condiciones siguen siendo configurables.
 
 ## D001 — Identidad del candidato
 

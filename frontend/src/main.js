@@ -1,17 +1,26 @@
 import './minimal.css';
 import { places, examples, simulateSearch, extractClues, regionNames } from './demo.js';
 import { icon, scene, mapArtwork } from './visuals.js';
+import { AtlasApiError, apiBaseUrl, getCapabilities, retrieve } from './api.js';
+import { adaptRetrievalResponse, buildRetrievalRequest, createQueryId, createRequestGuard, galleryLabel } from './retrieval.js';
+import { createResultsMap } from './map.js';
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const modelName = model => model === 'gotpr' ? 'GOTPR' : 'CrossText2Loc';
 const score = value => value.toFixed(2).replace('.', ',');
-const state = { page: 'explore', mobileView: 'description', optionsOpen: false, text: examples[0].text, region: 'centro', model: 'cross', topK: 3, visual: true, dialogue: true, results: [], selected: 'sol', busy: false, step: 0, hasRun: false, answered: '', last: null, zoom: 1, layer: true, revision: 0 };
-let timers = [], toastTimer;
+const explicitDemo = new URLSearchParams(location.search).get('mode') === 'demo' || import.meta.env?.VITE_DEMO_MODE === 'true';
+const state = { mode: explicitDemo ? 'demo' : 'real', page: 'explore', mobileView: 'description', optionsOpen: false, text: examples[0].text, language: 'es', region: 'centro', model: 'cross', topK: explicitDemo ? 3 : 5, galleryIds: ['madrid-50m'], capabilities: { status: explicitDemo ? 'idle' : 'loading', data: null, error: null }, request: { status: 'idle', error: null, requestId: null, response: null }, visual: true, dialogue: true, results: [], selected: explicitDemo ? 'sol' : '', busy: false, step: 0, hasRun: false, answered: '', last: null, zoom: 1, layer: true, revision: 0, mapView: null };
+let timers = [], toastTimer, activeController = null, mapHandle = null;
+const requestGuard = createRequestGuard();
 let history = [];
 try {
   const stored = JSON.parse(localStorage.getItem('atlas-history') || '[]');
-  history = Array.isArray(stored) ? stored.filter(x => typeof x?.text === 'string' && x.text.length <= 1200 && Object.hasOwn(regionNames, x.region) && ['cross', 'gotpr'].includes(x.model) && typeof x.date === 'string').slice(0, 12) : [];
+  history = Array.isArray(stored) ? stored.filter(x => {
+    if (typeof x?.text !== 'string' || x.text.length > 1200 || typeof x.date !== 'string') return false;
+    if (x.mode === 'real') return Array.isArray(x.galleryIds) && x.galleryIds.length > 0 && x.galleryIds.every(id => typeof id === 'string') && [3, 5, 10].includes(x.topK);
+    return Object.hasOwn(regionNames, x.region) && ['cross', 'gotpr'].includes(x.model);
+  }).slice(0, 12) : [];
 } catch { /* El prototipo también funciona sin almacenamiento. */ }
 
 function toast(message) {
@@ -25,22 +34,25 @@ function persist() {
   catch { toast('El historial solo estará disponible durante esta sesión.'); }
 }
 function cancel() { timers.forEach(clearTimeout); timers = []; state.busy = false; }
-function clearResults() { cancel(); state.results = []; state.hasRun = false; state.last = null; state.answered = ''; state.revision = 0; state.mobileView = 'description'; }
+function destroyMap() { mapHandle?.destroy(); mapHandle = null; }
+function cancelRealSearch() { requestGuard.cancel(); activeController?.abort(); activeController = null; state.request = { status: 'cancelled', error: null, requestId: null, response: null }; state.busy = false; }
+function clearResults() { state.mode === 'demo' ? cancel() : cancelRealSearch(); if (state.mode === 'real') state.request = { status: 'idle', error: null, requestId: null, response: null }; state.results = []; state.hasRun = false; state.last = null; state.answered = ''; state.revision = 0; state.mobileView = 'description'; state.mapView = null; }
 function getResults(model = state.model) {
   return simulateSearch(state.text, state.region, model, state.topK);
 }
 function shell() {
   $('#app').innerHTML = `
     <div class="app-body">
-      <header class="header"><a class="wordmark" href="#explore" aria-label="Atlas, inicio">${icon('compass', 27)}atlas</a><nav class="top-nav" aria-label="Vistas"><button data-page="explore" class="active">Explorar</button><button data-page="compare">Comparar modelos</button><button data-page="history">Historial</button></nav><div class="header-right"><span class="demo-badge"><i></i> Demo</span><button class="icon-button" data-action="help" aria-label="Ayuda">${icon('info')}</button></div></header>
+      <header class="header"><a class="wordmark" href="#explore" aria-label="Inicio">${icon('compass', 27)}<span>Geolocalización textual</span></a><nav class="top-nav" aria-label="Vistas"><button data-page="explore" class="active">Explorar</button>${state.mode === 'demo' ? '<button data-page="compare">Comparar modelos</button>' : ''}<button data-page="history">Historial</button></nav><div class="header-right"><a class="mode-badge ${state.mode}" href="${state.mode === 'demo' ? './#explore' : './?mode=demo#explore'}"><i></i>${state.mode === 'demo' ? ' Demo explícita' : ' Modo real'}</a><button class="icon-button" data-action="help" aria-label="Ayuda">${icon('info')}</button></div></header>
       <main id="main"></main>
-      <footer class="footer"><span>ATLAS <span class="footer-dot">/</span> Geolocalización con lenguaje natural</span><span>TFG · Madrid <span class="footer-dot">/</span> Datos de demostración</span></footer>
+      <footer class="footer"><span>Geolocalización textual <span class="footer-dot">/</span> Madrid</span><span>TFG <span class="footer-dot">/</span> ${state.mode === 'demo' ? 'Datos de demostración' : 'CrossText2Loc · similitudes no calibradas'}</span></footer>
     </div>
     <dialog id="modal" aria-labelledby="modal-title"></dialog>`;
   $('#app').addEventListener('click', handleClick);
   $('#modal').addEventListener('click', e => { if (e.target === $('#modal')) $('#modal').close(); });
-  window.addEventListener('hashchange', () => { const page = location.hash.slice(1); if (['explore', 'compare', 'history'].includes(page)) navigate(page); });
+  window.addEventListener('hashchange', () => { const page = location.hash.slice(1); const allowed = state.mode === 'demo' ? ['explore', 'compare', 'history'] : ['explore', 'history']; if (allowed.includes(page)) navigate(page); });
   render();
+  if (state.mode === 'real') loadCapabilities();
 }
 function navigate(page) {
   state.page = page;
@@ -49,14 +61,98 @@ function navigate(page) {
   window.scrollTo(0, 0);
 }
 function render() {
+  destroyMap();
   document.querySelectorAll('[data-page]').forEach(el => { el.classList.toggle('active', el.dataset.page === state.page); if (el.dataset.page === state.page) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current'); });
-  $('#main').innerHTML = state.page === 'explore' ? explorePage() : state.page === 'compare' ? comparePage() : historyPage();
+  $('#main').innerHTML = state.page === 'explore' ? (state.mode === 'real' ? realExplorePage() : explorePage()) : state.page === 'compare' ? comparePage() : historyPage();
   if (state.page === 'explore') {
     $('#description').addEventListener('input', e => { state.text = e.target.value; $('#char-count').textContent = `${state.text.length} / 1.200`; $('#form-error').textContent = ''; });
-    $('#region').addEventListener('change', e => { state.region = e.target.value; clearResults(); render(); });
+    if ($('#region')) $('#region').addEventListener('change', e => { state.region = e.target.value; clearResults(); render(); });
+    if ($('#gallery')) $('#gallery').addEventListener('change', e => { state.galleryIds = [e.target.value]; clearResults(); render(); });
+    if ($('#real-topk')) $('#real-topk').addEventListener('change', e => { state.topK = Number(e.target.value); clearResults(); render(); });
     $('#search-form').addEventListener('submit', e => { e.preventDefault(); runSearch(); });
-    $('.search-options').addEventListener('toggle', e => { state.optionsOpen = e.target.open; });
+    $('.search-options')?.addEventListener('toggle', e => { state.optionsOpen = e.target.open; });
+    if (state.mode === 'real' && state.page === 'explore' && $('#results-map') && state.mobileView === 'results') queueMicrotask(mountRealMap);
   }
+}
+async function loadCapabilities() {
+  const epoch = requestGuard.next();
+  state.capabilities = { status: 'loading', data: null, error: null };
+  render();
+  try {
+    const data = await getCapabilities({ baseUrl: apiBaseUrl, timeoutMs: 12000 });
+    if (!requestGuard.isCurrent(epoch)) return;
+    if (!data?.retrievers?.some(x => x.id === 'crosstext2loc' && x.available) || !Array.isArray(data.galleries) || !data.galleries.length) throw new TypeError('CrossText2Loc no está disponible.');
+    state.capabilities = { status: 'ready', data, error: null };
+    const available = new Set(data.galleries.map(x => x.gallery_id));
+    state.galleryIds = state.galleryIds.filter(id => available.has(id));
+    if (!state.galleryIds.length) state.galleryIds = [available.has('madrid-50m') ? 'madrid-50m' : data.galleries[0].gallery_id];
+  } catch (error) {
+    if (!requestGuard.isCurrent(epoch)) return;
+    state.capabilities = { status: 'error', data: null, error: normalizeUiError(error) };
+  }
+  if (requestGuard.isCurrent(epoch)) render();
+}
+function normalizeUiError(error) {
+  if (error?.name === 'AbortError') return { code: 'CANCELLED', message: 'La espera se ha cancelado en este navegador. La inferencia iniciada puede continuar en el servidor.', requestId: '' };
+  if (error instanceof AtlasApiError) {
+    const messages = { RUNTIME_BUSY: 'El recuperador está ocupado. Espera un momento antes de reintentar.', RUNTIME_NOT_READY: 'El servicio todavía no está preparado.', INFERENCE_FAILED: 'CrossText2Loc no pudo completar la consulta.', TIMEOUT: 'La consulta tardó más de lo esperado.' };
+    return { code: error.code, message: messages[error.code] || error.message, requestId: error.requestId };
+  }
+  return { code: 'INVALID_API_RESPONSE', message: error?.message || 'La respuesta del servicio no es válida.', requestId: '' };
+}
+async function runRealSearch() {
+  if (state.request.status === 'loading' || state.capabilities.status !== 'ready') return;
+  const text = state.text.trim();
+  if (text.length < 3) { $('#form-error').textContent = 'Escribe una descripción antes de buscar.'; $('#description').focus(); return; }
+  const epoch = requestGuard.next();
+  const controller = new AbortController();
+  activeController = controller;
+  const queryId = createQueryId();
+  state.request = { status: 'loading', error: null, requestId: queryId, response: null };
+  state.busy = true; state.results = []; state.selected = ''; state.hasRun = false; state.mapView = null;
+  render();
+  try {
+    const request = buildRetrievalRequest({ text, language: state.language, galleryIds: state.galleryIds, topK: state.topK, queryId });
+    const raw = await retrieve(request, { baseUrl: apiBaseUrl, signal: controller.signal, timeoutMs: 30000 });
+    if (!requestGuard.isCurrent(epoch)) return;
+    const response = adaptRetrievalResponse(raw, request);
+    state.request = { status: 'success', error: null, requestId: queryId, response };
+    state.results = response.retrievals;
+    state.selected = response.retrievals[0]?.results[0]?.key || '';
+    state.hasRun = true; state.mobileView = 'results'; state.mapView = null;
+    state.last = { mode: 'real', text, language: state.language, galleryIds: [...state.galleryIds], topK: state.topK, date: new Date().toISOString() };
+    history.unshift({ ...state.last }); history = history.slice(0, 12); persist();
+  } catch (error) {
+    if (!requestGuard.isCurrent(epoch)) return;
+    state.request = { status: error?.name === 'AbortError' ? 'cancelled' : 'error', error: normalizeUiError(error), requestId: error?.requestId || queryId, response: null };
+  } finally {
+    if (requestGuard.isCurrent(epoch)) { activeController = null; state.busy = false; render(); }
+  }
+}
+function realExplorePage() {
+  const ready = state.capabilities.status === 'ready';
+  const loading = state.request.status === 'loading';
+  const galleries = state.capabilities.data?.galleries || [];
+  const results = state.results;
+  const count = results.reduce((total, row) => total + row.results.length, 0);
+  const status = state.capabilities.status === 'loading' ? '<div class="service-state">Comprobando disponibilidad del servicio…</div>' : state.capabilities.status === 'error' ? `<div class="service-state error"><strong>Backend no disponible</strong><span>${escapeHtml(state.capabilities.error.message)}</span><button type="button" class="secondary" data-action="retry-capabilities">Reintentar conexión</button></div>` : '';
+  const requestError = state.request.error ? `<div class="service-state ${state.request.status === 'cancelled' ? '' : 'error'}" role="alert"><strong>${state.request.status === 'cancelled' ? 'Petición cancelada' : 'No se pudo completar la búsqueda'}</strong><span>${escapeHtml(state.request.error.message)}</span>${state.request.error.requestId ? `<small>Referencia: ${escapeHtml(state.request.error.requestId)}</small>` : ''}</div>` : '';
+  return `<section class="page-heading"><div><div class="eyebrow">RECUPERACIÓN REAL · CROSSTEXT2LOC</div><h1>Geolocalización textual</h1><p>Describe lo que ves y explora candidatos de la región piloto de Madrid.</p></div><div class="location-pill">${icon('pin', 16)} Madrid, España</div></section>
+  <div class="mobile-view-switch" role="group" aria-label="Vista de exploración"><button data-mobile="description" aria-pressed="${state.mobileView === 'description'}">${icon('chat', 16)} Descripción</button><button data-mobile="results" aria-pressed="${state.mobileView === 'results'}">${icon('pin', 16)} Mapa y resultados</button></div>
+  <div class="workspace" data-mobile-view="${state.mobileView}"><section id="search-panel" class="search-panel panel"><h2>¿Qué ves a tu alrededor?</h2><p class="muted small">La descripción se compara con imágenes OSM precalculadas.</p>${status}<form id="search-form"><label for="description" class="field-label">Tu descripción</label><div class="textarea-wrap"><textarea id="description" maxlength="1200" rows="4" placeholder="Veo una plaza amplia rodeada de edificios…" ${loading ? 'disabled' : ''}>${escapeHtml(state.text)}</textarea><div class="textarea-footer"><span>Idioma: español</span><span id="char-count">${state.text.length} / 1.200</span></div></div><div class="example-label">Ejemplos técnicos</div><div class="example-chips">${examples.map((x, i) => `<button type="button" class="example-chip" data-example="${i}" ${loading ? 'disabled' : ''}>${escapeHtml(x.label)} ${icon('arrow', 12)}</button>`).join('')}</div><label for="gallery" class="field-label">Galería</label><div class="select-wrap">${icon('layers', 17)}<select id="gallery" ${!ready || loading ? 'disabled' : ''}>${galleries.map(g => `<option value="${escapeHtml(g.gallery_id)}" ${state.galleryIds[0] === g.gallery_id ? 'selected' : ''}>${escapeHtml(galleryLabel(g.gallery_id))} · ${g.candidate_count} candidatos</option>`).join('')}</select></div><label for="real-topk" class="field-label">Resultados</label><div class="select-wrap">${icon('target', 17)}<select id="real-topk" ${!ready || loading ? 'disabled' : ''}>${[3, 5, 10].map(k => `<option value="${k}" ${state.topK === k ? 'selected' : ''}>Top-${k}</option>`).join('')}</select></div><p class="form-error" id="form-error" role="alert"></p><button class="primary search-button" type="submit" ${!ready || loading ? 'disabled' : ''}>${loading ? '<span class="spinner"></span> Ejecutando CrossText2Loc…' : icon('search', 18) + ' Buscar candidatos ' + icon('arrow', 18)}</button></form>${loading ? '<button class="cancel-button" data-action="cancel">Cancelar espera</button>' : ''}${requestError}<div class="privacy-note">${icon('info', 15)}<span>La descripción se envía al servicio interno. No introduzcas datos sensibles.</span></div></section>
+  <section class="exploration"><div class="map-panel panel"><div class="map-top"><div class="map-title">${icon('layers', 17)} Mapa de candidatos</div><span class="map-demo">Coordenadas WGS84</span></div><div id="results-map" class="real-map" aria-label="Mapa geográfico de candidatos"></div></div>${loading ? '<div class="pipeline-strip" aria-live="polite"><span class="pipeline-label"><span class="spinner small-spinner"></span> Recuperación CrossText2Loc en curso</span></div>' : ''}<div class="results-heading"><h2>${count ? 'Candidatos recuperados' : 'Sin resultados todavía'}</h2><span class="result-count">${count} candidatos</span></div>${results.length ? results.map(realGalleryResults).join('') : `<div class="empty-state compact">${icon('search', 28)}<h3>${state.hasRun ? 'La respuesta no contiene candidatos' : 'Ejecuta una búsqueda'}</h3><p>Los resultados reales aparecerán agrupados por galería.</p></div>`}<div class="results-footnote">${icon('info', 13)} Similitud coseno; no representa una probabilidad de acierto.</div></section></div>`;
+}
+function realGalleryResults(retrieval) {
+  return `<section class="gallery-results"><header><div><h3>${escapeHtml(galleryLabel(retrieval.galleryId))}</h3><p>${retrieval.galleryCount} candidatos evaluados · Top-${retrieval.effectiveK}</p></div></header><div class="result-grid real-results">${retrieval.results.map(candidate => realResultCard(candidate, candidate.key === state.selected)).join('')}</div></section>`;
+}
+function realResultCard(candidate, selected) {
+  return `<article class="result-card real-card ${selected ? 'selected' : ''}" id="card-${escapeHtml(candidate.key)}"><button class="card-select" data-select="${escapeHtml(candidate.key)}" aria-label="Seleccionar candidato ${escapeHtml(candidate.id)}" aria-pressed="${selected}"><div class="card-content"><span class="rank-badge">${candidate.rank}</span><div class="card-title"><h3>${escapeHtml(candidate.id)}</h3>${icon('chevron', 15)}</div><p>${escapeHtml(galleryLabel(candidate.galleryId))}</p><div class="coordinate-compact">${candidate.lat.toFixed(6)}, ${candidate.lon.toFixed(6)}</div><div class="score-row"><span>Similitud coseno</span><strong>${candidate.similarity.toFixed(4)}</strong></div></div></button><button class="card-detail" data-detail="${escapeHtml(candidate.key)}">Ver datos ${icon('chevron', 13)}</button></article>`;
+}
+function allRealCandidates() { return state.results.flatMap(row => row.results); }
+function mountRealMap() {
+  const candidates = allRealCandidates();
+  mapHandle = createResultsMap({ element: $('#results-map'), retrievals: state.results, selectedKey: state.selected, view: state.mapView, onSelect: key => { state.selected = key; const scroll = window.scrollY; render(); window.scrollTo(0, scroll); }, onViewChange: view => { state.mapView = view; } });
+  if (!candidates.length) state.mapView = null;
 }
 function explorePage() {
   const results = state.hasRun ? state.results : simulateSearch(examples[0].text, 'centro', 'cross', 3);
@@ -119,9 +215,11 @@ function comparePage() {
   return `<section class="page-heading"><div><div class="eyebrow">DOS ENFOQUES, EL MISMO ENTORNO</div><h1>Compara las posibilidades.</h1><p>Una consulta común. Dos formas de representar un lugar.</p></div><button class="secondary" data-action="export" ${!state.last ? 'disabled' : ''}>${icon('download', 17)} Exportar sesión</button></section><section class="comparison-query panel"><div class="query-icon">${icon('chat', 22)}</div><div><span class="section-label">${state.last ? 'ÚLTIMA CONSULTA' : 'CONSULTA DE EJEMPLO'}</span><p>«${escapeHtml(input.text)}»</p><span class="location-inline">${icon('pin', 13)} ${regionNames[input.region]}</span></div><button class="text-button" data-page="explore">Editar consulta ${icon('arrow', 15)}</button></section><div class="comparison-grid">${comparisonColumn('cross')}${comparisonColumn('gotpr')}</div><div class="comparison-notice">${icon('info', 19)}<div><strong>Comparación ilustrativa, no un resultado experimental.</strong><p>Ambas columnas comparten consulta y ubicaciones disponibles. Las puntuaciones son sintéticas y no comparables como probabilidades. Recall, latencia y error geográfico se medirán al conectar los modelos y las ubicaciones de referencia.</p></div></div><section class="next-steps panel"><div><span class="section-label">AMPLIACIONES DEL SISTEMA</span><h2>Más contexto, mejores preguntas.</h2></div><div class="extension-item">${icon('chat', 22)}<strong>Diálogo</strong><span>Preguntas para resolver ambigüedades</span><span class="status-tag">Interacción simulada</span></div><div class="extension-item">${icon('eye', 22)}<strong>Street View + VLM</strong><span>Contraste de evidencias visuales</span><span class="status-tag">Vista de prototipo</span></div><div class="extension-item">${icon('target', 22)}<strong>TOLoc</strong><span>Refinamiento de posición</span><span class="status-tag neutral">Trabajo futuro</span></div></section>`;
 }
 function historyPage() {
-  return `<section class="page-heading"><div><div class="eyebrow">TU CUADERNO DE EXPLORACIÓN</div><h1>Vuelve sobre tus pistas.</h1><p>Consultas guardadas en este navegador. Sin cuenta ni sincronización.</p></div><button class="secondary" data-action="clear-history" ${history.length ? '' : 'disabled'}>${icon('trash', 16)} Borrar historial</button></section><section class="history-list panel">${history.length ? history.map((item, i) => `<article class="history-item"><div class="history-item-icon">${icon('history', 23)}</div><div><span class="section-label">${escapeHtml(new Date(item.date).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' }))} · DEMO</span><h3>${escapeHtml(item.text)}</h3><p>${regionNames[item.region]} <span>·</span> ${modelName(item.model)}</p></div><button class="secondary" data-restore="${i}">Recuperar ${icon('arrow', 15)}</button></article>`).join('') : `<div class="empty-state">${icon('history', 38)}<h2>Aún no hay exploraciones.</h2><p>Haz una búsqueda de demostración y podrás recuperarla desde aquí.</p><button class="primary" data-page="explore">Empezar a explorar ${icon('arrow', 17)}</button></div>`}</section>`;
+  const visible = history.map((item, index) => ({ item, index })).filter(({ item }) => state.mode === 'demo' ? item.mode !== 'real' : item.mode === 'real');
+  return `<section class="page-heading"><div><div class="eyebrow">HISTORIAL LOCAL · ${state.mode === 'demo' ? 'DEMO' : 'MODO REAL'}</div><h1>Vuelve sobre tus consultas.</h1><p>Se guardan solo los ajustes de las últimas búsquedas en este navegador.</p></div><button class="secondary" data-action="clear-history" ${visible.length ? '' : 'disabled'}>${icon('trash', 16)} Borrar historial</button></section><section class="history-list panel">${visible.length ? visible.map(({ item, index }) => `<article class="history-item"><div class="history-item-icon">${icon('history', 23)}</div><div><span class="section-label">${escapeHtml(new Date(item.date).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' }))} · ${item.mode === 'real' ? 'REAL' : 'DEMO'}</span><h3>${escapeHtml(item.text)}</h3><p>${item.mode === 'real' ? `${escapeHtml(item.galleryIds.join(', '))} · Top-${item.topK}` : `${regionNames[item.region]} · ${modelName(item.model)}`}</p></div><button class="secondary" data-restore="${index}">Recuperar ${icon('arrow', 15)}</button></article>`).join('') : `<div class="empty-state">${icon('history', 38)}<h2>Aún no hay consultas.</h2><p>Haz una búsqueda en este modo para recuperarla después.</p><button class="primary" data-page="explore">Empezar a explorar ${icon('arrow', 17)}</button></div>`}</section>`;
 }
 function runSearch() {
+  if (state.mode === 'real') return runRealSearch();
   if (state.busy) return;
   if (state.text.trim().length < 20) { $('#form-error').textContent = 'Añade algo más de detalle: al menos 20 caracteres.'; $('#description').focus(); return; }
   state.busy = true; state.step = 0; state.hasRun = false; state.answered = ''; state.revision = 0;
@@ -140,10 +238,17 @@ function runSearch() {
 }
 function openModal(content) { $('#modal').innerHTML = `<button class="modal-close icon-button" data-action="close-modal" aria-label="Cerrar ventana">${icon('close')}</button>${content}`; $('#modal').showModal(); }
 function showDetail(id) {
+  if (state.mode === 'real') return showRealDetail(id);
   const p = state.results.find(p => p.id === id) || places.find(p => p.id === id);
   if (!p) return;
   const clues = extractClues(state.last?.text || examples[0].text);
   openModal(`<div class="detail-hero">${scene(p, 'modal')}<span class="detail-hero-label">Ilustración · no es una captura de Street View</span></div><div class="modal-content"><span class="section-label">FICHA DE CANDIDATO · DEMOSTRACIÓN</span><h2 id="modal-title">${p.name}</h2><p class="muted">${p.area}</p><div class="coordinate-row">${icon('pin', 16)} <code>${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</code><button class="text-button" data-copy="${p.id}">${icon('copy', 14)} Copiar</button></div><h3>Pistas de la descripción</h3><div class="clue-list">${clues.map(c => `<span>${escapeHtml(c)}</span>`).join('') || '<span>Sin pistas reconocidas en la demo</span>'}</div><h3>Evidencias del escenario</h3><ul class="evidence-list">${p.evidence.map(e => `<li>${icon('check', 16)}${e}</li>`).join('')}</ul><div class="unknown-note">${icon('info', 17)}${p.unknown}</div><div class="visual-status">${icon('eye', 19)}<div><strong>Verificación visual ${state.visual ? 'prevista' : 'desactivada'}</strong><p>${state.visual ? 'Sin Street View ni VLM conectados. Las evidencias anteriores son parte del escenario de demostración.' : 'La sesión utiliza únicamente los candidatos ilustrativos del recuperador.'}</p></div></div><a class="secondary full-width" href="https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=18/${p.lat}/${p.lon}" target="_blank" rel="noopener noreferrer">Abrir ubicación en OpenStreetMap ${icon('arrow', 16)}</a></div>`);
+}
+function showRealDetail(key) {
+  const candidate = allRealCandidates().find(row => row.key === key);
+  if (!candidate) return;
+  const response = state.request.response;
+  openModal(`<div class="modal-content settings-content"><span class="section-label">CANDIDATO RECUPERADO · TOP-${candidate.rank}</span><h2 id="modal-title">${escapeHtml(candidate.id)}</h2><p class="muted">${escapeHtml(galleryLabel(candidate.galleryId))}</p><div class="coordinate-row">${icon('pin', 16)} <code>${candidate.lat.toFixed(7)}, ${candidate.lon.toFixed(7)}</code><button class="text-button" data-copy="${escapeHtml(candidate.key)}">${icon('copy', 14)} Copiar</button></div><h3>Similitud coseno</h3><div class="unknown-note">${icon('info', 17)}${candidate.similarity.toFixed(6)} · No es una probabilidad de acierto.</div><div class="visual-status">${icon('layers', 19)}<div><strong>CrossText2Loc</strong><p>Ranking exhaustivo y desempate determinista por candidate_id. Tiempo interno del recuperador: ${Number(response?.timingsMs?.total || 0).toFixed(2)} ms.</p></div></div><a class="secondary full-width" href="https://www.openstreetmap.org/?mlat=${candidate.lat}&mlon=${candidate.lon}#map=18/${candidate.lat}/${candidate.lon}" target="_blank" rel="noopener noreferrer">Abrir coordenada en OpenStreetMap ${icon('arrow', 16)}</a></div>`);
 }
 function settings() {
   openModal(`<div class="modal-content settings-content"><span class="section-label">PERSONALIZA LA EXPLORACIÓN</span><h2 id="modal-title">Ajustes de la sesión</h2><p class="muted">Configura la experiencia de demostración.</p><form id="settings-form"><label class="field-label" for="topk">Número máximo de candidatos</label><select class="settings-select" id="topk">${[3, 5].map(n => `<option value="${n}" ${state.topK === n ? 'selected' : ''}>Top-${n}</option>`).join('')}</select><p class="small muted">La demo contiene seis lugares; algunas zonas tienen menos candidatos.</p><label class="switch-row"><span><strong>Diálogo de aclaración</strong><small>Una pregunta de ejemplo tras buscar.</small></span><input type="checkbox" id="dialogue-toggle" ${state.dialogue ? 'checked' : ''}><span class="switch" aria-hidden="true"></span></label><label class="switch-row"><span><strong>Verificación visual</strong><small>Muestra el estado previsto en las fichas.</small></span><input type="checkbox" id="visual-toggle" ${state.visual ? 'checked' : ''}><span class="switch" aria-hidden="true"></span></label><div class="unknown-note">${icon('info', 17)}TOLoc no está implementado en este prototipo. No se estima una posición precisa del observador.</div><button type="submit" class="primary full-width">Guardar ajustes ${icon('check', 17)}</button></form></div>`);
@@ -151,6 +256,11 @@ function settings() {
 }
 function exportSession() {
   if (!state.last) return;
+  if (state.mode === 'real') {
+    const payload = { mode: 'real', retrieval_response: state.request.response?.raw || null, exported_at: new Date().toISOString() };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+    const a = document.createElement('a'); a.href = url; a.download = 'geolocalizacion-textual-sesion.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); toast('Sesión real exportada.'); return;
+  }
   const payload = { prototype: true, disclaimer: 'Datos sintéticos. No se han ejecutado modelos ni medido rendimiento.', query: state.last, settings: { dialogue: state.dialogue, visual: state.visual }, answer: state.answered || null, candidates: state.results.map(({ id, name, lat, lon, value }) => ({ id, name, lat, lon, syntheticScore: value })), comparison: Object.fromEntries(['cross', 'gotpr'].map(m => [modelName(m), simulateSearch(state.last.text, state.last.region, m, state.last.topK).map(({ id, value }) => ({ id, syntheticScore: value }))])) };
   const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
   const a = document.createElement('a'); a.href = url; a.download = 'atlas-sesion-demo.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); toast('Sesión exportada como JSON de demostración.');
@@ -165,17 +275,18 @@ async function handleClick(e) {
   if (d.model) { state.model = d.model; clearResults(); render(); return; }
   if (d.select) { state.selected = d.select; const scroll = window.scrollY; render(); window.scrollTo(0, scroll); return; }
   if (d.detail) return showDetail(d.detail);
-  if (d.restore !== undefined) { const item = history[Number(d.restore)]; if (!item) return; clearResults(); state.text = item.text; state.region = item.region; state.model = item.model; navigate('explore'); toast('Consulta recuperada. Puedes editarla o volver a buscar.'); return; }
+  if (d.restore !== undefined) { const item = history[Number(d.restore)]; if (!item) return; clearResults(); state.text = item.text; if (item.mode === 'real') { const available = new Set(state.capabilities.data?.galleries?.map(g => g.gallery_id) || []); const restored = item.galleryIds.filter(id => available.has(id)); if (!restored.length) { toast('La galería guardada ya no está disponible.'); return; } state.galleryIds = restored; state.topK = item.topK; } else { state.region = item.region; state.model = item.model; } navigate('explore'); toast('Consulta recuperada. Puedes editarla o volver a buscar.'); return; }
   if (d.answer) {
     state.answered = d.answer; state.revision++;
     if (d.answer === 'Sí') { const preferred = state.results.find(p => p.id === 'sol' || p.id === 'retiro'); if (preferred) state.results = [preferred, ...state.results.filter(p => p.id !== preferred.id)]; }
     state.selected = state.results[0]?.id || ''; render(); toast('Respuesta incorporada a la sesión de demostración.'); return;
   }
-  if (d.copy) { const p = places.find(x => x.id === d.copy); try { await navigator.clipboard.writeText(`${p.lat}, ${p.lon}`); toast('Coordenadas copiadas.'); } catch { toast(`Coordenadas: ${p.lat}, ${p.lon}`); } return; }
+  if (d.copy) { const p = state.mode === 'real' ? allRealCandidates().find(x => x.key === d.copy) : places.find(x => x.id === d.copy); if (!p) return; try { await navigator.clipboard.writeText(`${p.lat}, ${p.lon}`); toast('Coordenadas copiadas.'); } catch { toast(`Coordenadas: ${p.lat}, ${p.lon}`); } return; }
   switch (d.action) {
     case 'settings': settings(); break;
     case 'close-modal': $('#modal').close(); break;
-    case 'cancel': cancel(); render(); toast('Búsqueda cancelada.'); break;
+    case 'cancel': state.mode === 'real' ? cancelRealSearch() : cancel(); render(); toast(state.mode === 'real' ? 'Espera cancelada. La inferencia del servidor puede continuar.' : 'Búsqueda cancelada.'); break;
+    case 'retry-capabilities': loadCapabilities(); break;
     case 'export': exportSession(); break;
     case 'zoom-in': state.zoom = Math.min(1.6, state.zoom + .2); render(); break;
     case 'zoom-out': state.zoom = Math.max(.8, state.zoom - .2); render(); break;
@@ -183,9 +294,10 @@ async function handleClick(e) {
     case 'layer': state.layer = !state.layer; render(); break;
     case 'retry-answer': state.answered = ''; if (state.last) state.results = simulateSearch(state.last.text, state.last.region, state.last.model, state.last.topK); render(); break;
     case 'clear-history': openModal('<div class="modal-content settings-content"><h2 id="modal-title">¿Borrar el historial local?</h2><p class="muted">Se eliminarán las consultas guardadas en este navegador.</p><div class="modal-actions"><button class="secondary" data-action="close-modal">Conservar</button><button class="primary" data-action="confirm-clear">Borrar historial</button></div></div>'); break;
-    case 'confirm-clear': history = []; persist(); $('#modal').close(); render(); toast('Historial borrado.'); break;
-    case 'help': openModal(`<div class="modal-content settings-content"><span class="section-label">ACERCA DE ATLAS</span><h2 id="modal-title">De lo que ves<br>a dónde podrías estar.</h2><p>Atlas es un prototipo de interfaz para un TFG sobre geolocalización mediante lenguaje natural.</p><div class="help-step"><span>01</span><p>Describe el entorno y elige una zona aproximada.</p></div><div class="help-step"><span>02</span><p>Explora candidatos y sus evidencias ilustrativas.</p></div><div class="help-step"><span>03</span><p>Responde a una pregunta o compara las dos variantes.</p></div><div class="unknown-note">${icon('info', 18)}No hay conexión con Azure, OSM, Street View ni modelos. Mapa, ilustraciones y puntuaciones son de demostración. Los enlaces externos sí abren OpenStreetMap.</div><p class="small muted">Las últimas 12 consultas se guardan solo en este navegador. Puedes borrarlas desde Historial. No utilices datos sensibles.</p></div>`); break;
+    case 'confirm-clear': history = history.filter(item => state.mode === 'demo' ? item.mode === 'real' : item.mode !== 'real'); persist(); $('#modal').close(); render(); toast(`Historial del modo ${state.mode === 'demo' ? 'demo' : 'real'} borrado.`); break;
+    case 'help': openModal(state.mode === 'real' ? `<div class="modal-content settings-content"><span class="section-label">MODO REAL</span><h2 id="modal-title">Geolocalización textual</h2><p>La descripción se codifica con CrossText2Loc y se compara exhaustivamente con una galería OSM de Madrid.</p><div class="help-step"><span>01</span><p>Describe el entorno y selecciona la cuadrícula.</p></div><div class="help-step"><span>02</span><p>Revisa los candidatos y sus coordenadas WGS84.</p></div><div class="unknown-note">${icon('info', 18)}La similitud coseno no es una probabilidad. El Top-1 no confirma tu ubicación. No hay LLM, diálogo, GOTPR ni verificación visual conectados.</div><p class="small muted">La descripción se envía al servicio interno. No introduzcas datos sensibles.</p></div>` : `<div class="modal-content settings-content"><span class="section-label">DEMO EXPLÍCITA</span><h2 id="modal-title">Interfaz simulada</h2><p>Mapa, candidatos y puntuaciones son ficticios y no ejecutan modelos.</p></div>`); break;
   }
 }
-state.page = ['explore', 'compare', 'history'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'explore';
+const initialPages = state.mode === 'demo' ? ['explore', 'compare', 'history'] : ['explore', 'history'];
+state.page = initialPages.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'explore';
 shell();

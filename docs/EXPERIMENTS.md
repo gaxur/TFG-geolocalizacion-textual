@@ -289,6 +289,18 @@ repetición, paridad con F4.4, request ID y errores 422/404. La primera consulta
 multigalería tardó 149,43 ms. SIGTERM cerró el lifespan y no quedó contenedor
 residual.
 
+## MVP.2: integración frontend real
+
+Se ejecutó Vite en `127.0.0.1:5173` con proxy hacia MVP.1 en el puerto temporal
+18000. Una petición española enviada por `/api/v1/retrievals` devolvió cinco
+candidatos reales de 50 m; otra devolvió Top-3 de 25 m y su repetición produjo
+exactamente los mismos candidatos y scores. La API mantuvo un único proceso
+Uvicorn y ambos servicios se detuvieron sin residuos.
+
+Los tests Node y la build Vite pasaron. El browser-check con API fake y Leaflet
+no pudo ejecutarse porque la PGX no dispone de Chrome/Chromium ni `CHROME_PATH`;
+no se presenta como validación visual superada.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

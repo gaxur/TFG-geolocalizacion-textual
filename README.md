@@ -16,8 +16,9 @@ contexto original se conserva sin cambios en [BASELINE.md](BASELINE.md).
 
 Ya existen contratos propios de Fase 0 (`src/tfg_phase0/`, `schemas/`,
 `config/madrid.yaml`), documentación, una memoria LaTeX y un
-[prototipo frontend](frontend/README.md) **simulado**. El frontend no ejecuta
-modelos. F1, F2 y F3 proporcionan el catálogo geométrico, el snapshot OSM y los
+[frontend Vite](frontend/README.md) conectado a la API interna. El modo real
+ejecuta CrossText2Loc; la simulación histórica queda aislada en `?mode=demo`.
+F1, F2 y F3 proporcionan el catálogo geométrico, el snapshot OSM y los
 bundles de asociaciones de Madrid; su cierre está en
 [PHASE3_CLOSURE.md](docs/PHASE3_CLOSURE.md). La reproducción oficial
 NewYork-mixed OSM de CrossText2Loc se completó en la NVIDIA GB10. F4 ya dispone
@@ -35,13 +36,15 @@ F4.5 añade un experimento técnico de robustez lingüística con 27 variantes
 controladas en inglés y español sobre ambas galerías. Sus métricas describen
 estabilidad de ranking, no precisión geográfica.
 
-F4.6 cierra técnicamente CrossText2Loc con una interfaz Python residente para el
-futuro backend: una carga de modelo, galerías 25 m/50 m reutilizables y consultas
-Top-K individuales o multigalería. No es todavía una API HTTP ni el MVP.
+F4.6 cierra técnicamente CrossText2Loc con una interfaz Python residente: una
+carga de modelo, galerías 25 m/50 m reutilizables y consultas Top-K individuales
+o multigalería.
 
 MVP.1 añade una API FastAPI interna con health, capabilities y retrieval real,
-manteniendo una sola instancia GPU. El frontend continúa sin integrar en este
-incremento.
+manteniendo una sola instancia GPU.
+
+MVP.2 conecta el frontend Vite con esa API, muestra candidatos reales sobre
+Leaflet y conserva la simulación únicamente como modo demo explícito.
 
 El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 
