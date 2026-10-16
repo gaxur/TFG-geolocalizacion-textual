@@ -16,6 +16,20 @@ F4_FULL_SELECTION_VERSION = "f4-full-50m-gallery-v1"
 F4_FULL_SELECTION_POLICY = "full_verified_catalog_order_v1"
 F4_FULL_CANDIDATE_COUNT = 253
 F4_FULL_SELECTION_SHA256 = "2758a291222646cc84ec1ee1bcbfd69759a066d968129d202f457754de712389"
+F4_FULL_SELECTIONS = {
+    F4_FULL_SELECTION_VERSION: {
+        "spacing_m": 50,
+        "cell_size_m": 50,
+        "candidate_count": F4_FULL_CANDIDATE_COUNT,
+        "selection_sha256": F4_FULL_SELECTION_SHA256,
+    },
+    "f4-full-25m-gallery-v1": {
+        "spacing_m": 25,
+        "cell_size_m": 25,
+        "candidate_count": 1115,
+        "selection_sha256": "e5f28809d3fb85277a4211c6871ce165aacc0a15a69e7393bbd6299672acb5f0",
+    },
+}
 F4_EMBEDDING_CONTRACT_VERSION = "f4-image-embeddings-v2"
 F4_EMBEDDING_GENERATOR_VERSION = "phase4-crosstext2loc-embeddings-v1"
 F4_RETRIEVAL_CONTRACT_VERSION = "f4-exhaustive-retrieval-v2"

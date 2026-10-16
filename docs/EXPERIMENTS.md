@@ -192,6 +192,41 @@ ausencia de Top-K, Haversine, huecos F1, bordes, referencias pendientes y
 contaminación entre particiones. Sus resultados validan software y no son
 rendimiento de CrossText2Loc.
 
+## F4.4: galería 25 m y comparación con 50 m
+
+### Galería y embeddings
+
+```text
+selección: f4-full-25m-gallery-v1
+candidatos: 1.115
+visual: f4-madrid-visual-sha256-ebe6c91b8ed5600d65c3021a53c768d6e65545777efda92d7b171f705a0d42e9
+embeddings: f4-madrid-embeddings-sha256-2874609b95005b65823ce6efb5b7888b9d1500b7ec2f6ba301dfc3083cb56c2a
+```
+
+- 1.115/1.115 footprints cubiertos y PNG validados.
+- 231.485.372 bytes de PNG.
+- Render limpio: 989,67 s; 1.115 renders y 0 hits.
+- Repetición: 170,58 s; 0 renders y 1.115 hits.
+- Embeddings: `(1115, 768)`, `float32`, finitos y L2.
+- Generación GPU: 46,88 s; repetición con el mismo ID.
+
+### Top-10 comparativo
+
+| Consulta | Top-1 25 m | Score | Top-1 50 m | Score | Distancia entre Top-1 |
+|---|---|---:|---|---:|---:|
+| Plaza urbana y calles estrechas | `...R0027_C0026` | 0,21502331 | `...R0013_C0012` | 0,21134724 | 39,46 m |
+| Avenida amplia junto a parque | `...R0012_C0028` | 0,20504767 | `...R0012_C0013` | 0,20875248 | 315,27 m |
+| Bloque denso e intersección principal | `...R0004_C0007` | 0,19638419 | `...R0002_C0003` | 0,21027139 | 17,67 m |
+
+Los ranking sets son `e83d1f82...` para 25 m y `d803e6f3...` para 50 m. Las
+ejecuciones F4.3 son `4d9b2494...` y `0c947675...`, respectivamente, ambas con
+tres Top-10 listos y cero referencias validadas. La comparación técnica es
+`1fc6e96d...`. Ambas ramas usan los mismos textos,
+checkpoint, encoder y perfil visual, pero galerías de tamaños distintos. F4.3
+acepta los dos Top-10 y registra cero referencias validadas; por tanto Recall,
+GeoRecall y errores empíricos continúan no disponibles. No se infiere mejora o
+empeoramiento a partir de estos tres ejemplos.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

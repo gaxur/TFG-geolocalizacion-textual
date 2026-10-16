@@ -18,6 +18,7 @@ from .f4_validation import F4ValidationError
 QUERY_DATASET_PREFIX = "f4-madrid-queries-sha256-"
 EVALUATION_PREFIX = "f4-madrid-evaluation-sha256-"
 RANKING_SET_PREFIX = "f4-madrid-rankings-sha256-"
+COMPARISON_PREFIX = "f4-madrid-gallery-comparison-sha256-"
 EARTH_MEAN_RADIUS_M = 6_371_008.8
 BOUNDARY_TOLERANCE_M = 1e-6
 
@@ -53,6 +54,11 @@ def query_inputs_sha256(document: Mapping[str, Any], partition: str) -> str:
 def ranking_set_id(document: Mapping[str, Any]) -> str:
     identity = {key: document[key] for key in ("contract_version", "query_inputs_sha256", "embedding_dataset_id", "checkpoint_sha256", "partition", "frozen_before_reference_access", "rankings")}
     return RANKING_SET_PREFIX + hashlib.sha256(_canonical_bytes(identity)).hexdigest()
+
+
+def gallery_comparison_id(document: Mapping[str, Any]) -> str:
+    identity = {key: document[key] for key in ("contract_version", "query_inputs_sha256", "checkpoint_sha256", "galleries", "queries", "empirical_metrics_available", "limitations")}
+    return COMPARISON_PREFIX + hashlib.sha256(_canonical_bytes(identity)).hexdigest()
 
 
 def normalize_description(text: str) -> str:

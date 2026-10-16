@@ -154,6 +154,15 @@ class Phase4RetrievalTests(unittest.TestCase):
         self.assertEqual(result["gallery_count"], 253)
         self.assertEqual(result["effective_k"], 253)
 
+    def test_25m_gallery_ranking_scores_all_1115_candidates(self):
+        ids = tuple(f"candidate-{index:04d}" for index in range(1115))
+        matrix = np.zeros((1115, 768), dtype="<f4")
+        matrix[:, 0] = 1.0
+        query = np.zeros(768, dtype=np.float32); query[0] = 1.0
+        ranked = exhaustive_rank(matrix, ids, query, 2000)
+        self.assertEqual(len(ranked), 1115)
+        self.assertEqual([candidate_id for candidate_id, _ in ranked], sorted(ids))
+
 
 if __name__ == "__main__":
     unittest.main()

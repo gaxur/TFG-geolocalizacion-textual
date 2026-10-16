@@ -910,7 +910,7 @@ def _validate_f4_query_dataset(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("catálogo del dataset F4.3 no válido")
     _non_empty_string(catalog["manifest_id"], "f4_query_dataset.catalog.manifest_id")
     _sha256(catalog["manifest_sha256"], "f4_query_dataset.catalog.manifest_sha256")
-    if catalog["candidate_count"] != 253 or catalog["assignment_policy"] != "projected_cell_interior_boundary_ambiguous_v1":
+    if catalog["candidate_count"] not in {253, 1115} or catalog["assignment_policy"] != "projected_cell_interior_boundary_ambiguous_v1":
         raise SchemaValidationError("política de asignación F4.3 no válida")
     policy = document["partition_policy"]
     if not isinstance(policy, Mapping) or set(policy) != {"version", "group_by", "evaluation_frozen", "evaluation_use_restriction", "near_duplicate_token_jaccard_threshold"}:
@@ -1091,12 +1091,37 @@ def _validate_f4_ranking_set(document: Mapping[str, Any]) -> None:
         _logical_path(item["logical_path"], "ranking_set.logical_path")
         _sha256(item["sha256"], "ranking_set.sha256")
         _positive_id(item["effective_k"], "ranking_set.effective_k")
-        if item["effective_k"] > 253 or item["query_id"] in seen:
+        if item["effective_k"] > 1115 or item["query_id"] in seen:
             raise SchemaValidationError("ranking_set contiene K o query_id no válido")
         seen.add(item["query_id"])
     from .f4_evaluation import ranking_set_id
     if document["ranking_set_id"] != ranking_set_id(document):
         raise SchemaValidationError("ranking_set_id no corresponde al contenido")
+
+
+def _validate_f4_gallery_comparison(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "comparison_id", "query_inputs_sha256", "checkpoint_sha256", "galleries", "queries", "empirical_metrics_available", "limitations"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f4-gallery-comparison-v1":
+        raise SchemaValidationError("f4_gallery_comparison incompatible")
+    if not isinstance(document["comparison_id"], str) or not re.fullmatch(r"f4-madrid-gallery-comparison-sha256-[0-9a-f]{64}", document["comparison_id"]):
+        raise SchemaValidationError("comparison_id no válido")
+    _sha256(document["query_inputs_sha256"], "comparison.query_inputs_sha256")
+    _sha256(document["checkpoint_sha256"], "comparison.checkpoint_sha256")
+    if set(document["galleries"]) != {"25m", "50m"} or document["galleries"]["25m"]["candidate_count"] != 1115 or document["galleries"]["50m"]["candidate_count"] != 253:
+        raise SchemaValidationError("galerías comparadas no corresponden a 25 m y 50 m")
+    if document["empirical_metrics_available"] is not False or not isinstance(document["queries"], list) or not isinstance(document["limitations"], list):
+        raise SchemaValidationError("comparación técnica F4.4 no válida")
+    seen = set()
+    for query in document["queries"]:
+        required = {"query_id", "top1_25m", "top1_50m", "top1_cross_gallery_distance_m", "minimum_top10_cross_gallery_distance_m"}
+        if not isinstance(query, Mapping) or set(query) != required or query["query_id"] in seen:
+            raise SchemaValidationError("consulta comparativa no válida")
+        seen.add(query["query_id"])
+        for field in ("top1_cross_gallery_distance_m", "minimum_top10_cross_gallery_distance_m"):
+            _finite_number(query[field], f"comparison.{field}", minimum=0)
+    from .f4_evaluation import gallery_comparison_id
+    if document["comparison_id"] != gallery_comparison_id(document):
+        raise SchemaValidationError("comparison_id no corresponde al contenido")
 
 
 def _non_empty_string(value: Any, field: str) -> None:
@@ -1162,15 +1187,15 @@ def _validate_f4_visual_manifest(document: Mapping[str, Any]) -> None:
     _sha256(catalog["manifest_sha256"], "f4_visual_manifest.catalog.manifest_sha256")
     if catalog["region_id"] != "madrid_pilot":
         raise SchemaValidationError("f4_visual_manifest.catalog.region_id no soportado")
-    if catalog["spacing_m"] != 50 or catalog["cell_size_m"] != 50:
-        raise SchemaValidationError("f4_visual_manifest requiere el catálogo experimental de 50 m")
+    if (catalog["spacing_m"], catalog["cell_size_m"]) not in {(25, 25), (50, 50)}:
+        raise SchemaValidationError("f4_visual_manifest requiere catálogo de 25 m o 50 m")
     if not isinstance(catalog["grid_hash"], str) or not re.fullmatch(r"[0-9a-f]{12}", catalog["grid_hash"]):
         raise SchemaValidationError("f4_visual_manifest.catalog.grid_hash no válido")
 
     selection = document["selection"]
     if not isinstance(selection, Mapping) or set(selection) != {"selection_id", "logical_path", "sha256"}:
         raise SchemaValidationError("f4_visual_manifest.selection no válida")
-    if selection["selection_id"] not in {"f4-nine-candidates-v1", "f4-full-50m-gallery-v1"}:
+    if selection["selection_id"] not in {"f4-nine-candidates-v1", "f4-full-50m-gallery-v1", "f4-full-25m-gallery-v1"}:
         raise SchemaValidationError("f4_visual_manifest.selection_id no soportado")
     _logical_path(selection["logical_path"], "f4_visual_manifest.selection.logical_path")
     _sha256(selection["sha256"], "f4_visual_manifest.selection.sha256")
@@ -1235,8 +1260,8 @@ def _validate_f4_visual_manifest(document: Mapping[str, Any]) -> None:
         _sha256(style[field], f"style.{field}")
 
     images = document["images"]
-    if not isinstance(images, list) or not 1 <= len(images) <= 253:
-        raise SchemaValidationError("f4_visual_manifest.images debe contener entre 1 y 253 entradas")
+    if not isinstance(images, list) or not 1 <= len(images) <= 1115:
+        raise SchemaValidationError("f4_visual_manifest.images debe contener entre 1 y 1115 entradas")
     image_fields = (
         "candidate_id", "latitude", "longitude", "generation_status", "geometry",
         "image_path", "image_sha256", "width_px", "height_px", "color_mode", "format", "error_code",
@@ -1374,8 +1399,9 @@ def _validate_f4_visual_selection(document: Mapping[str, Any]) -> None:
     _sha256(document["source_manifest_sha256"], "selection.source_manifest_sha256")
     if document["evaluation_use"] is not False or document["text_or_ground_truth_used"] is not False:
         raise SchemaValidationError("la selección F4 no puede depender de evaluación, texto o ground truth")
-    if document["selection_id"] == "f4-full-50m-gallery-v1":
-        if document["schema_version"] != "2.0" or document["selection_policy"] != "full_verified_catalog_order_v1" or document["candidate_count"] != 253 or document["order"] != "catalog_manifest_order":
+    if document["selection_id"] in {"f4-full-50m-gallery-v1", "f4-full-25m-gallery-v1"}:
+        expected_count = 253 if document["selection_id"] == "f4-full-50m-gallery-v1" else 1115
+        if document["schema_version"] != "2.0" or document["selection_policy"] != "full_verified_catalog_order_v1" or document["candidate_count"] != expected_count or document["order"] != "catalog_manifest_order":
             raise SchemaValidationError("selección de galería completa F4 no soportada")
         return
     if document["schema_version"] != "1.0" or document["selection_id"] != "f4-nine-candidates-v1" or document["selection_policy"] != "fixed_spatial_coverage_v1":
@@ -1485,7 +1511,7 @@ def _validate_f4_retrieval_result(document: Mapping[str, Any]) -> None:
     if len(query["language"]) < 2:
         raise SchemaValidationError("f4_retrieval_result.query.language no válido")
     _positive_id(document["requested_k"], "f4_retrieval_result.requested_k")
-    if document["checkpoint_sha256"] != "d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d" or document["tie_break"] != "candidate_id_ascending" or not 1 <= document["gallery_count"] <= 253:
+    if document["checkpoint_sha256"] != "d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d" or document["tie_break"] != "candidate_id_ascending" or not 1 <= document["gallery_count"] <= 1115:
         raise SchemaValidationError("identidad o política de ranking no válida")
     results = document["results"]
     expected_k = min(document["requested_k"], document["gallery_count"])
@@ -1528,6 +1554,7 @@ def validate_document(document: Any, schema_name: str) -> None:
         "f4_query_dataset": _validate_f4_query_dataset,
         "f4_evaluation_result": _validate_f4_evaluation_result,
         "f4_ranking_set": _validate_f4_ranking_set,
+        "f4_gallery_comparison": _validate_f4_gallery_comparison,
         "manifest": _validate_manifest,
         "osm_snapshot": _validate_osm_snapshot,
         "f3_osm_object": _validate_f3_osm_object,

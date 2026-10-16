@@ -23,6 +23,7 @@ services:
       F4_CONTAINER_IMAGE_DIGEST: ${F4_RENDER_IMAGE_ID:?set F4_RENDER_IMAGE_ID with scripts/run_f4_osm_render.sh}
       F4_ONLY_CANDIDATE: ${F4_ONLY_CANDIDATE:-}
       F4_SELECTION: ${F4_SELECTION:-config/madrid_f4_visual_fixture.json}
+      F4_CATALOG_MANIFEST: ${F4_CATALOG_MANIFEST:-data/processed/catalog/manifest-50m.json}
       F4_REUSE_BUNDLE: ${F4_REUSE_BUNDLE:-}
       F4_HOST_UID: ${F4_HOST_UID:?set F4_HOST_UID with scripts/run_f4_osm_render.sh}
       F4_HOST_GID: ${F4_HOST_GID:?set F4_HOST_GID with scripts/run_f4_osm_render.sh}

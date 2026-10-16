@@ -22,7 +22,7 @@ from src.tfg_phase0.f4_preflight import load_verified_selection
 from src.tfg_phase0.f4_retrieval import build_retrieval_result, exhaustive_rank, normalize_l2
 from src.tfg_phase0.f4_validation import (
     embedding_dataset_id,
-    load_verified_f1_50m,
+    load_verified_f1_catalog,
     sha256_bytes,
     validate_embedding_bundle,
     validate_retrieval_result,
@@ -90,7 +90,7 @@ def build_model(cvg_root: Path, checkpoint: Path, clip_weights: Path, device: st
 
 
 def common_inputs(args):
-    catalog = load_verified_f1_50m(args.catalog_manifest, load_region_config(args.region_config))
+    catalog = load_verified_f1_catalog(args.catalog_manifest, load_region_config(args.region_config))
     selection, selection_hash = load_verified_selection(args.selection, catalog)
     visual_raw = (args.visual_bundle / "manifest.json").read_bytes()
     visual = json.loads(visual_raw.decode("utf-8"))

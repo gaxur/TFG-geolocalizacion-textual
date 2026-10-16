@@ -16,7 +16,7 @@ from src.tfg_phase0.f4_contracts import F4_EMBEDDING_DIMENSION, F4_EXPERIMENTAL_
 from src.tfg_phase0.f4_geometry import BBox3857, bbox_contains, bbox_wgs84_to_epsg3857, epsg3857_to_wgs84
 from src.tfg_phase0.f4_preflight import load_verified_selection
 from src.tfg_phase0.f4_validation import (
-    F4ValidationError, embedding_dataset_id, geometry_document, load_verified_f1_50m,
+    F4ValidationError, embedding_dataset_id, geometry_document, load_verified_f1_catalog, load_verified_f1_50m,
     validate_embedding_manifest, validate_retrieval_result, validate_visual_bundle,
     validate_render_extract_provenance, validate_visual_manifest, visual_dataset_id,
 )
@@ -191,6 +191,8 @@ class Phase4ContractTests(unittest.TestCase):
         write_manifest(build_catalog(self.config, spacing_m=25), f1_25m)
         with self.assertRaises(F4ValidationError):
             load_verified_f1_50m(f1_25m, self.config)
+        catalog_25 = load_verified_f1_catalog(f1_25m, self.config)
+        self.assertEqual((catalog_25.spacing_m, catalog_25.cell_size_m, len(catalog_25.candidates)), (25, 25, 1115))
 
     def test_full_gallery_manifest_requires_all_253_in_catalog_order(self):
         selection, selection_hash = load_verified_selection(ROOT / "config/madrid_f4_visual_gallery_50m.json", self.catalog)

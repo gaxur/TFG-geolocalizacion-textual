@@ -12,7 +12,7 @@ from src.tfg_phase0.f4_geometry import (
     wgs84_to_epsg3857, wgs84_to_global_pixel,
 )
 from src.tfg_phase0.f4_preflight import build_coverage_preflight, build_osm_source_reference, load_verified_selection
-from src.tfg_phase0.f4_validation import load_verified_f1_50m
+from src.tfg_phase0.f4_validation import load_verified_f1_catalog, load_verified_f1_50m
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,6 +91,16 @@ class Phase4GeometryTests(unittest.TestCase):
         self.assertTrue(selected[-1].endswith("R0016_C0016"))
         self.assertFalse(self.full_selection["text_or_ground_truth_used"])
         self.assertEqual(self.full_selection_hash, "2758a291222646cc84ec1ee1bcbfd69759a066d968129d202f457754de712389")
+
+    def test_full_25m_selection_is_exact_catalog_order(self):
+        catalog = load_verified_f1_catalog(ROOT / "data/processed/catalog/manifest-25m.json", self.config)
+        selection, digest = load_verified_selection(ROOT / "config/madrid_f4_visual_gallery_25m.json", catalog)
+        selected = [row["candidate_id"] for row in selection["candidates"]]
+        self.assertEqual(selected, [candidate.candidate_id for candidate in catalog.candidates])
+        self.assertEqual(len(selected), 1115)
+        self.assertTrue(selected[0].endswith("R0001_C0001"))
+        self.assertTrue(selected[-1].endswith("R0034_C0033"))
+        self.assertEqual(digest, "e5f28809d3fb85277a4211c6871ce165aacc0a15a69e7393bbd6299672acb5f0")
 
 
 if __name__ == "__main__":

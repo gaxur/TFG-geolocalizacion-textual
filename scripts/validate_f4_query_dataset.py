@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.tfg_phase0.config import load_region_config
 from src.tfg_phase0.f4_evaluation import assign_reference, validate_query_dataset
-from src.tfg_phase0.f4_validation import load_verified_f1_50m
+from src.tfg_phase0.f4_validation import load_verified_f1_catalog
 
 
 def main() -> int:
@@ -23,7 +23,7 @@ def main() -> int:
     parser.add_argument("--config", type=Path, default=ROOT / "config/madrid.yaml")
     parser.add_argument("--print-assignments", action="store_true")
     args = parser.parse_args()
-    catalog = load_verified_f1_50m(args.manifest, load_region_config(args.config))
+    catalog = load_verified_f1_catalog(args.manifest, load_region_config(args.config))
     document = json.loads(args.dataset.read_text(encoding="utf-8"))
     audit = validate_query_dataset(document, catalog)
     references = {}

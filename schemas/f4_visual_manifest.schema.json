@@ -16,7 +16,7 @@
     "source": {"$ref": "#/$defs/source"},
     "renderer": {"$ref": "#/$defs/renderer"},
     "style": {"$ref": "#/$defs/style"},
-    "images": {"type": "array", "minItems": 1, "maxItems": 253, "items": {"$ref": "#/$defs/image"}}
+    "images": {"type": "array", "minItems": 1, "maxItems": 1115, "items": {"$ref": "#/$defs/image"}}
   },
   "$defs": {
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
@@ -27,13 +27,13 @@
       "properties": {
         "manifest_id": {"type": "string", "minLength": 1}, "manifest_sha256": {"$ref": "#/$defs/sha256"},
         "region_id": {"const": "madrid_pilot"}, "catalog_version": {"type": "string", "minLength": 1},
-        "spacing_m": {"const": 50}, "cell_size_m": {"const": 50}, "grid_hash": {"type": "string", "pattern": "^[0-9a-f]{12}$"}
+        "spacing_m": {"enum": [25, 50]}, "cell_size_m": {"enum": [25, 50]}, "grid_hash": {"type": "string", "pattern": "^[0-9a-f]{12}$"}
       }
     },
     "selection": {
       "type": "object", "additionalProperties": false,
       "required": ["selection_id", "logical_path", "sha256"],
-      "properties": {"selection_id": {"enum": ["f4-nine-candidates-v1", "f4-full-50m-gallery-v1"]}, "logical_path": {"$ref": "#/$defs/logicalPath"}, "sha256": {"$ref": "#/$defs/sha256"}}
+      "properties": {"selection_id": {"enum": ["f4-nine-candidates-v1", "f4-full-50m-gallery-v1", "f4-full-25m-gallery-v1"]}, "logical_path": {"$ref": "#/$defs/logicalPath"}, "sha256": {"$ref": "#/$defs/sha256"}}
     },
     "profile": {
       "type": "object", "additionalProperties": false,

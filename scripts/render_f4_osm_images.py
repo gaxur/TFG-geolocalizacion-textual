@@ -24,7 +24,7 @@ from src.tfg_phase0.f4_geometry import bbox_wgs84_to_epsg3857
 from src.tfg_phase0.f4_preflight import load_verified_selection
 from src.tfg_phase0.f4_validation import (
     geometry_document,
-    load_verified_f1_50m,
+    load_verified_f1_catalog,
     sha256_bytes,
     validate_visual_bundle,
     visual_dataset_id,
@@ -160,7 +160,7 @@ def main() -> int:
     args = parser.parse_args()
 
     config = load_region_config(ROOT / "config/madrid.yaml")
-    catalog = load_verified_f1_50m(ROOT / args.manifest, config)
+    catalog = load_verified_f1_catalog(ROOT / args.manifest, config)
     selection, selection_hash = load_verified_selection(ROOT / args.selection, catalog)
     candidates = {candidate.candidate_id: candidate for candidate in catalog.candidates}
     source_dir = ROOT / args.source_dir
@@ -205,6 +205,8 @@ def main() -> int:
         cache_inputs = {
             "cache_version": "f4-render-cache-v1",
             "profile": experimental_visual_profile(),
+            "catalog_manifest_id": catalog.manifest_id,
+            "catalog_manifest_sha256": catalog.sha256,
             "source_sha256": source_provenance["raw_sha256"],
             "container_image_digest": args.container_image_digest,
             "renderer_configuration_sha256": sha256_bytes(renderer_config_raw),

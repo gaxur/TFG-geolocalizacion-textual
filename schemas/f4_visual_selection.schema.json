@@ -17,10 +17,10 @@
       "type": "object", "additionalProperties": false,
       "required": ["schema_version", "selection_id", "selection_policy", "source_manifest_id", "source_manifest_sha256", "evaluation_use", "text_or_ground_truth_used", "candidate_count", "order"],
       "properties": {
-        "schema_version": {"const": "2.0"}, "selection_id": {"const": "f4-full-50m-gallery-v1"},
+        "schema_version": {"const": "2.0"}, "selection_id": {"enum": ["f4-full-50m-gallery-v1", "f4-full-25m-gallery-v1"]},
         "selection_policy": {"const": "full_verified_catalog_order_v1"}, "source_manifest_id": {"type": "string", "minLength": 1},
         "source_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "evaluation_use": {"const": false},
-        "text_or_ground_truth_used": {"const": false}, "candidate_count": {"const": 253}, "order": {"const": "catalog_manifest_order"}
+        "text_or_ground_truth_used": {"const": false}, "candidate_count": {"enum": [253, 1115]}, "order": {"const": "catalog_manifest_order"}
       }
     }
   ]

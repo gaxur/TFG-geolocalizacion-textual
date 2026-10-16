@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f4_gallery_comparison.schema.json",
+  "title": "F4.4 comparison of 25 m and 50 m galleries",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "comparison_id", "query_inputs_sha256", "checkpoint_sha256", "galleries", "queries", "empirical_metrics_available", "limitations"],
+  "properties": {
+    "schema_version": {"const": "1.0"}, "contract_version": {"const": "f4-gallery-comparison-v1"},
+    "comparison_id": {"type": "string", "pattern": "^f4-madrid-gallery-comparison-sha256-[0-9a-f]{64}$"},
+    "query_inputs_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "checkpoint_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "galleries": {"type": "object", "required": ["25m", "50m"]},
+    "queries": {"type": "array"}, "empirical_metrics_available": {"type": "boolean"},
+    "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  }
+}

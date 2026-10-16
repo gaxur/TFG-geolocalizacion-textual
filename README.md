@@ -22,9 +22,10 @@ bundles de asociaciones de Madrid; su cierre está en
 [PHASE3_CLOSURE.md](docs/PHASE3_CLOSURE.md). La reproducción oficial
 NewYork-mixed OSM de CrossText2Loc se completó en la NVIDIA GB10. F4 ya dispone
 de una fixture local de nueve imágenes OSM y de una galería completa para los
-253 candidatos F1 de 50 m, ambas con embeddings visuales CrossText2Loc. La
-recuperación textual exhaustiva sobre 253 candidatos ya tiene una prueba
-técnica; la evaluación formal de Madrid sigue pendiente.
+253 candidatos F1 de 50 m y de 1.115 candidatos F1 de 25 m, ambas con embeddings
+visuales CrossText2Loc. La recuperación textual exhaustiva y la comparación
+técnica 25 m/50 m ya están operativas; la evaluación formal de Madrid sigue
+pendiente.
 
 F4.3 ya dispone de contratos, control de particiones, asignación geográfica y
 métricas reproducibles. No existen todavía consultas humanas con referencias

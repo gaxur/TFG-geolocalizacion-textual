@@ -487,3 +487,80 @@ F4.2 demuestra ejecución técnica sobre la bbox piloto D004, no precisión del
 modelo en Madrid. El perfil continúa `experimental_unconfirmed`, el checkpoint
 continúa provisional y las licencias de CVG-Text siguen pendientes: D007, D013
 y D016 permanecen abiertas.
+
+## Galería de 25 m y comparación F4.4
+
+F4.4 utiliza el catálogo F1 `madrid-pilot-grid-v1-s25-l25`, con 1.115 candidatos
+en orden canónico. El tamaño de celda pasa de 50 m a 25 m, pero el encuadre de
+imagen permanece idéntico: z18, crop nativo 256 x 256, norte arriba y salida PNG
+RGB 512 x 512. Por ello aumenta el solapamiento visual entre candidatos; no se
+reduce el footprint del mapa al tamaño de la celda.
+
+Artefactos canónicos:
+
+```text
+visual:     f4-madrid-visual-sha256-ebe6c91b8ed5600d65c3021a53c768d6e65545777efda92d7b171f705a0d42e9
+embeddings: f4-madrid-embeddings-sha256-2874609b95005b65823ce6efb5b7888b9d1500b7ec2f6ba301dfc3083cb56c2a
+```
+
+La galería contiene 1.115 PNG válidos que suman 231.485.372 bytes. Su manifest
+tiene SHA-256
+`f4b1f0e61a9a1c1ff13548a5de158f7ad3ece5e8391cf0c347bab7fd598e8cef`.
+La generación limpia tardó 989,67 s. La repetición recuperó 1.115 filas de cache,
+renderizó cero y tardó 170,58 s, conservando el mismo ID.
+
+La matriz visual tiene forma `(1115, 768)`, dtype `float32`, orden C y normas L2
+entre `0,99999988` y `1,00000012`. Sus hashes son:
+
+```text
+image_embeddings.npy: 317030e5e181cf31b4b099e1e0b19fb048e35c85b9ae0432c0e7c371d53b3160
+candidate_ids.jsonl:  a0766a8fbf01ae429cdccab771b1472dee93ecaf1968184182e28625147b898d
+manifest.json:         88439910b7e520e3750a9bff3cdb8535d8d5327954081fba0633a04dad634066
+```
+
+La extracción GPU tardó 46,88 s. Una segunda ejecución devolvió el mismo bundle.
+
+Render:
+
+```bash
+F4_CATALOG_MANIFEST=data/processed/catalog/manifest-25m.json \
+F4_SELECTION=config/madrid_f4_visual_gallery_25m.json \
+  bash scripts/run_f4_osm_render.sh
+```
+
+Embeddings y ranking reutilizan `scripts/run_f4_crosstext2loc.sh`, pasando el
+manifest, selección y bundles de 25 m. Las tres sondas existentes se ejecutaron
+como Top-10 tanto sobre 1.115 como sobre 253 candidatos.
+
+Generación de embeddings de 25 m:
+
+```bash
+bash scripts/run_f4_crosstext2loc.sh embed \
+  --visual-bundle /workspace/project/data/processed/visual/f4-madrid-visual-sha256-ebe6c91b8ed5600d65c3021a53c768d6e65545777efda92d7b171f705a0d42e9 \
+  --catalog-manifest /workspace/project/data/processed/catalog/manifest-25m.json \
+  --selection /workspace/project/config/madrid_f4_visual_gallery_25m.json \
+  --region-config /workspace/project/config/madrid.yaml \
+  --checkpoint /workspace/project/checkpoints/CrossText2Loc/long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth \
+  --clip-weights /root/.cache/clip/ViT-L-14-336px.pt \
+  --cvg-text-root /workspace/project/external/CVG-Text \
+  --device cuda --output-root /artifacts
+```
+
+Para obtener Top-10 se usa el subcomando `rank` con el mismo catálogo,
+selección y bundle de 25 m, `--k 10` y un fichero bajo
+`/run-results/f44/25m/`. La rama de 50 m usa exactamente los mismos textos y
+checkpoint, pero sus propios catálogo, selección y embeddings. Los dos conjuntos
+se congelan mediante `scripts/freeze_f4_rankings.py` y se comparan con
+`scripts/compare_f4_galleries.py`.
+
+La comparación content-addressed es:
+
+```text
+f4-madrid-gallery-comparison-sha256-1fc6e96d64fb7ee58011232c130421abbc9e2e84a289987b483b80650e4a634d
+```
+
+Solo describe rankings y distancias entre sus resultados. No declara qué
+galería es mejor: no existen referencias verificadas, los tamaños de búsqueda
+son distintos y el Recall exacto define celdas diferentes. Cuando haya ground
+truth, F4.3 calculará Haversine y GeoRecall con umbrales comunes sobre el mismo
+subconjunto evaluable; Recall exacto se informará separado por catálogo.

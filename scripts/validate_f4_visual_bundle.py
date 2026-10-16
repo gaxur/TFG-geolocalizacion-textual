@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.tfg_phase0.config import load_region_config
 from src.tfg_phase0.f4_preflight import load_verified_selection
-from src.tfg_phase0.f4_validation import load_verified_f1_50m, validate_visual_bundle
+from src.tfg_phase0.f4_validation import load_verified_f1_catalog, validate_visual_bundle
 
 
 def main() -> int:
@@ -25,7 +25,7 @@ def main() -> int:
     args = parser.parse_args()
 
     bundle = args.bundle.resolve()
-    catalog = load_verified_f1_50m(args.manifest, load_region_config(args.config))
+    catalog = load_verified_f1_catalog(args.manifest, load_region_config(args.config))
     selection, selection_hash = load_verified_selection(args.selection, catalog)
     document = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     validate_visual_bundle(

@@ -18,7 +18,7 @@ from src.tfg_phase0.config import load_region_config
 from src.tfg_phase0.f4_evaluation import evaluate_rankings, query_inputs_sha256, ranking_set_id, validate_evaluation_result, validate_query_dataset
 from src.tfg_phase0.f4_preflight import load_verified_selection
 from src.tfg_phase0.f4_validation import (
-    load_verified_f1_50m,
+    load_verified_f1_catalog,
     validate_embedding_bundle,
     validate_retrieval_result,
     validate_visual_manifest,
@@ -45,7 +45,7 @@ def main() -> int:
     parser.add_argument("--config", type=Path, default=ROOT / "config/madrid.yaml")
     args = parser.parse_args()
 
-    catalog = load_verified_f1_50m(args.catalog_manifest, load_region_config(args.config))
+    catalog = load_verified_f1_catalog(args.catalog_manifest, load_region_config(args.config))
     dataset_raw = args.dataset.read_bytes()
     dataset = json.loads(dataset_raw.decode("utf-8"))
     validate_query_dataset(dataset, catalog)

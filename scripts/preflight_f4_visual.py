@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.tfg_phase0.config import load_region_config
 from src.tfg_phase0.f4_preflight import load_verified_selection, preflight_local_snapshot
-from src.tfg_phase0.f4_validation import load_verified_f1_50m
+from src.tfg_phase0.f4_validation import load_verified_f1_catalog
 
 
 def main() -> int:
@@ -24,7 +24,7 @@ def main() -> int:
     parser.add_argument("--config", type=Path, default=ROOT / "config/madrid.yaml")
     args = parser.parse_args()
     config = load_region_config(args.config)
-    catalog = load_verified_f1_50m(args.manifest, config)
+    catalog = load_verified_f1_catalog(args.manifest, config)
     selection, _ = load_verified_selection(args.selection, catalog)
     result = preflight_local_snapshot(catalog, selection, args.snapshot_dir)
     print(json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")))

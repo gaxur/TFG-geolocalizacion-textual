@@ -18,7 +18,7 @@ from src.tfg_phase0.f4_evaluation import (
     validate_evaluation_result,
     validate_query_dataset,
 )
-from src.tfg_phase0.f4_validation import F4ValidationError, load_verified_f1_50m
+from src.tfg_phase0.f4_validation import F4ValidationError, load_verified_f1_catalog, load_verified_f1_50m
 from src.tfg_phase0.validation import validate_document
 
 
@@ -242,6 +242,18 @@ class Phase4EvaluationTests(unittest.TestCase):
         result["results"] = result["results"][:5]
         with self.assertRaises(F4ValidationError):
             self.evaluate(dataset, {query["query_id"]: result})
+
+    def test_25m_catalog_has_independent_assignment(self):
+        catalog_25_path = Path(self.temporary.name) / "manifest-25m.json"
+        write_manifest(build_catalog(self.config, spacing_m=25), catalog_25_path)
+        catalog_25 = load_verified_f1_catalog(catalog_25_path, self.config)
+        candidate_50 = self.catalog.candidates[100]
+        assignment_50 = assign_reference(candidate_50.latitude, candidate_50.longitude, self.catalog, reported_accuracy_m=0.0)
+        assignment_25 = assign_reference(candidate_50.latitude, candidate_50.longitude, catalog_25, reported_accuracy_m=0.0)
+        self.assertEqual(assignment_50["status"], "assigned")
+        self.assertNotEqual(assignment_50.get("candidate_id"), assignment_25.get("candidate_id"))
+        draft = json.loads((ROOT / "config/madrid_f44_query_dataset_25m_draft.json").read_text())
+        validate_query_dataset(draft, catalog_25)
 
 
 if __name__ == "__main__":

@@ -38,7 +38,7 @@ mkdir -p "$CARTO_ROOT/fonts"
 find /usr/share/fonts -type f \( -name '*.ttf' -o -name '*.otf' \) -exec cp -n {} "$CARTO_ROOT/fonts/" \;
 carto -a 3.0.22 "$CARTO_ROOT/project.mml" > "$CARTO_ROOT/project.xml"
 render_args=(
-  --manifest data/processed/catalog/manifest-50m.json
+  --manifest "${F4_CATALOG_MANIFEST:-data/processed/catalog/manifest-50m.json}"
   --selection "$F4_SELECTION"
   --source-dir data/raw/osm/f4_sources/madrid-geofabrik-20261014
   --carto-root external/openstreetmap-carto-v5.9.0

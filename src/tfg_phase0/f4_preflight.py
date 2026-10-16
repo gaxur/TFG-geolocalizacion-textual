@@ -9,10 +9,8 @@ from typing import Any, Mapping
 
 from .f3_inputs import CatalogInput
 from .f4_contracts import (
-    F4_FULL_CANDIDATE_COUNT,
     F4_FULL_SELECTION_POLICY,
-    F4_FULL_SELECTION_SHA256,
-    F4_FULL_SELECTION_VERSION,
+    F4_FULL_SELECTIONS,
     F4_SELECTED_CANDIDATES,
     F4_SELECTION_SHA256,
     F4_SELECTION_VERSION,
@@ -91,13 +89,15 @@ def load_verified_selection(path: str | Path, catalog: CatalogInput) -> tuple[Ma
         if any(candidate_id not in known for candidate_id, _ in actual):
             raise F4PreflightError("selección F4 contiene candidate_id ajeno a F1")
         return document, digest
+    expected_full = F4_FULL_SELECTIONS.get(document["selection_id"])
     if (
-        document["selection_id"] != F4_FULL_SELECTION_VERSION
+        expected_full is None
         or document["selection_policy"] != F4_FULL_SELECTION_POLICY
-        or document["candidate_count"] != F4_FULL_CANDIDATE_COUNT
+        or document["candidate_count"] != expected_full["candidate_count"]
         or document["order"] != "catalog_manifest_order"
-        or len(catalog.candidates) != F4_FULL_CANDIDATE_COUNT
-        or digest != F4_FULL_SELECTION_SHA256
+        or (catalog.spacing_m, catalog.cell_size_m) != (expected_full["spacing_m"], expected_full["cell_size_m"])
+        or len(catalog.candidates) != expected_full["candidate_count"]
+        or digest != expected_full["selection_sha256"]
     ):
         raise F4PreflightError("selección de galería completa F4 no válida")
     expanded = dict(document)

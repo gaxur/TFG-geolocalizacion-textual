@@ -13,8 +13,7 @@ import zlib
 from .f3_inputs import CatalogInput, F3InputError, load_verified_catalog
 from .f4_contracts import (
     F4_EMBEDDING_DIMENSION,
-    F4_FULL_CANDIDATE_COUNT,
-    F4_FULL_SELECTION_VERSION,
+    F4_FULL_SELECTIONS,
     F4_SELECTED_CANDIDATES,
     F4_SELECTION_SHA256,
     F4_SELECTION_VERSION,
@@ -81,13 +80,20 @@ def embedding_dataset_id(document: Mapping[str, Any]) -> str:
     return EMBEDDING_DATASET_ID_PREFIX + sha256_bytes(_identity_bytes(embedding_identity(document)))
 
 
-def load_verified_f1_50m(manifest_path: str | Path, config: Mapping[str, Any]) -> CatalogInput:
+def load_verified_f1_catalog(manifest_path: str | Path, config: Mapping[str, Any]) -> CatalogInput:
     try:
         catalog = load_verified_catalog(manifest_path, config)
     except F3InputError as error:
         raise F4ValidationError("manifest F1 de F4 inválido") from error
-    if catalog.spacing_m != 50 or catalog.cell_size_m != 50:
-        raise F4ValidationError("F4 requiere spacing_m=50 y cell_size_m=50 para este piloto")
+    if (catalog.spacing_m, catalog.cell_size_m) not in {(25, 25), (50, 50)}:
+        raise F4ValidationError("F4 requiere un catálogo soportado de 25 m o 50 m")
+    return catalog
+
+
+def load_verified_f1_50m(manifest_path: str | Path, config: Mapping[str, Any]) -> CatalogInput:
+    catalog = load_verified_f1_catalog(manifest_path, config)
+    if (catalog.spacing_m, catalog.cell_size_m) != (50, 50):
+        raise F4ValidationError("este consumidor requiere el catálogo F1 de 50 m")
     return catalog
 
 
@@ -154,7 +160,7 @@ def validate_visual_manifest(
     if dict(document["catalog"]) != expected_catalog:
         raise F4ValidationError("referencia al manifest F1 inconsistente")
     selection_contract = dict(selection)
-    if selection_contract.get("selection_id") == F4_FULL_SELECTION_VERSION:
+    if selection_contract.get("selection_id") in F4_FULL_SELECTIONS:
         selection_contract.pop("candidates", None)
     try:
         validate_document(selection_contract, "f4_visual_selection")
@@ -164,9 +170,10 @@ def validate_visual_manifest(
     if selection["selection_id"] == F4_SELECTION_VERSION:
         if actual_selection != F4_SELECTED_CANDIDATES or selection_sha256 != F4_SELECTION_SHA256:
             raise F4ValidationError("selección F4 no corresponde a la fixture fija versionada")
-    elif selection["selection_id"] == F4_FULL_SELECTION_VERSION:
+    elif selection["selection_id"] in F4_FULL_SELECTIONS:
+        expected_selection = F4_FULL_SELECTIONS[selection["selection_id"]]
         expected_full = tuple((candidate.candidate_id, "full_catalog") for candidate in catalog.candidates)
-        if len(expected_full) != F4_FULL_CANDIDATE_COUNT or actual_selection != expected_full:
+        if len(expected_full) != expected_selection["candidate_count"] or actual_selection != expected_full:
             raise F4ValidationError("selección F4.2 no corresponde al catálogo F1 completo")
     else:
         raise F4ValidationError("selección F4 no soportada")
@@ -560,7 +567,7 @@ def validate_visual_bundle(
     except (UnicodeDecodeError, json.JSONDecodeError, SchemaValidationError) as error:
         raise F4ValidationError("selección visual almacenada inválida") from error
     expected_stored_selection = dict(selection)
-    if expected_stored_selection.get("selection_id") == F4_FULL_SELECTION_VERSION:
+    if expected_stored_selection.get("selection_id") in F4_FULL_SELECTIONS:
         expected_stored_selection.pop("candidates", None)
     if stored_selection != expected_stored_selection:
         raise F4ValidationError("selección suministrada no coincide con el fichero verificado")

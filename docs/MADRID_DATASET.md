@@ -8,8 +8,9 @@ adquirido y validado el primer snapshot OSM raw de D004, identificado como
 se documenta en [PHASE2_OSM_SNAPSHOT.md](PHASE2_OSM_SNAPSHOT.md) y permanece
 fuera de Git. F3 ha materializado el catálogo geométrico asociado. F4 ha
 generado primero una fixture de nueve imágenes y después la galería completa de
-253 candidatos F1 de 50 m con sus embeddings. También ha ejecutado una prueba
-técnica de retrieval exhaustivo, documentada en
+253 candidatos F1 de 50 m y la galería de 1.115 candidatos F1 de 25 m, ambas con
+sus embeddings. También ha ejecutado una comparación técnica de retrieval
+exhaustivo, documentada en
 [PHASE4_VISUAL_CONTRACTS.md](PHASE4_VISUAL_CONTRACTS.md). La evaluación formal
 de Madrid sigue pendiente. El piloto utiliza la bounding box fijada en D004; la
 extensión definitiva de Madrid continúa pendiente.

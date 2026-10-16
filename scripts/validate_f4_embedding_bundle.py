@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 from src.tfg_phase0.config import load_region_config
 from src.tfg_phase0.f4_preflight import load_verified_selection
 from src.tfg_phase0.f4_validation import (
-    load_verified_f1_50m,
+    load_verified_f1_catalog,
     validate_embedding_bundle,
     validate_visual_manifest,
     verify_visual_image_files,
@@ -30,7 +30,7 @@ def main() -> int:
     parser.add_argument("--config", type=Path, default=ROOT / "config/madrid.yaml")
     args = parser.parse_args()
 
-    catalog = load_verified_f1_50m(args.manifest, load_region_config(args.config))
+    catalog = load_verified_f1_catalog(args.manifest, load_region_config(args.config))
     selection, selection_hash = load_verified_selection(args.selection, catalog)
     visual_raw = (args.visual_bundle / "manifest.json").read_bytes()
     visual = json.loads(visual_raw.decode("utf-8"))

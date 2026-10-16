@@ -6,7 +6,7 @@ from .crs import epsg25830_to_wgs84, wgs84_to_epsg25830
 from .f3_inputs import load_verified_f3_inputs
 from .f4_contracts import experimental_visual_profile
 from .f4_geometry import epsg3857_to_wgs84, wgs84_to_epsg3857
-from .f4_validation import load_verified_f1_50m, validate_visual_bundle, validate_visual_manifest
+from .f4_validation import load_verified_f1_catalog, load_verified_f1_50m, validate_visual_bundle, validate_visual_manifest
 from .osm_snapshot import build_overpass_query, snapshot_id, validate_local_snapshot, validate_osm_xml
 from .validation import SchemaValidationError, validate_document
 
@@ -21,6 +21,7 @@ __all__ = [
     "load_region_config",
     "load_verified_f3_inputs",
     "load_verified_f1_50m",
+    "load_verified_f1_catalog",
     "snapshot_id",
     "validate_local_snapshot",
     "validate_document",
