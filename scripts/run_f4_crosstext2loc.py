@@ -16,29 +16,30 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.tfg_phase0.config import load_region_config
+from src.tfg_phase0.crosstext2loc_runtime import (
+    EXPECTED_CHECKPOINT_NAME as EXPECTED_CHECKPOINT,
+    EXPECTED_CHECKPOINT_SHA256,
+    EXPECTED_CHECKPOINT_SIZE,
+    EXPECTED_CLIP_WEIGHTS_NAME as EXPECTED_CLIP_WEIGHTS,
+    EXPECTED_CLIP_WEIGHTS_SHA256,
+    EXPECTED_CLIP_WEIGHTS_SIZE,
+    EXPECTED_CLIP_COMMIT,
+    EXPECTED_CVG_TEXT_COMMIT,
+    CLIP_ARCHITECTURE as MODEL_NAME,
+    CONTEXT_LENGTH,
+    CrossText2LocRetriever,
+    GalleryConfig,
+    ModelConfig,
+    load_model_components,
+    load_visual_inputs,
+)
 from src.tfg_phase0.f4_contracts import F4_EMBEDDING_CONTRACT_VERSION, F4_EMBEDDING_GENERATOR_VERSION
-from src.tfg_phase0.f4_preflight import load_verified_selection
-from src.tfg_phase0.f4_retrieval import build_retrieval_result, exhaustive_rank, normalize_l2
+from src.tfg_phase0.f4_retrieval import normalize_l2
 from src.tfg_phase0.f4_validation import (
     embedding_dataset_id,
-    load_verified_f1_catalog,
     sha256_bytes,
     validate_embedding_bundle,
-    validate_retrieval_result,
-    validate_visual_manifest,
-    verify_visual_image_files,
 )
-EXPECTED_CVG_TEXT_COMMIT = "6910d2747a94fbe985309bde60cd4732bcbbf50f"
-EXPECTED_CLIP_COMMIT = "dcba3cb2e2827b402d2701e7e1c7d9fed8a20ef1"
-EXPECTED_CHECKPOINT = "long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth"
-EXPECTED_CHECKPOINT_SIZE = 1712649548
-EXPECTED_CHECKPOINT_SHA256 = "d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d"
-EXPECTED_CLIP_WEIGHTS = "ViT-L-14-336px.pt"
-EXPECTED_CLIP_WEIGHTS_SIZE = 934088680
-EXPECTED_CLIP_WEIGHTS_SHA256 = "3035c92b350959924f9f00213499208652fc7ea050643e8b385c2dac08641f02"
-CONTEXT_LENGTH = 300
-MODEL_NAME = "ViT-L/14@336px"
 
 
 def sha256(path: Path) -> str:
@@ -56,54 +57,13 @@ def require_file(path: Path, *, name: str, size: int, digest: str) -> None:
         raise RuntimeError(f"tamaño o SHA-256 inesperado: {path}")
 
 
-def git_head(path: Path) -> str:
-    import subprocess
-    return subprocess.run(["git", "-C", str(path), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
-
-
-def clip_commit() -> str | None:
-    from importlib.metadata import distribution
-    data = distribution("clip").read_text("direct_url.json")
-    return json.loads(data).get("vcs_info", {}).get("commit_id") if data else None
-
-
-def build_model(cvg_root: Path, checkpoint: Path, clip_weights: Path, device: str):
-    import clip
-    import torch
-    sys.path.insert(0, str(cvg_root))
-    from utils import interpolate_pos_embedding
-
-    model, preprocess = clip.load(str(clip_weights), device="cpu")
-    model = model.float()
-    model.positional_embedding = torch.nn.Parameter(interpolate_pos_embedding(model.positional_embedding, CONTEXT_LENGTH))
-    mask = torch.empty(CONTEXT_LENGTH, CONTEXT_LENGTH)
-    mask.fill_(float("-inf"))
-    mask.triu_(1)
-    for block in model.transformer.resblocks:
-        block.attn_mask = mask
-    state = torch.load(checkpoint, map_location="cpu", weights_only=True)
-    incompatible = model.load_state_dict(state, strict=False)
-    if incompatible.missing_keys or incompatible.unexpected_keys:
-        raise RuntimeError(f"checkpoint incompatible: {incompatible}")
-    model.eval().to(device)
-    return model, preprocess
-
-
 def common_inputs(args):
-    catalog = load_verified_f1_catalog(args.catalog_manifest, load_region_config(args.region_config))
-    selection, selection_hash = load_verified_selection(args.selection, catalog)
-    visual_raw = (args.visual_bundle / "manifest.json").read_bytes()
-    visual = json.loads(visual_raw.decode("utf-8"))
-    validate_visual_manifest(visual, catalog, selection=selection, selection_sha256=selection_hash)
-    verify_visual_image_files(visual, args.visual_bundle)
-    require_file(args.checkpoint, name=EXPECTED_CHECKPOINT, size=EXPECTED_CHECKPOINT_SIZE, digest=EXPECTED_CHECKPOINT_SHA256)
-    require_file(args.clip_weights, name=EXPECTED_CLIP_WEIGHTS, size=EXPECTED_CLIP_WEIGHTS_SIZE, digest=EXPECTED_CLIP_WEIGHTS_SHA256)
-    if git_head(args.cvg_text_root) != EXPECTED_CVG_TEXT_COMMIT or clip_commit() != EXPECTED_CLIP_COMMIT:
-        raise RuntimeError("commit de CVG-Text u OpenAI CLIP inesperado")
-    interpolation_source = args.cvg_text_root / "utils.py"
-    if sha256(interpolation_source) != args.cvg_utils_sha256:
-        raise RuntimeError("utils.py de CVG-Text no coincide con el hash declarado")
-    return catalog, visual, visual_raw
+    gallery = GalleryConfig("cli", args.catalog_manifest, args.selection, args.visual_bundle, getattr(args, "embedding_bundle", args.visual_bundle))
+    return load_visual_inputs(gallery, region_config=args.region_config, deep_validate_visual_assets=True)
+
+
+def model_config(args) -> ModelConfig:
+    return ModelConfig(args.checkpoint, args.clip_weights, args.cvg_text_root, args.cvg_utils_sha256, args.device)
 
 
 def canonical_jsonl(candidate_ids: list[str]) -> bytes:
@@ -157,7 +117,7 @@ def command_embed(args) -> int:
     generated = [row for row in visual["images"] if row["generation_status"] == "generated"]
     if len(generated) != len(visual["images"]):
         raise RuntimeError("el bundle visual debe estar completo antes de generar embeddings")
-    model, preprocess = build_model(args.cvg_text_root, args.checkpoint, args.clip_weights, args.device)
+    model, preprocess, _ = load_model_components(model_config(args))
     rows = []
     with torch.inference_mode():
         for image_row in generated:
@@ -174,22 +134,25 @@ def command_embed(args) -> int:
 
 
 def command_rank(args) -> int:
-    import clip
-    import torch
-    catalog, visual, visual_raw = common_inputs(args)
-    embedding = json.loads((args.embedding_bundle / "manifest.json").read_text(encoding="utf-8"))
-    matrix, candidate_ids = validate_embedding_bundle(embedding, args.embedding_bundle, visual, visual_raw, catalog)
-    model, _ = build_model(args.cvg_text_root, args.checkpoint, args.clip_weights, args.device)
-    start = time.perf_counter()
-    tokens = clip.tokenize(args.text, context_length=CONTEXT_LENGTH, truncate=True).to(args.device)
-    with torch.inference_mode():
-        text_feature = model.encode_text(tokens).float().cpu().numpy()[0]
-    encoded = time.perf_counter()
-    ranked = exhaustive_rank(matrix, candidate_ids, text_feature, args.k)
-    ranked_at = time.perf_counter()
-    timings = {"text_encoding": (encoded - start) * 1000, "ranking": (ranked_at - encoded) * 1000, "total": (ranked_at - start) * 1000}
-    result = build_retrieval_result(query_id=args.query_id, text=args.text, language=args.language, embedding_dataset_id=embedding["embedding_dataset_id"], checkpoint_sha256=EXPECTED_CHECKPOINT_SHA256, ranked=ranked, catalog=catalog, gallery_count=len(candidate_ids), requested_k=args.k, timings_ms=timings)
-    validate_retrieval_result(result, catalog, embedding_manifest=embedding, candidate_ids=candidate_ids, matrix=matrix, text_embedding=normalize_l2(text_feature))
+    gallery = GalleryConfig("cli", args.catalog_manifest, args.selection, args.visual_bundle, args.embedding_bundle)
+    runtime = CrossText2LocRetriever.load(model_config=model_config(args), gallery_configs=[gallery], region_config=args.region_config, deep_validate_visual_assets=True)
+    try:
+        resident_count = runtime.gallery_count("cli")
+        effective_request_k = min(args.k, resident_count)
+        source = runtime.retrieve_many(gallery_ids=["cli"], query_id=args.query_id, text=args.text, language=args.language, k=effective_request_k)
+        resident = source["retrievals"][0]
+        timing = source["timings_ms"]
+        result = {
+            "schema_version": "2.0", "contract_version": "f4-exhaustive-retrieval-v2",
+            "query": source["query"], "embedding_dataset_id": resident["embedding_dataset_id"],
+            "checkpoint_sha256": source["model"]["checkpoint_sha256"], "ranking_method": "exhaustive_cosine",
+            "tie_break": "candidate_id_ascending", "gallery_count": resident["gallery_count"], "requested_k": args.k,
+            "effective_k": len(resident["results"]),
+            "results": [{"rank": row["rank"], "candidate_id": row["candidate_id"], "latitude": row["latitude"], "longitude": row["longitude"], "score": row["cosine_similarity"]} for row in resident["results"]],
+            "timings_ms": {"text_encoding": timing["text_encoding"], "ranking": timing["ranking_by_gallery"]["cli"], "total": timing["total"]},
+        }
+    finally:
+        runtime.close()
     output = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

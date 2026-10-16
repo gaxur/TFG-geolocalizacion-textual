@@ -65,6 +65,9 @@ def build_retrieval_result(
     timings_ms: Mapping[str, float],
 ) -> dict[str, Any]:
     candidates = {candidate.candidate_id: candidate for candidate in catalog.candidates}
+    unknown = [candidate_id for candidate_id, _ in ranked if candidate_id not in candidates]
+    if unknown:
+        raise F4ValidationError(f"candidate_id rankeado ajeno al catálogo: {unknown[0]}")
     return {
         "schema_version": "2.0",
         "contract_version": "f4-exhaustive-retrieval-v2",

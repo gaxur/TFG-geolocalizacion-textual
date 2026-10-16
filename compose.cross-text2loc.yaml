@@ -19,6 +19,7 @@ services:
       GIT_CONFIG_VALUE_0: /workspace/project/external/CVG-Text
       F4_HOST_UID: ${F4_HOST_UID:-0}
       F4_HOST_GID: ${F4_HOST_GID:-0}
+      CLIP_WEIGHTS_PATH: ${CLIP_WEIGHTS_PATH:-/root/.cache/clip/ViT-L-14-336px.pt}
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=1g
     volumes:

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "crosstext2loc_retrieval_response.schema.json",
+  "title": "Resident CrossText2Loc retrieval response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "query", "model", "retrievals", "timings_ms"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "crosstext2loc-retrieval-response-v1"},
+    "query": {"type": "object", "additionalProperties": false, "required": ["query_id", "text", "language"], "properties": {"query_id": {"type": "string", "minLength": 1}, "text": {"type": "string", "minLength": 1}, "language": {"type": "string", "minLength": 2}}},
+    "model": {"type": "object", "additionalProperties": false, "required": ["name", "checkpoint_sha256"], "properties": {"name": {"const": "CLIP-L/14@336"}, "checkpoint_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
+    "retrievals": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"type": "object", "additionalProperties": false, "required": ["gallery_id", "visual_dataset_id", "embedding_dataset_id", "gallery_count", "requested_k", "effective_k", "ranking_method", "tie_break", "results"], "properties": {"gallery_id": {"type": "string", "minLength": 1}, "visual_dataset_id": {"type": "string", "minLength": 1}, "embedding_dataset_id": {"type": "string", "minLength": 1}, "gallery_count": {"type": "integer", "minimum": 1}, "requested_k": {"type": "integer", "minimum": 1}, "effective_k": {"type": "integer", "minimum": 1}, "ranking_method": {"const": "exhaustive_cosine"}, "tie_break": {"const": "candidate_id_ascending"}, "results": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["rank", "candidate_id", "latitude", "longitude", "cosine_similarity"], "properties": {"rank": {"type": "integer", "minimum": 1}, "candidate_id": {"type": "string", "minLength": 1}, "latitude": {"type": "number", "minimum": -90, "maximum": 90}, "longitude": {"type": "number", "minimum": -180, "maximum": 180}, "cosine_similarity": {"type": "number", "minimum": -1, "maximum": 1}}}}}}},
+    "timings_ms": {"type": "object", "additionalProperties": false, "required": ["text_encoding", "ranking_by_gallery", "total"], "properties": {"text_encoding": {"type": "number", "minimum": 0}, "ranking_by_gallery": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}}, "total": {"type": "number", "minimum": 0}}}
+  }
+}

@@ -257,6 +257,26 @@ controladas, sin ubicación verdadera y con checkpoint de Nueva York.
 Los batches tardaron 8,29 s en 50 m y 10,28 s en 25 m, incluida una carga de
 modelo por galería. `geographic_accuracy_available` permanece `false`.
 
+## F4.6: runtime residente para el MVP
+
+La prueba real cargó una instancia FP32 del checkpoint y ambas galerías dentro
+del mismo proceso. La primera petición Top-10 multigalería codificó el texto una
+vez y produjo exactamente los mismos candidatos y scores que F4.4.
+
+```text
+inicialización: 5.571,25 ms
+primera consulta multigalería: 154,19 ms
+CUDA asignada tras carga: 1.712.462.336 B
+CUDA reservada tras carga: 1.772.093.440 B
+pico de primera consulta tras reset post-carga, asignado: 1.741.103.104 B
+pico de primera consulta tras reset post-carga, reservado: 1.803.550.720 B
+```
+
+Se confirmó repetición idéntica, tres codificaciones para tres peticiones
+multigalería, consulta en español, dos matrices residentes y rechazo después de
+cerrar el runtime. El informe local `results/generated/f4/f46-smoke-final.json`
+permanece fuera de Git. Estas medidas no son un SLA ni métricas de precisión.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

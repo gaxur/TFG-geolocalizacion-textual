@@ -9,6 +9,16 @@ from .f4_geometry import epsg3857_to_wgs84, wgs84_to_epsg3857
 from .f4_validation import load_verified_f1_catalog, load_verified_f1_50m, validate_visual_bundle, validate_visual_manifest
 from .osm_snapshot import build_overpass_query, snapshot_id, validate_local_snapshot, validate_osm_xml
 from .validation import SchemaValidationError, validate_document
+from .crosstext2loc_runtime import (
+    CrossText2LocRetriever,
+    CrossText2LocRuntimeError,
+    GalleryConfig,
+    GalleryNotLoadedError,
+    ModelConfig,
+    ResidentGallery,
+    RetrievalInputError,
+    RuntimeClosedError,
+)
 
 __all__ = [
     "SchemaValidationError",
@@ -32,4 +42,12 @@ __all__ = [
     "wgs84_to_epsg3857",
     "write_manifest",
     "experimental_visual_profile",
+    "CrossText2LocRetriever",
+    "CrossText2LocRuntimeError",
+    "GalleryConfig",
+    "GalleryNotLoadedError",
+    "ModelConfig",
+    "ResidentGallery",
+    "RetrievalInputError",
+    "RuntimeClosedError",
 ]

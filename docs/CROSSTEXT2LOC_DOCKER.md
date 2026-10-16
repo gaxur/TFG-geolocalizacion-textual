@@ -92,6 +92,11 @@ La configuración Compose:
 - permite gestionar el contenedor mediante `up`, `exec`, `stop`, `start` y
   `down`.
 
+F4.6 añade un proceso Python residente sobre este mismo entorno. Mantener vivo
+solo `sleep infinity` no mantiene el modelo: debe permanecer vivo el proceso que
+contiene `CrossText2LocRetriever`. Véase
+[la interfaz de retrieval](CROSSTEXT2LOC_RETRIEVAL_INTERFACE.md).
+
 Compose resuelve `${HOME}/.cache/clip` contra el directorio personal del usuario
 que ejecuta el comando, sin fijar en el archivo una ruta privada concreta.
 

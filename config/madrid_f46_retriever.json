@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "crosstext2loc-runtime-config-v1",
+  "model": {
+    "checkpoint": "checkpoints/CrossText2Loc/long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth",
+    "clip_weights": "${CLIP_WEIGHTS_PATH}",
+    "cvg_text_root": "external/CVG-Text",
+    "device": "cuda"
+  },
+  "galleries": {
+    "madrid-50m": {"catalog_manifest": "data/processed/catalog/manifest-50m.json", "selection": "config/madrid_f4_visual_gallery_50m.json", "visual_bundle": "data/processed/visual/f4-madrid-visual-sha256-15310268e0fed30180085c7ec1f14fce696c4ba94e83bf9727970451cc82f564", "embedding_bundle": "data/embeddings/f4-madrid-embeddings-sha256-199dae0e3eb38b206004557f20fae0ef98f620621458fc64c2dfa3f7ef7f84c1"},
+    "madrid-25m": {"catalog_manifest": "data/processed/catalog/manifest-25m.json", "selection": "config/madrid_f4_visual_gallery_25m.json", "visual_bundle": "data/processed/visual/f4-madrid-visual-sha256-ebe6c91b8ed5600d65c3021a53c768d6e65545777efda92d7b171f705a0d42e9", "embedding_bundle": "data/embeddings/f4-madrid-embeddings-sha256-2874609b95005b65823ce6efb5b7888b9d1500b7ec2f6ba301dfc3083cb56c2a"}
+  }
+}

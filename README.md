@@ -35,6 +35,10 @@ F4.5 añade un experimento técnico de robustez lingüística con 27 variantes
 controladas en inglés y español sobre ambas galerías. Sus métricas describen
 estabilidad de ranking, no precisión geográfica.
 
+F4.6 cierra técnicamente CrossText2Loc con una interfaz Python residente para el
+futuro backend: una carga de modelo, galerías 25 m/50 m reutilizables y consultas
+Top-K individuales o multigalería. No es todavía una API HTTP ni el MVP.
+
 El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 
 ```text

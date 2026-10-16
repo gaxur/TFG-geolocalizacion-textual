@@ -564,3 +564,13 @@ galería es mejor: no existen referencias verificadas, los tamaños de búsqueda
 son distintos y el Recall exacto define celdas diferentes. Cuando haya ground
 truth, F4.3 calculará Haversine y GeoRecall con umbrales comunes sobre el mismo
 subconjunto evaluable; Recall exacto se informará separado por catálogo.
+
+## Interfaz residente F4.6
+
+El cierre técnico extrae la carga del modelo y galerías a
+`src/tfg_phase0/crosstext2loc_runtime.py`. El runtime mantiene un solo modelo en
+GPU y las matrices de 25 m y 50 m en CPU. Una petición multigalería codifica el
+texto una vez y conserva `exhaustive_rank` como única implementación matemática.
+
+La interfaz, contratos, errores, memoria medida y ejemplo de uso se documentan
+en [CROSSTEXT2LOC_RETRIEVAL_INTERFACE.md](CROSSTEXT2LOC_RETRIEVAL_INTERFACE.md).

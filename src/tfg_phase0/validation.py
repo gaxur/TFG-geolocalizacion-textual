@@ -1153,6 +1153,83 @@ def _validate_f4_linguistic_robustness_result(document: Mapping[str, Any]) -> No
         raise SchemaValidationError("robustness_result_id no corresponde al contenido")
 
 
+def _validate_crosstext2loc_retrieval_request(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "query", "gallery_ids", "top_k"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "crosstext2loc-retrieval-request-v1":
+        raise SchemaValidationError("crosstext2loc_retrieval_request incompatible")
+    query = document["query"]
+    if not isinstance(query, Mapping) or set(query) != {"query_id", "text", "language"}:
+        raise SchemaValidationError("query de retrieval no válida")
+    for field in ("query_id", "text", "language"):
+        _non_empty_string(query[field], f"retrieval_request.query.{field}")
+    if not isinstance(document["gallery_ids"], list) or not 1 <= len(document["gallery_ids"]) <= 2 or len(set(document["gallery_ids"])) != len(document["gallery_ids"]):
+        raise SchemaValidationError("gallery_ids debe contener una o dos galerías únicas")
+    for gallery_id in document["gallery_ids"]:
+        _non_empty_string(gallery_id, "retrieval_request.gallery_id")
+    _positive_id(document["top_k"], "retrieval_request.top_k")
+    if document["top_k"] > 1115:
+        raise SchemaValidationError("top_k excede el máximo soportado")
+
+
+def _validate_crosstext2loc_retrieval_response(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "query", "model", "retrievals", "timings_ms"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "crosstext2loc-retrieval-response-v1":
+        raise SchemaValidationError("crosstext2loc_retrieval_response incompatible")
+    query = document["query"]
+    if not isinstance(query, Mapping) or set(query) != {"query_id", "text", "language"}:
+        raise SchemaValidationError("query de respuesta no válida")
+    for field in ("query_id", "text", "language"):
+        _non_empty_string(query[field], f"retrieval_response.query.{field}")
+    model = document["model"]
+    if not isinstance(model, Mapping) or set(model) != {"name", "checkpoint_sha256"} or model["name"] != "CLIP-L/14@336":
+        raise SchemaValidationError("modelo de respuesta no válido")
+    _sha256(model["checkpoint_sha256"], "retrieval_response.model.checkpoint_sha256")
+    retrievals = document["retrievals"]
+    if not isinstance(retrievals, list) or not 1 <= len(retrievals) <= 2:
+        raise SchemaValidationError("retrievals debe contener una o dos galerías")
+    seen_galleries = set()
+    for retrieval in retrievals:
+        required = {"gallery_id", "visual_dataset_id", "embedding_dataset_id", "gallery_count", "requested_k", "effective_k", "ranking_method", "tie_break", "results"}
+        if not isinstance(retrieval, Mapping) or set(retrieval) != required or retrieval["ranking_method"] != "exhaustive_cosine" or retrieval["tie_break"] != "candidate_id_ascending":
+            raise SchemaValidationError("retrieval de galería no válido")
+        if retrieval["gallery_id"] in seen_galleries:
+            raise SchemaValidationError("gallery_id duplicado en respuesta")
+        seen_galleries.add(retrieval["gallery_id"])
+        for field in ("gallery_id", "visual_dataset_id", "embedding_dataset_id"):
+            _non_empty_string(retrieval[field], f"retrieval_response.{field}")
+        _positive_id(retrieval["gallery_count"], "retrieval_response.gallery_count")
+        _positive_id(retrieval["requested_k"], "retrieval_response.requested_k")
+        _positive_id(retrieval["effective_k"], "retrieval_response.effective_k")
+        if not isinstance(retrieval["results"], list) or len(retrieval["results"]) != retrieval["effective_k"] or retrieval["effective_k"] != retrieval["requested_k"] or retrieval["effective_k"] > retrieval["gallery_count"]:
+            raise SchemaValidationError("results de galería vacío")
+        previous_score = None
+        seen_candidates = set()
+        for index, row in enumerate(retrieval["results"], 1):
+            if not isinstance(row, Mapping) or set(row) != {"rank", "candidate_id", "latitude", "longitude", "cosine_similarity"} or row["rank"] != index:
+                raise SchemaValidationError("fila de resultado residente no válida")
+            _non_empty_string(row["candidate_id"], "retrieval_response.candidate_id")
+            if row["candidate_id"] in seen_candidates:
+                raise SchemaValidationError("candidate_id duplicado en respuesta")
+            seen_candidates.add(row["candidate_id"])
+            _finite_number(row["latitude"], "retrieval_response.latitude", minimum=-90)
+            _finite_number(row["longitude"], "retrieval_response.longitude", minimum=-180)
+            _finite_number(row["cosine_similarity"], "retrieval_response.cosine_similarity", minimum=-1)
+            if row["latitude"] > 90 or row["longitude"] > 180 or row["cosine_similarity"] > 1:
+                raise SchemaValidationError("resultado residente fuera de rango")
+            if previous_score is not None and (row["cosine_similarity"] > previous_score or (row["cosine_similarity"] == previous_score and row["candidate_id"] < retrieval["results"][index - 2]["candidate_id"])):
+                raise SchemaValidationError("scores residentes no descendentes")
+            previous_score = row["cosine_similarity"]
+    timings = document["timings_ms"]
+    if not isinstance(timings, Mapping) or set(timings) != {"text_encoding", "ranking_by_gallery", "total"} or not isinstance(timings["ranking_by_gallery"], Mapping):
+        raise SchemaValidationError("timings residentes no válidos")
+    _finite_number(timings["text_encoding"], "retrieval_response.timings.text_encoding", minimum=0)
+    _finite_number(timings["total"], "retrieval_response.timings.total", minimum=0)
+    for value in timings["ranking_by_gallery"].values():
+        _finite_number(value, "retrieval_response.timings.ranking", minimum=0)
+    if set(timings["ranking_by_gallery"]) != seen_galleries:
+        raise SchemaValidationError("timings no corresponden a retrievals")
+
+
 def _non_empty_string(value: Any, field: str) -> None:
     if not isinstance(value, str) or not value:
         raise SchemaValidationError(f"{field} debe ser texto no vacío")
@@ -1586,6 +1663,8 @@ def validate_document(document: Any, schema_name: str) -> None:
         "f4_gallery_comparison": _validate_f4_gallery_comparison,
         "f4_linguistic_query_set": _validate_f4_linguistic_query_set,
         "f4_linguistic_robustness_result": _validate_f4_linguistic_robustness_result,
+        "crosstext2loc_retrieval_request": _validate_crosstext2loc_retrieval_request,
+        "crosstext2loc_retrieval_response": _validate_crosstext2loc_retrieval_response,
         "manifest": _validate_manifest,
         "osm_snapshot": _validate_osm_snapshot,
         "f3_osm_object": _validate_f3_osm_object,
