@@ -12,8 +12,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.run_f46_retriever import load_config
-from src.tfg_phase0.crosstext2loc_runtime import CrossText2LocRetriever, ModelConfig, RuntimeClosedError
+from src.tfg_phase0.crosstext2loc_runtime import CrossText2LocRetriever, RuntimeClosedError, load_runtime_config
 
 
 def stable_rows(response):
@@ -38,8 +37,7 @@ def main() -> int:
 
     import torch
     torch.cuda.reset_peak_memory_stats()
-    model, galleries = load_config(args.config)
-    model = ModelConfig(model.checkpoint, model.clip_weights, model.cvg_text_root, args.cvg_utils_sha256, model.device)
+    model, galleries = load_runtime_config(args.config, project_root=ROOT, cvg_utils_sha256=args.cvg_utils_sha256, clip_weights_path=Path("/root/.cache/clip/ViT-L-14-336px.pt"))
     started = time.perf_counter()
     runtime = CrossText2LocRetriever.load(model_config=model, gallery_configs=galleries, region_config=ROOT / "config/madrid.yaml", deep_validate_visual_assets=False)
     initialized = time.perf_counter()

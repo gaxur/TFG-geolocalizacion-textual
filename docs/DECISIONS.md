@@ -68,6 +68,62 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D050 | Fijar el contrato del dataset de asociaciones geométricas F3 | ACEPTADA | OSM / catálogo geométrico F3 |
 | D051 | Limitar la provenance de cada artefacto a sus inputs efectivos | ACEPTADA | Provenance / catálogo F1 |
 | D052 | Fijar la serialización, identidad y publicación canónica de F3 | ACEPTADA | OSM / publicación F3 |
+| D053 | Usar FastAPI como capa HTTP fina con un único worker y runtime F4.6 residente | ACEPTADA | MVP / backend |
+
+## D053 — API HTTP interna del MVP
+
+**Estado:** ACEPTADA
+**Componente:** MVP / backend
+**Fecha:** 2026-10-16
+**Origen:** Implementación solicitada expresamente para MVP.1.
+
+### Decisión
+
+FastAPI actúa únicamente como transporte HTTP sobre `CrossText2LocRetriever`.
+El servicio se ejecuta con un solo worker Uvicorn, carga una instancia del modelo
+durante lifespan y falla al arrancar si los recursos obligatorios no son válidos.
+
+### Contexto
+
+F4.6 ya proporciona un runtime residente y validado, pero no existe transporte
+HTTP ni conexión con el frontend. Ejecutar el runner JSONL como subproceso por
+petición recargaría recursos y duplicaría responsabilidades.
+
+### Justificación
+
+FastAPI permite exponer los contratos F4.6 sin modificar el núcleo científico.
+Un solo worker evita duplicar el modelo GPU; el fallo rápido de startup permite
+que un supervisor reinicie recursos inválidos, y `RUNTIME_BUSY` acota la carga
+sin introducir una cola externa.
+
+### Alternativas consideradas
+
+- Flask: viable, pero FastAPI aporta validación y OpenAPI con menos adaptación.
+- Subproceso JSONL por petición: descartado porque perdería residencia.
+- Varios workers, Redis o Celery: descartados para este MVP por duplicación de
+  GPU y complejidad innecesaria.
+
+### Consecuencias
+
+No se duplican tokenización, ranking ni coordenadas. La inferencia síncrona se
+ejecuta en un thread y se limita a una petición activa; no se incorporan colas
+externas, base de datos, HTTP público ni funcionalidades F5.
+
+### Evidencia
+
+- `backend/atlas_api/`
+- `scripts/run_mvp1_api.sh`
+- `tests/test_api_mvp1.py`
+- `docs/MVP1_API.md`
+
+### Dependencias
+
+F4.6 y sus contratos request/response.
+
+### Pendiente
+
+MVP.2 conectará el frontend; MVP.3 definirá el despliegue conjunto. No se aprueba
+exposición pública en Internet mediante esta decisión.
 
 ## D001 — Identidad del candidato
 

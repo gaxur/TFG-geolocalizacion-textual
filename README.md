@@ -39,6 +39,10 @@ F4.6 cierra técnicamente CrossText2Loc con una interfaz Python residente para e
 futuro backend: una carga de modelo, galerías 25 m/50 m reutilizables y consultas
 Top-K individuales o multigalería. No es todavía una API HTTP ni el MVP.
 
+MVP.1 añade una API FastAPI interna con health, capabilities y retrieval real,
+manteniendo una sola instancia GPU. El frontend continúa sin integrar en este
+incremento.
+
 El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 
 ```text

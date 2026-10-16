@@ -101,6 +101,7 @@ La ruta del peso base CLIP se proporciona explícitamente:
 export CLIP_WEIGHTS_PATH=/root/.cache/clip/ViT-L-14-336px.pt
 python scripts/run_f46_retriever.py \
   --cvg-utils-sha256 <sha256> \
+  --clip-weights "$CLIP_WEIGHTS_PATH" \
   --request request.json
 ```
 

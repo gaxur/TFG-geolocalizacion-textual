@@ -96,6 +96,31 @@ class GalleryConfig:
     embedding_bundle: Path
 
 
+def load_runtime_config(
+    path: Path,
+    *,
+    project_root: Path,
+    cvg_utils_sha256: str,
+    clip_weights_path: Path,
+) -> tuple[ModelConfig, list[GalleryConfig]]:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as error:
+        raise ResourceConfigurationError("no se pudo leer la configuración runtime") from error
+    if set(raw) != {"schema_version", "contract_version", "model", "galleries"} or raw["schema_version"] != "1.0" or raw["contract_version"] != "crosstext2loc-runtime-config-v1":
+        raise ResourceConfigurationError("configuración runtime incompatible")
+    model = raw["model"]
+    if not isinstance(model, Mapping) or set(model) != {"checkpoint", "clip_weights", "cvg_text_root", "device"} or model["clip_weights"] != "${CLIP_WEIGHTS_PATH}":
+        raise ResourceConfigurationError("configuración de modelo incompatible")
+    galleries_raw = raw["galleries"]
+    expected_fields = {"catalog_manifest", "selection", "visual_bundle", "embedding_bundle"}
+    if not isinstance(galleries_raw, Mapping) or not galleries_raw or any(not isinstance(value, Mapping) or set(value) != expected_fields for value in galleries_raw.values()):
+        raise ResourceConfigurationError("configuración de galerías incompatible")
+    model_config = ModelConfig(project_root / model["checkpoint"], clip_weights_path, project_root / model["cvg_text_root"], cvg_utils_sha256, model["device"])
+    galleries = [GalleryConfig(gallery_id, project_root / value["catalog_manifest"], project_root / value["selection"], project_root / value["visual_bundle"], project_root / value["embedding_bundle"]) for gallery_id, value in galleries_raw.items()]
+    return model_config, galleries
+
+
 @dataclass(frozen=True)
 class ResidentGallery:
     gallery_id: str

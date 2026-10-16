@@ -277,6 +277,18 @@ multigalería, consulta en español, dos matrices residentes y rechazo después 
 cerrar el runtime. El informe local `results/generated/f4/f46-smoke-final.json`
 permanece fuera de Git. Estas medidas no son un SLA ni métricas de precisión.
 
+## MVP.1: smoke HTTP interno
+
+La API FastAPI se ejecutó en la imagen ARM64/CUDA con un único worker Uvicorn.
+El puerto 8000 estaba ocupado por un servicio ajeno y se utilizó temporalmente
+`127.0.0.1:18000`, sin detenerlo.
+
+El smoke de pila automatizado verificó un único proceso Uvicorn, liveness,
+readiness, capabilities, consultas Top-10 de ambas galerías, multigalería,
+repetición, paridad con F4.4, request ID y errores 422/404. La primera consulta
+multigalería tardó 149,43 ms. SIGTERM cerró el lifespan y no quedó contenedor
+residual.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado
