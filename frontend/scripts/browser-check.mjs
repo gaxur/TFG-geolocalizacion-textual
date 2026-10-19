@@ -88,13 +88,16 @@ try {
   await click('.search-button');
   await waitFor(`document.querySelectorAll('.result-card').length === 5`);
   assert.match(await evaluate(`document.querySelector('.result-card h3').textContent`), /madrid-50m-candidate-1/);
-  assert.match(await evaluate(`document.querySelector('.results-footnote').textContent`), /no representa una probabilidad/);
+  assert.match(await evaluate(`document.querySelector('.results-footnote').textContent`), /no (?:representa|es) una probabilidad/);
   assert.equal(await evaluate(`document.querySelectorAll('.leaflet-container').length`), 1);
   assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker').length`), 5);
+  assert.equal(await evaluate(`document.querySelectorAll('.candidate-cell').length`), 5);
+  assert.match(await evaluate(`document.querySelector('.cell-legend').textContent`), /50 × 50 m/);
   assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker.top-result').length`), 1);
   await click('[data-select="madrid-50m:madrid-50m-candidate-2"]');
   assert.equal(await evaluate(`document.querySelectorAll('.leaflet-container').length`), 1, 'Leaflet sin contenedores duplicados');
   assert.equal(await evaluate(`document.querySelector('[data-select="madrid-50m:madrid-50m-candidate-2"]').getAttribute('aria-pressed')`), 'true');
+  assert.equal(await evaluate(`document.querySelectorAll('.candidate-cell.selected').length`), 1);
   await click('.candidate-marker-shell:nth-of-type(3) .candidate-marker');
   assert.equal(await evaluate(`document.querySelector('[data-select="madrid-50m:madrid-50m-candidate-3"]').getAttribute('aria-pressed')`), 'true');
   assert.equal(apiRequests.length, 1);
@@ -108,6 +111,7 @@ try {
   await click('[data-select-id="top-k"][data-select-value="3"]');
   assert.match(await evaluate(`document.querySelector('#gallery-value').textContent`), /25 m/);
   assert.match(await evaluate(`document.querySelector('#top-k-value').textContent`), /Top-3/);
+  assert.match(await evaluate(`document.querySelector('.cell-legend').textContent`), /25 × 25 m/);
   await fill('trigger-busy');
   await click('.search-button');
   await waitFor(`document.querySelector('.service-state.error')?.textContent.includes('ocupado')`);

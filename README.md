@@ -97,6 +97,21 @@ La configuración, acceso LAN opcional, healthchecks, pruebas y diagnóstico se
 documentan en [MVP.md](docs/MVP.md), junto con la API, el frontend, la validación
 y las limitaciones del MVP funcional.
 
+El cuadro de métricas está en
+[MVP.md](docs/MVP.md#estado-de-evaluación-y-métricas). Recall@K y error
+geográfico de Madrid figuran como no disponibles porque todavía no existen
+referencias evaluables validadas; no se presentan los tests técnicos como
+precisión del modelo.
+
+Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
+
+```bash
+python scripts/check_mvp_bilingual.py --base-url http://127.0.0.1:8080
+```
+
+La interpretación y las consultas manuales se documentan en
+[PRUEBAS_BILINGUES_MVP.md](docs/PRUEBAS_BILINGUES_MVP.md).
+
 El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 
 ```text

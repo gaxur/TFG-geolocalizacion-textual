@@ -84,6 +84,12 @@ la navegación del mapa y se muestra en rojo. El Top-1 se diferencia visualmente
 pero no confirma la ubicación. Si las teselas fallan, candidatos y fondo neutro
 siguen disponibles.
 
+Cada candidato se representa además mediante un rectángulo semitransparente
+centrado en su coordenada: `25 × 25 m` para `madrid-25m` y `50 × 50 m` para
+`madrid-50m`. El área seleccionada se resalta junto con su marcador. Es una
+aproximación WGS84 de la celda métrica del catálogo y no una estimación precisa
+de la huella del observador.
+
 El servidor Vite (`npm --prefix frontend run dev`) se conserva únicamente para
 desarrollo. La aplicación desplegada no usa Vite dev server ni datos ficticios.
 
@@ -430,6 +436,135 @@ La segunda recorre navegador, Nginx, FastAPI, CrossText2Loc y GPU reales.
 npm --prefix frontend test
 npm --prefix frontend run build
 ```
+
+### Check bilingüe inglés-español
+
+Con el stack levantado:
+
+```bash
+python scripts/check_mvp_bilingual.py \
+  --base-url http://127.0.0.1:8080 \
+  --output results/generated/mvp3/bilingual-check.json
+```
+
+El check usa los tres pares de traducción controlados de F4.5 y consulta ambas
+galerías a través de Nginx y FastAPI. Reporta estabilidad del Top-K, no precisión
+geográfica. Las descripciones y el procedimiento de revisión visual están en
+[PRUEBAS_BILINGUES_MVP.md](PRUEBAS_BILINGUES_MVP.md).
+
+La ejecución validada completó 12 peticiones y seis comparaciones. Ninguna
+traducción conservó Top-1; este dato describe sensibilidad lingüística sin
+ground truth y no permite comparar la precisión de inglés y español.
+
+## Estado de evaluación y métricas
+
+### Resumen ejecutivo
+
+| Dimensión | Métrica | Estado o valor actual | Interpretación |
+|---|---|---|---|
+| Precisión Madrid | Recall@1, Recall@5, Recall@10 | **No disponible** | No hay referencias evaluables con ground truth validado |
+| Precisión Madrid | GeoRecall a 25/50/100/500 m | **No disponible** | No puede calcularse distancia al lugar real |
+| Precisión Madrid | Error Top-1 medio/mediano/P90/P95 | **No disponible** | Falta una posición real independiente por consulta |
+| Cobertura de búsqueda | Galería 50 m | 253 candidatos | Catálogo completo disponible para el MVP |
+| Cobertura de búsqueda | Galería 25 m | 1.115 candidatos | Catálogo completo disponible para el MVP |
+| Determinismo técnico | Repetición de una consulta de smoke | IDs, orden, scores y coordenadas idénticos | Confirma reproducibilidad de esa consulta, no precisión |
+| Integración | Casos reales del smoke | Top-5 de 50 m y Top-3 de 25 m completados | Confirma navegador/proxy/API/GPU/mapa |
+| Robustez bilingüe | Top-1 igual inglés-español | 0/6 comparaciones | Sensibilidad lingüística alta en las sondas controladas |
+| Robustez bilingüe | Candidatos compartidos Top-10 | Media 0,5 de 10 | Solapamiento muy bajo entre traducciones |
+| Robustez bilingüe | Jaccard@10 medio | 0,027 | Estabilidad de conjunto baja; no es accuracy |
+| Robustez bilingüe | Distancia entre Top-1 | Media 261,1 m; mediana 135,9 m | Distancia entre salidas, no error geográfico |
+| Calidad software | Suite Python | 294 tests PASS | Regresión técnica |
+| Calidad software | API / frontend | 7 tests API y 8 tests Node PASS | Contratos y comportamiento técnico |
+| Despliegue | Browser-check y Compose | PASS | MVP técnicamente operativo en PGX ARM64/GB10 |
+
+El estado actual puede resumirse como **MVP técnicamente completo, modelo aún no
+evaluado geográficamente en Madrid**. No debe sustituirse «no disponible» por
+`0 %`: cero indicaría que se evaluaron consultas y todas fallaron, lo cual no ha
+ocurrido.
+
+### Por qué no se publica Recall de Madrid
+
+El borrador actual contiene tres sondas técnicas de desarrollo, pero:
+
+- no proceden de observaciones humanas independientes *in situ*;
+- sus coordenadas de referencia están pendientes;
+- `ground_truth_candidate_id` no está validado;
+- la partición final de evaluación no está congelada;
+- las consultas manuales de `PRUEBAS_BILINGUES_MVP.md` se redactaron conociendo
+  el lugar y sirven para inspección, no para una prueba reservada.
+
+Por tanto:
+
+```text
+referencias validadas: 0
+referencias evaluables: 0
+metrics_available: false
+```
+
+Las métricas previstas son:
+
+```text
+Recall@K = consultas cuyo ground_truth_candidate_id aparece en Top-K
+           / número de referencias evaluables
+```
+
+```text
+GeoRecall@K,d = consultas con algún candidato Top-K a distancia <= d
+                / número de referencias geográficamente evaluables
+```
+
+Además se calcularán error Haversine Top-1, distancia mínima dentro de Top-K,
+media, mediana y, con al menos 20 observaciones, P90 y P95. Recall exacto y
+GeoRecall deben presentarse por separado porque una celda vecina puede fallar el
+primero y estar cerca según el segundo.
+
+### Métricas que no son Recall
+
+Los siguientes valores son útiles para diagnosticar el MVP, pero no miden si ha
+localizado correctamente al usuario:
+
+- similitud coseno y su representación multiplicada por 100;
+- margen entre Top-1 y Top-2;
+- coincidencia de rankings repetidos;
+- Jaccard o candidatos compartidos entre español e inglés;
+- distancia entre dos Top-1 producidos por variantes de texto;
+- número de candidatos o tamaño de celda;
+- porcentaje de tests de software superados.
+
+En particular, un score `0,29` o `29/100` no significa 29 % de probabilidad de
+acierto. Una traducción estable también puede mantener un candidato incorrecto.
+
+### Referencia externa: reproducción oficial en Nueva York
+
+La reproducción oficial NewYork-mixed OSM sí dispone de métricas publicadas:
+
+| Protocolo | R@1 | R@5 | R@10 | Desviación media |
+|---|---:|---:|---:|---:|
+| Nueva York oficial, 1.200 consultas | 59,08 % | 82,75 % | 90,00 % | 0,18 km |
+
+Estas cifras **no son resultados del MVP en Madrid**. El evaluador oficial usa la
+coordenada real para seleccionar los 100 vecinos más cercanos antes del ranking,
+mientras que el MVP busca exhaustivamente en una galería de Madrid sin utilizar
+ground truth. Los protocolos no son directamente comparables. Detalles:
+[CROSSTEXT2LOC.md](CROSSTEXT2LOC.md#resultado-de-la-reproducción-oficial).
+
+### Trabajo necesario para obtener métricas de Madrid
+
+1. Recoger descripciones humanas desde posiciones conocidas sin mostrar mapa,
+   candidatos ni rankings a los participantes.
+2. Capturar coordenada, precisión, método e instante de referencia.
+3. Validar si cada punto está dentro de la bbox y si admite asignación inequívoca
+   a las galerías de 25 m y 50 m.
+4. Separar localizaciones y grupos derivados entre desarrollo y evaluación.
+5. Congelar dataset, checkpoint, galerías, código y rankings antes de abrir las
+   referencias reservadas.
+6. Ejecutar el evaluador independiente descrito en
+   [PHASE4_EVALUATION.md](PHASE4_EVALUATION.md).
+7. Publicar conteos y casos sin ranking junto con Recall, GeoRecall y errores,
+   sin seleccionar consultas después de observar resultados.
+
+Hasta completar esos pasos, el criterio de éxito del proyecto es técnico y de
+reproducibilidad, no un umbral de Recall.
 
 ## Validación realizada en la PGX
 

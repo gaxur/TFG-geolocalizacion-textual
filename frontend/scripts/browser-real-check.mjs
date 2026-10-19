@@ -37,6 +37,8 @@ try {
     await click('.search-button');
     await waitFor(`document.querySelectorAll('.result-card').length === ${topK}`);
     assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker').length`), topK);
+    assert.equal(await evaluate(`document.querySelectorAll('.candidate-cell').length`), topK);
+    assert.match(await evaluate(`document.querySelector('.cell-legend').textContent`), new RegExp(`${gallery.includes('25m') ? '25' : '50'} × ${gallery.includes('25m') ? '25' : '50'} m`));
     assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker.top-result').length`), 1);
     assert.equal(await evaluate(`[...document.querySelectorAll('.coordinate-compact')].every(x => /^-?\\d+\\.\\d+, -?\\d+\\.\\d+$/.test(x.textContent.trim()))`), true);
     return evaluate(`[...document.querySelectorAll('.result-card')].map(card => ({id:card.querySelector('h3').textContent,score:card.querySelector('.score-row strong').childNodes[0].textContent.trim()}))`);

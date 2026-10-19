@@ -334,6 +334,14 @@ dispone de una posición real validada. El informe local se conserva en
 `results/generated/mvp3/stack-smoke.json`, fuera de Git. La operación completa
 se documenta en [MVP.md](MVP.md).
 
+El check HTTP bilingüe posterior reutilizó los tres pares inglés-español de
+F4.5 sobre ambas galerías. Las 12 peticiones finalizaron y ninguna de las seis
+comparaciones conservó Top-1. El solapamiento Top-10 fue 0 en cuatro casos, 1 en
+parque/50 m y 2 en intersección/50 m. El informe local
+`results/generated/mvp3/bilingual-check.json` registra estabilidad de salida,
+no accuracy ni superioridad de un idioma. Procedimiento e interpretación:
+[PRUEBAS_BILINGUES_MVP.md](PRUEBAS_BILINGUES_MVP.md).
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado
