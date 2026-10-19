@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f5_textual_variant_dataset.schema.json",
+  "title": "F5.1 Madrid textual variants sidecar",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "dataset_id", "dataset_version", "source_query_dataset", "protocol", "comparison_protocol", "observations"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "f5-textual-variant-dataset-v1"},
+    "dataset_id": {"type": "string", "pattern": "^f5-madrid-textual-variants-sha256-[0-9a-f]{64}$"},
+    "dataset_version": {"type": "string", "minLength": 1},
+    "source_query_dataset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dataset_id", "sha256"],
+      "properties": {
+        "dataset_id": {"type": "string", "pattern": "^f4-madrid-queries-sha256-[0-9a-f]{64}$"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "protocol": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "variant_kinds", "ground_truth_source", "orientation_policy", "toponym_policy", "osm_preselection_status", "ranking_policy"],
+      "properties": {
+        "version": {"const": "f5-madrid-textual-variants-v1"},
+        "variant_kinds": {"const": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"]},
+        "ground_truth_source": {"const": "f4_query_dataset_reference_only"},
+        "orientation_policy": {"const": "optional_explicit_only_no_egocentric_to_cardinal_inference"},
+        "toponym_policy": {"const": "manual_annotation_no_osm_lookup"},
+        "osm_preselection_status": {"const": "standby_pending_tutor_decision"},
+        "ranking_policy": {"const": "independent_exhaustive_rankings_no_fusion"}
+      }
+    },
+    "comparison_protocol": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pairing", "fixed_factors", "precision_metrics", "stability_metrics", "spatial_dispersion", "cross_gallery_policy", "fusion_enabled"],
+      "properties": {
+        "pairing": {"const": "paired_by_source_query_id"},
+        "fixed_factors": {"const": ["checkpoint", "encoder", "gallery", "visual_embeddings", "ranking_method", "tie_break", "top_k", "ground_truth"]},
+        "precision_metrics": {"const": ["recall_at_1", "recall_at_5", "recall_at_10", "top1_haversine_m", "minimum_haversine_at_k_m", "geo_recall_at_k"]},
+        "stability_metrics": {"const": ["top1_agreement", "top_k_overlap", "jaccard_at_k", "top1_output_distance_m", "shared_candidate_rank_shift", "top1_margin"]},
+        "spatial_dispersion": {"const": "mean_haversine_distance_to_top_k_medoid_m"},
+        "cross_gallery_policy": {"const": "spatial_distance_only_no_candidate_id_equality"},
+        "fusion_enabled": {"const": false}
+      }
+    },
+    "observations": {"type": "array", "items": {"$ref": "#/$defs/observation"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "nullableNonEmpty": {"type": ["string", "null"], "minLength": 1},
+    "observation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_query_id", "source_input_sha256", "partition", "location_id", "derivation_group_id", "toponyms", "orientation", "variants", "notes"],
+      "properties": {
+        "source_query_id": {"type": "string", "minLength": 1},
+        "source_input_sha256": {"$ref": "#/$defs/sha256"},
+        "partition": {"enum": ["development", "evaluation"]},
+        "location_id": {"$ref": "#/$defs/nullableNonEmpty"},
+        "derivation_group_id": {"type": "string", "minLength": 1},
+        "toponyms": {"type": "array", "items": {"$ref": "#/$defs/toponym"}},
+        "orientation": {"$ref": "#/$defs/orientation"},
+        "variants": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"$ref": "#/$defs/variant"}},
+        "notes": {"type": ["string", "null"]}
+      }
+    },
+    "toponym": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mention", "span", "entity_type", "name_kind", "aliases", "annotation_provenance", "review_status"],
+      "properties": {
+        "mention": {"type": "string", "minLength": 1},
+        "span": {"type": "object", "additionalProperties": false, "required": ["start", "end"], "properties": {"start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 1}}},
+        "entity_type": {"enum": ["square", "street", "avenue", "station", "building", "poi", "neighbourhood", "district", "other"]},
+        "name_kind": {"enum": ["proper_name", "generic_expression"]},
+        "aliases": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "annotation_provenance": {"enum": ["manual", "model_assisted", "imported"]},
+        "review_status": {"enum": ["pending", "reviewed", "rejected"]}
+      }
+    },
+    "orientation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "cardinal", "bearing_degrees", "bearing_convention", "method", "uncertainty_degrees", "provenance", "verification_status", "relative_relations_present", "notes"],
+      "properties": {
+        "status": {"enum": ["absent", "reported", "verified"]},
+        "cardinal": {"enum": ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest", null]},
+        "bearing_degrees": {"type": ["number", "null"], "minimum": 0, "exclusiveMaximum": 360},
+        "bearing_convention": {"enum": ["degrees_clockwise_from_true_north", null]},
+        "method": {"$ref": "#/$defs/nullableNonEmpty"},
+        "uncertainty_degrees": {"type": ["number", "null"], "minimum": 0, "maximum": 180},
+        "provenance": {"$ref": "#/$defs/nullableNonEmpty"},
+        "verification_status": {"enum": ["not_applicable", "pending", "verified", "rejected"]},
+        "relative_relations_present": {"type": "boolean"},
+        "notes": {"type": ["string", "null"]}
+      }
+    },
+    "variant": {
+      "type": "object", "additionalProperties": false,
+      "required": ["variant_id", "kind", "status", "text", "language", "generation", "review_status", "transformations", "preserved_elements", "removed_elements", "modified_elements", "protected_toponyms"],
+      "properties": {
+        "variant_id": {"$ref": "#/$defs/nullableNonEmpty"},
+        "kind": {"enum": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"]},
+        "status": {"enum": ["pending", "generated", "reviewed", "rejected"]},
+        "text": {"$ref": "#/$defs/nullableNonEmpty"},
+        "language": {"enum": ["es", "en"]},
+        "generation": {
+          "type": "object", "additionalProperties": false,
+          "required": ["method", "tool_or_model", "version", "configuration_or_prompt", "transformation_time_ms"],
+          "properties": {
+            "method": {"enum": ["pending", "original", "manual_cartographic_rewrite", "manual_translation", "automatic_translation", "model_assisted_translation"]},
+            "tool_or_model": {"$ref": "#/$defs/nullableNonEmpty"},
+            "version": {"$ref": "#/$defs/nullableNonEmpty"},
+            "configuration_or_prompt": {"$ref": "#/$defs/nullableNonEmpty"},
+            "transformation_time_ms": {"type": ["number", "null"], "minimum": 0}
+          }
+        },
+        "review_status": {"enum": ["pending", "reviewed", "rejected"]},
+        "transformations": {"type": "array", "uniqueItems": true, "items": {"enum": ["preserve_original", "cartographic_filter", "translation", "toponym_protection"]}},
+        "preserved_elements": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "removed_elements": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "modified_elements": {"type": "array", "uniqueItems": true, "items": {"type": "object", "additionalProperties": false, "required": ["from", "to", "reason"], "properties": {"from": {"type": "string", "minLength": 1}, "to": {"type": "string", "minLength": 1}, "reason": {"type": "string", "minLength": 1}}}},
+        "protected_toponyms": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    }
+  }
+}

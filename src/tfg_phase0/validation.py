@@ -1153,6 +1153,143 @@ def _validate_f4_linguistic_robustness_result(document: Mapping[str, Any]) -> No
         raise SchemaValidationError("robustness_result_id no corresponde al contenido")
 
 
+def _validate_f5_textual_variant_dataset(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "dataset_id", "dataset_version", "source_query_dataset", "protocol", "comparison_protocol", "observations"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f5-textual-variant-dataset-v1":
+        raise SchemaValidationError("f5_textual_variant_dataset incompatible")
+    if not isinstance(document["dataset_id"], str) or not re.fullmatch(r"f5-madrid-textual-variants-sha256-[0-9a-f]{64}", document["dataset_id"]):
+        raise SchemaValidationError("dataset_id F5.1 no válido")
+    _non_empty_string(document["dataset_version"], "f5.dataset_version")
+    source = document["source_query_dataset"]
+    if not isinstance(source, Mapping) or set(source) != {"dataset_id", "sha256"} or not re.fullmatch(r"f4-madrid-queries-sha256-[0-9a-f]{64}", source["dataset_id"]):
+        raise SchemaValidationError("referencia F5.1 a F4.3 no válida")
+    _sha256(source["sha256"], "f5.source_query_dataset.sha256")
+    protocol = document["protocol"]
+    expected_protocol = {
+        "version": "f5-madrid-textual-variants-v1",
+        "variant_kinds": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"],
+        "ground_truth_source": "f4_query_dataset_reference_only",
+        "orientation_policy": "optional_explicit_only_no_egocentric_to_cardinal_inference",
+        "toponym_policy": "manual_annotation_no_osm_lookup",
+        "osm_preselection_status": "standby_pending_tutor_decision",
+        "ranking_policy": "independent_exhaustive_rankings_no_fusion",
+    }
+    if protocol != expected_protocol:
+        raise SchemaValidationError("protocolo F5.1 no válido")
+    comparison = document["comparison_protocol"]
+    expected_comparison = {
+        "pairing": "paired_by_source_query_id",
+        "fixed_factors": ["checkpoint", "encoder", "gallery", "visual_embeddings", "ranking_method", "tie_break", "top_k", "ground_truth"],
+        "precision_metrics": ["recall_at_1", "recall_at_5", "recall_at_10", "top1_haversine_m", "minimum_haversine_at_k_m", "geo_recall_at_k"],
+        "stability_metrics": ["top1_agreement", "top_k_overlap", "jaccard_at_k", "top1_output_distance_m", "shared_candidate_rank_shift", "top1_margin"],
+        "spatial_dispersion": "mean_haversine_distance_to_top_k_medoid_m",
+        "cross_gallery_policy": "spatial_distance_only_no_candidate_id_equality",
+        "fusion_enabled": False,
+    }
+    if comparison != expected_comparison:
+        raise SchemaValidationError("protocolo comparativo F5.1 no válido")
+    observations = document["observations"]
+    if not isinstance(observations, list):
+        raise SchemaValidationError("observations F5.1 debe ser lista")
+    for index, observation in enumerate(observations):
+        _validate_f5_observation(observation, f"observations[{index}]")
+
+
+def _validate_f5_observation(observation: Any, label: str) -> None:
+    fields = {"source_query_id", "source_input_sha256", "partition", "location_id", "derivation_group_id", "toponyms", "orientation", "variants", "notes"}
+    if not isinstance(observation, Mapping) or set(observation) != fields:
+        raise SchemaValidationError(f"{label} incompatible")
+    _non_empty_string(observation["source_query_id"], f"{label}.source_query_id")
+    _sha256(observation["source_input_sha256"], f"{label}.source_input_sha256")
+    if observation["partition"] not in {"development", "evaluation"}:
+        raise SchemaValidationError(f"{label}.partition no válida")
+    if observation["location_id"] is not None:
+        _non_empty_string(observation["location_id"], f"{label}.location_id")
+    _non_empty_string(observation["derivation_group_id"], f"{label}.derivation_group_id")
+    if not isinstance(observation["toponyms"], list) or not isinstance(observation["variants"], list) or len(observation["variants"]) != 4:
+        raise SchemaValidationError(f"{label} requiere topónimos y cuatro variantes")
+    if observation["notes"] is not None:
+        _non_empty_string(observation["notes"], f"{label}.notes")
+    for index, toponym in enumerate(observation["toponyms"]):
+        _validate_f5_toponym(toponym, f"{label}.toponyms[{index}]")
+    _validate_f5_orientation(observation["orientation"], f"{label}.orientation")
+    for index, variant in enumerate(observation["variants"]):
+        _validate_f5_variant(variant, f"{label}.variants[{index}]")
+
+
+def _validate_f5_toponym(toponym: Any, label: str) -> None:
+    fields = {"mention", "span", "entity_type", "name_kind", "aliases", "annotation_provenance", "review_status"}
+    if not isinstance(toponym, Mapping) or set(toponym) != fields:
+        raise SchemaValidationError(f"{label} incompatible")
+    _non_empty_string(toponym["mention"], f"{label}.mention")
+    span = toponym["span"]
+    if not isinstance(span, Mapping) or set(span) != {"start", "end"}:
+        raise SchemaValidationError(f"{label}.span no válido")
+    _non_negative_integer(span["start"], f"{label}.span.start")
+    _positive_id(span["end"], f"{label}.span.end")
+    if toponym["entity_type"] not in {"square", "street", "avenue", "station", "building", "poi", "neighbourhood", "district", "other"} or toponym["name_kind"] not in {"proper_name", "generic_expression"}:
+        raise SchemaValidationError(f"{label} contiene tipo no válido")
+    if not isinstance(toponym["aliases"], list) or any(not isinstance(value, str) or not value for value in toponym["aliases"]):
+        raise SchemaValidationError(f"{label}.aliases no válido")
+    if toponym["annotation_provenance"] not in {"manual", "model_assisted", "imported"} or toponym["review_status"] not in {"pending", "reviewed", "rejected"}:
+        raise SchemaValidationError(f"{label} contiene procedencia o revisión no válida")
+
+
+def _validate_f5_orientation(orientation: Any, label: str) -> None:
+    fields = {"status", "cardinal", "bearing_degrees", "bearing_convention", "method", "uncertainty_degrees", "provenance", "verification_status", "relative_relations_present", "notes"}
+    if not isinstance(orientation, Mapping) or set(orientation) != fields:
+        raise SchemaValidationError(f"{label} incompatible")
+    if orientation["status"] not in {"absent", "reported", "verified"} or orientation["cardinal"] not in {None, "north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"}:
+        raise SchemaValidationError(f"{label} contiene estado o cardinal no válido")
+    if orientation["bearing_degrees"] is not None:
+        _finite_number(orientation["bearing_degrees"], f"{label}.bearing_degrees", minimum=0)
+        if orientation["bearing_degrees"] >= 360:
+            raise SchemaValidationError(f"{label}.bearing_degrees fuera de rango")
+    if orientation["bearing_convention"] not in {None, "degrees_clockwise_from_true_north"} or orientation["verification_status"] not in {"not_applicable", "pending", "verified", "rejected"} or not isinstance(orientation["relative_relations_present"], bool):
+        raise SchemaValidationError(f"{label} contiene convención o verificación no válida")
+    for field in ("method", "provenance", "notes"):
+        if orientation[field] is not None:
+            _non_empty_string(orientation[field], f"{label}.{field}")
+    if orientation["uncertainty_degrees"] is not None:
+        _finite_number(orientation["uncertainty_degrees"], f"{label}.uncertainty_degrees", minimum=0)
+        if orientation["uncertainty_degrees"] > 180:
+            raise SchemaValidationError(f"{label}.uncertainty_degrees fuera de rango")
+
+
+def _validate_f5_variant(variant: Any, label: str) -> None:
+    fields = {"variant_id", "kind", "status", "text", "language", "generation", "review_status", "transformations", "preserved_elements", "removed_elements", "modified_elements", "protected_toponyms"}
+    if not isinstance(variant, Mapping) or set(variant) != fields:
+        raise SchemaValidationError(f"{label} incompatible")
+    if variant["variant_id"] is not None:
+        _non_empty_string(variant["variant_id"], f"{label}.variant_id")
+    if variant["kind"] not in {"es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"} or variant["status"] not in {"pending", "generated", "reviewed", "rejected"} or variant["language"] not in {"es", "en"} or variant["review_status"] not in {"pending", "reviewed", "rejected"}:
+        raise SchemaValidationError(f"{label} contiene kind, status, idioma o revisión no válidos")
+    if variant["text"] is not None:
+        _non_empty_string(variant["text"], f"{label}.text")
+    generation = variant["generation"]
+    generation_fields = {"method", "tool_or_model", "version", "configuration_or_prompt", "transformation_time_ms"}
+    methods = {"pending", "original", "manual_cartographic_rewrite", "manual_translation", "automatic_translation", "model_assisted_translation"}
+    if not isinstance(generation, Mapping) or set(generation) != generation_fields or generation["method"] not in methods:
+        raise SchemaValidationError(f"{label}.generation no válida")
+    for field in ("tool_or_model", "version", "configuration_or_prompt"):
+        if generation[field] is not None:
+            _non_empty_string(generation[field], f"{label}.generation.{field}")
+    if generation["transformation_time_ms"] is not None:
+        _finite_number(generation["transformation_time_ms"], f"{label}.generation.transformation_time_ms", minimum=0)
+    if not isinstance(variant["transformations"], list) or any(value not in {"preserve_original", "cartographic_filter", "translation", "toponym_protection"} for value in variant["transformations"]):
+        raise SchemaValidationError(f"{label}.transformations no válida")
+    for field in ("preserved_elements", "removed_elements", "protected_toponyms"):
+        if not isinstance(variant[field], list) or any(not isinstance(value, str) or not value for value in variant[field]):
+            raise SchemaValidationError(f"{label}.{field} no válido")
+    if not isinstance(variant["modified_elements"], list):
+        raise SchemaValidationError(f"{label}.modified_elements no válido")
+    for change in variant["modified_elements"]:
+        if not isinstance(change, Mapping) or set(change) != {"from", "to", "reason"}:
+            raise SchemaValidationError(f"{label}.modified_elements contiene cambio no válido")
+        for field in ("from", "to", "reason"):
+            _non_empty_string(change[field], f"{label}.modified_elements.{field}")
+
+
 def _validate_crosstext2loc_retrieval_request(document: Mapping[str, Any]) -> None:
     fields = {"schema_version", "contract_version", "query", "gallery_ids", "top_k"}
     if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "crosstext2loc-retrieval-request-v1":
@@ -1663,6 +1800,7 @@ def validate_document(document: Any, schema_name: str) -> None:
         "f4_gallery_comparison": _validate_f4_gallery_comparison,
         "f4_linguistic_query_set": _validate_f4_linguistic_query_set,
         "f4_linguistic_robustness_result": _validate_f4_linguistic_robustness_result,
+        "f5_textual_variant_dataset": _validate_f5_textual_variant_dataset,
         "crosstext2loc_retrieval_request": _validate_crosstext2loc_retrieval_request,
         "crosstext2loc_retrieval_response": _validate_crosstext2loc_retrieval_response,
         "manifest": _validate_manifest,

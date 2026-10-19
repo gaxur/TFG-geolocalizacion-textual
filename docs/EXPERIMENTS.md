@@ -342,6 +342,37 @@ parque/50 m y 2 en intersección/50 m. El informe local
 no accuracy ni superioridad de un idioma. Procedimiento e interpretación:
 [PRUEBAS_BILINGUES_MVP.md](PRUEBAS_BILINGUES_MVP.md).
 
+## F5.1: contrato y plantilla de variantes textuales
+
+F5.1 añadió un sidecar content-addressed ligado al dataset F4.3 para registrar
+topónimos, orientación opcional y cuatro variantes textuales. La ejecución de
+validación utilizó:
+
+```bash
+.venv-geo/bin/python scripts/validate_f5_textual_variants.py \
+  --dataset config/madrid_f51_textual_variants_template.json \
+  --source-query-dataset config/madrid_f43_query_dataset_draft.json
+```
+
+Resultado observado de la plantilla:
+
+```text
+observaciones F5.1: 0
+ground truths validados: 0
+comparaciones emparejadas listas: 0
+precision_metrics_available: false
+osm_preselection_status: standby_pending_tutor_decision
+```
+
+Esto valida contrato, identidad, referencia F4.3 y herramientas; no constituye
+un dataset recogido, no ejecuta CrossText2Loc y no aporta métricas. No se
+generaron traducciones ni descripciones cartográficas artificiales.
+
+La suite específica F5.1 completó 14 tests y la regresión Python completa 308
+tests. También pasaron el JSON Schema Draft 2020-12, el CLI de plantilla, los 8
+tests Node y la build Vite. Checkpoint y manifests de embeddings conservaron sus
+hashes. El MVP alcanzó readiness sin cambios de API, runtime o Compose.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

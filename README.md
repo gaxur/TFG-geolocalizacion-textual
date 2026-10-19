@@ -103,6 +103,10 @@ geográfico de Madrid figuran como no disponibles porque todavía no existen
 referencias evaluables validadas; no se presentan los tests técnicos como
 precisión del modelo.
 
+F5.1 prepara la recogida de observaciones, topónimos, orientación y variantes
+textuales sin ejecutar traducción ni modificar el MVP. Contrato, plantilla y
+procedimiento: [PHASE5_TEXTUAL_VARIANTS.md](docs/PHASE5_TEXTUAL_VARIANTS.md).
+
 Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
 
 ```bash

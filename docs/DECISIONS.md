@@ -73,6 +73,8 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D055 | Retirar definitivamente la interfaz sintética del frontend | ACEPTADA | MVP / frontend |
 | D056 | Desplegar el MVP integrado con Nginx, proxy interno y una única API GPU | ACEPTADA | MVP / despliegue |
 | D057 | Publicar por defecto el frontend MVP en la LAN de confianza | ACEPTADA | MVP / despliegue |
+| D058 | Extender F4.3 mediante un sidecar F5.1 para variantes textuales | ACEPTADA | F5 / dataset textual |
+| D059 | Mantener la preselección y el reranking OSM en stand-by | ACEPTADA | F5 / alcance |
 
 ## D053 — API HTTP interna del MVP
 
@@ -243,6 +245,56 @@ operador debe usar una red de confianza y revisar firewall y aislamiento de
 clientes. No se habilitan reglas de firewall, TLS ni exposición a Internet.
 D057 sustituye únicamente el binding predeterminado de D056; conserva el resto
 de su arquitectura y restricciones.
+
+## D058 — Sidecar F5.1 compatible con F4.3
+
+**Estado:** ACEPTADA
+**Componente:** F5 / dataset textual
+**Fecha:** 2026-10-19
+**Origen:** Alcance F5.1 solicitado expresamente por el responsable del TFG.
+
+### Decisión
+
+Topónimos, orientación y variantes textuales se almacenan en un artefacto
+content-addressed `f5-textual-variant-dataset-v1` que referencia un dataset F4.3
+por `dataset_id`, SHA-256 y `query_id`. F4.3 conserva en exclusiva descripción
+original, procedencia, partición y ground truth.
+
+Cada observación F5.1 declara cuatro slots: `es_original`, `es_cartographic`,
+`en_conventional` y `en_toponym_preserved`. Los derivados pueden permanecer
+pendientes y no se tratan como observaciones independientes.
+
+### Justificación
+
+`f4-query-dataset-v1` tiene campos cerrados e identidad content-addressed.
+Añadirle campos rompería los artefactos F4.3 existentes. El sidecar permite
+validación cruzada y evolución versionada sin duplicar la infraestructura de
+evaluación ni el ground truth.
+
+### Consecuencias
+
+Todas las variantes heredan ubicación, grupo y partición. La orientación es
+opcional y solo puede convertirse a cardinal cuando se registra explícitamente.
+F5.1 valida y resume completitud, pero no genera textos ni ejecuta inferencia.
+
+## D059 — Preselección OSM en stand-by
+
+**Estado:** ACEPTADA
+**Componente:** F5 / alcance
+**Fecha:** 2026-10-19
+**Origen:** Decisión expresa del responsable pendiente de conversación con el tutor.
+
+### Decisión
+
+F5.1 no implementa filtros, reducción de galerías, etiquetas OSM para priorizar,
+reranking, combinación de scores, fusión de coordenadas ni selección automática
+entre 25 m y 50 m. El ranking exhaustivo CrossText2Loc permanece intacto.
+
+### Consecuencias
+
+El contrato fija `osm_preselection_status: standby_pending_tutor_decision` y
+`fusion_enabled: false`. F3 podrá servir en el futuro para análisis alrededor de
+candidatos únicamente tras una nueva decisión metodológica.
 
 ## D001 — Identidad del candidato
 
