@@ -1268,7 +1268,7 @@ def _validate_f5_variant(variant: Any, label: str) -> None:
         _non_empty_string(variant["text"], f"{label}.text")
     generation = variant["generation"]
     generation_fields = {"method", "tool_or_model", "version", "configuration_or_prompt", "transformation_time_ms"}
-    methods = {"pending", "original", "manual_cartographic_rewrite", "manual_translation", "automatic_translation", "model_assisted_translation"}
+    methods = {"pending", "original", "manual_cartographic_rewrite", "model_assisted_cartographic_rewrite", "manual_translation", "automatic_translation", "model_assisted_translation"}
     if not isinstance(generation, Mapping) or set(generation) != generation_fields or generation["method"] not in methods:
         raise SchemaValidationError(f"{label}.generation no válida")
     for field in ("tool_or_model", "version", "configuration_or_prompt"):
@@ -1288,6 +1288,145 @@ def _validate_f5_variant(variant: Any, label: str) -> None:
             raise SchemaValidationError(f"{label}.modified_elements contiene cambio no válido")
         for field in ("from", "to", "reason"):
             _non_empty_string(change[field], f"{label}.modified_elements.{field}")
+
+
+def _validate_f5_transformation_run(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "run_id", "source_sidecar", "derived_sidecar", "transformer", "generation", "environment", "records", "limitations"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f5-transformation-run-v1":
+        raise SchemaValidationError("f5_transformation_run incompatible")
+    if not isinstance(document["run_id"], str) or not re.fullmatch(r"f5-transformation-run-sha256-[0-9a-f]{64}", document["run_id"]):
+        raise SchemaValidationError("run_id F5.2 no válido")
+    for label in ("source_sidecar", "derived_sidecar"):
+        artifact = document[label]
+        if not isinstance(artifact, Mapping) or set(artifact) != {"logical_path", "dataset_id", "sha256"}:
+            raise SchemaValidationError(f"{label} F5.2 no válido")
+        _logical_path(artifact["logical_path"], label + ".logical_path")
+        _non_empty_string(artifact["dataset_id"], label + ".dataset_id")
+        _sha256(artifact["sha256"], label + ".sha256")
+    transformer = document["transformer"]
+    transformer_fields = {"adapter", "model_id", "revision", "tokenizer_id", "tokenizer_revision", "artifact_manifest_sha256", "real_model_inference"}
+    if not isinstance(transformer, Mapping) or set(transformer) != transformer_fields or not isinstance(transformer["real_model_inference"], bool):
+        raise SchemaValidationError("transformer F5.2 no válido")
+    for field in transformer_fields - {"real_model_inference"}:
+        if field == "artifact_manifest_sha256": _sha256(transformer[field], "transformer.artifact_manifest_sha256")
+        else: _non_empty_string(transformer[field], f"transformer.{field}")
+    generation = document["generation"]
+    expected_generation_fields = {"prompt_version", "do_sample", "temperature", "seed", "max_new_tokens", "enable_thinking"}
+    if not isinstance(generation, Mapping) or set(generation) != expected_generation_fields or generation["prompt_version"] != "f52-text-transform-v1" or generation["do_sample"] is not False or generation["temperature"] != 0 or generation["enable_thinking"] is not False:
+        raise SchemaValidationError("generación F5.2 no determinista o incompatible")
+    if isinstance(generation["seed"], bool) or not isinstance(generation["seed"], int):
+        raise SchemaValidationError("seed F5.2 no válida")
+    _positive_id(generation["max_new_tokens"], "generation.max_new_tokens")
+    environment = document["environment"]
+    if not isinstance(environment, Mapping) or set(environment) != {"python_version", "torch_version", "transformers_version", "device", "hardware"}:
+        raise SchemaValidationError("environment F5.2 no válido")
+    for field in ("python_version", "device", "hardware"):
+        _non_empty_string(environment[field], f"environment.{field}")
+    for field in ("torch_version", "transformers_version"):
+        if environment[field] is not None: _non_empty_string(environment[field], f"environment.{field}")
+    if not isinstance(document["records"], list) or not isinstance(document["limitations"], list) or not document["limitations"]:
+        raise SchemaValidationError("records o limitations F5.2 no válidos")
+    seen = set()
+    for record in document["records"]:
+        required = {"source_query_id", "variant_id", "kind", "task", "status", "input_text_sha256", "output_text_sha256", "protected_toponyms", "prompt_sha256", "raw_output_sha256", "duration_ms", "validation"}
+        if not isinstance(record, Mapping) or set(record) != required:
+            raise SchemaValidationError("record F5.2 no válido")
+        key = (record["source_query_id"], record["kind"])
+        if key in seen: raise SchemaValidationError("record F5.2 duplicado")
+        seen.add(key)
+        if record["kind"] not in {"es_cartographic", "en_conventional", "en_toponym_preserved"} or record["task"] not in {"cartographic_rewrite_es", "translate_en_conventional", "translate_en_preserve_toponyms"} or record["status"] not in {"generated", "rejected", "error"}:
+            raise SchemaValidationError("record F5.2 contiene tarea o estado no válido")
+        for field in ("input_text_sha256", "prompt_sha256"):
+            _sha256(record[field], f"record.{field}")
+        for field in ("output_text_sha256", "raw_output_sha256"):
+            if record[field] is not None: _sha256(record[field], f"record.{field}")
+        _finite_number(record["duration_ms"], "record.duration_ms", minimum=0)
+        validation = record["validation"]
+        if not isinstance(validation, Mapping) or set(validation) != {"structurally_valid", "human_review_required", "issues"} or validation["human_review_required"] is not True or not isinstance(validation["structurally_valid"], bool) or not isinstance(validation["issues"], list):
+            raise SchemaValidationError("validation F5.2 no válida")
+    from .f5_text_transform import transformation_run_id
+    if document["run_id"] != transformation_run_id(document):
+        raise SchemaValidationError("run_id F5.2 no corresponde al contenido")
+
+
+def _validate_f5_variant_ranking_report(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "report_id", "sidecar", "retrieval", "rankings", "comparisons", "cross_gallery", "geographic_accuracy_available", "limitations"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f5-variant-ranking-report-v1" or document["geographic_accuracy_available"] is not False:
+        raise SchemaValidationError("f5_variant_ranking_report incompatible")
+    if not isinstance(document["report_id"], str) or not re.fullmatch(r"f5-variant-ranking-report-sha256-[0-9a-f]{64}", document["report_id"]):
+        raise SchemaValidationError("report_id F5.2 no válido")
+    if not isinstance(document["sidecar"], Mapping) or set(document["sidecar"]) != {"dataset_id", "sha256", "transformation_run_id"}:
+        raise SchemaValidationError("sidecar del informe F5.2 no válido")
+    _sha256(document["sidecar"]["sha256"], "ranking_report.sidecar.sha256")
+    retrieval = document["retrieval"]
+    retrieval_fields = {"checkpoint_sha256", "gallery_ids", "top_k", "ranking_method", "tie_break", "scores_fused", "coordinates_fused"}
+    if not isinstance(retrieval, Mapping) or set(retrieval) != retrieval_fields or retrieval["ranking_method"] != "exhaustive_cosine" or retrieval["tie_break"] != "candidate_id_ascending" or retrieval["scores_fused"] is not False or retrieval["coordinates_fused"] is not False:
+        raise SchemaValidationError("retrieval del informe F5.2 no válido")
+    _sha256(retrieval["checkpoint_sha256"], "ranking_report.checkpoint_sha256")
+    if not isinstance(retrieval["gallery_ids"], list) or not retrieval["gallery_ids"] or len(retrieval["gallery_ids"]) != len(set(retrieval["gallery_ids"])) or any(value not in {"madrid-25m", "madrid-50m"} for value in retrieval["gallery_ids"]):
+        raise SchemaValidationError("galerías del informe F5.2 no válidas")
+    if isinstance(retrieval["top_k"], bool) or not isinstance(retrieval["top_k"], int) or not 2 <= retrieval["top_k"] <= 10:
+        raise SchemaValidationError("K del informe F5.2 no válida")
+    if not all(isinstance(document[field], list) for field in ("rankings", "comparisons", "cross_gallery")) or not isinstance(document["limitations"], list) or not document["limitations"]:
+        raise SchemaValidationError("colecciones del informe F5.2 no válidas")
+    seen = set()
+    for row in document["rankings"]:
+        required = {"source_query_id", "partition", "variant_id", "kind", "review_status", "gallery_id", "top_k", "results", "top1_margin", "spatial_dispersion_m", "transformation_ms", "retrieval_ms", "pipeline_elapsed_ms"}
+        if not isinstance(row, Mapping) or set(row) != required:
+            raise SchemaValidationError("ranking F5.2 no válido")
+        key = (row["variant_id"], row["gallery_id"])
+        if key in seen: raise SchemaValidationError("ranking F5.2 duplicado")
+        seen.add(key)
+        if row["top_k"] != retrieval["top_k"] or row["gallery_id"] not in retrieval["gallery_ids"] or len(row["results"]) != row["top_k"]:
+            raise SchemaValidationError("ranking F5.2 incompatible con configuración")
+        _finite_number(row["top1_margin"], "ranking.top1_margin")
+        _finite_number(row["spatial_dispersion_m"], "ranking.spatial_dispersion_m", minimum=0)
+        _finite_number(row["retrieval_ms"], "ranking.retrieval_ms", minimum=0)
+        _finite_number(row["pipeline_elapsed_ms"], "ranking.pipeline_elapsed_ms", minimum=0)
+        if row["transformation_ms"] is not None: _finite_number(row["transformation_ms"], "ranking.transformation_ms", minimum=0)
+        ranks = [result.get("rank") for result in row["results"]]
+        ids = [result.get("candidate_id") for result in row["results"]]
+        if ranks != list(range(1, row["top_k"] + 1)) or len(ids) != len(set(ids)):
+            raise SchemaValidationError("resultados de ranking F5.2 no consecutivos o duplicados")
+        for result in row["results"]:
+            if set(result) != {"rank", "candidate_id", "latitude", "longitude", "cosine_similarity"}:
+                raise SchemaValidationError("candidato de ranking F5.2 no válido")
+            _non_empty_string(result["candidate_id"], "ranking.result.candidate_id")
+            _finite_number(result["latitude"], "ranking.result.latitude", minimum=-90)
+            _finite_number(result["longitude"], "ranking.result.longitude", minimum=-180)
+            _finite_number(result["cosine_similarity"], "ranking.result.cosine_similarity")
+            if result["latitude"] > 90 or result["longitude"] > 180:
+                raise SchemaValidationError("coordenada de ranking F5.2 fuera de rango")
+    for row in document["comparisons"]:
+        required = {"source_query_id", "gallery_id", "anchor_variant_id", "variant_id", "variant_kind", "top_k", "top1_agreement", "top_k_overlap", "jaccard_at_k", "top1_output_distance_m", "mean_shared_rank_shift", "anchor_top1_margin", "variant_top1_margin", "anchor_dispersion_m", "variant_dispersion_m", "transformation_ms", "retrieval_ms", "total_variant_latency_ms"}
+        if not isinstance(row, Mapping) or set(row) != required or not isinstance(row["top1_agreement"], bool):
+            raise SchemaValidationError("comparación F5.2 no válida")
+        k, overlap = row["top_k"], row["top_k_overlap"]
+        if isinstance(k, bool) or not isinstance(k, int) or isinstance(overlap, bool) or not isinstance(overlap, int) or not 0 <= overlap <= k:
+            raise SchemaValidationError("overlap F5.2 fuera de rango")
+        expected_jaccard = overlap / (2 * k - overlap)
+        if not math.isclose(row["jaccard_at_k"], expected_jaccard):
+            raise SchemaValidationError("Jaccard F5.2 inconsistente")
+        for field in ("jaccard_at_k", "top1_output_distance_m", "anchor_dispersion_m", "variant_dispersion_m", "retrieval_ms"):
+            _finite_number(row[field], f"comparison.{field}", minimum=0)
+        for field in ("anchor_top1_margin", "variant_top1_margin"):
+            _finite_number(row[field], f"comparison.{field}")
+        for field in ("mean_shared_rank_shift", "transformation_ms", "total_variant_latency_ms"):
+            if row[field] is not None: _finite_number(row[field], f"comparison.{field}", minimum=0)
+        expected_total = row["transformation_ms"] + row["retrieval_ms"] if row["transformation_ms"] is not None else None
+        if row["total_variant_latency_ms"] != expected_total:
+            raise SchemaValidationError("latencia total F5.2 inconsistente")
+    for row in document["cross_gallery"]:
+        required = {"source_query_id", "variant_id", "variant_kind", "top1_distance_m", "minimum_top_k_distance_m", "candidate_ids_compared_as_equal"}
+        if not isinstance(row, Mapping) or set(row) != required or row["candidate_ids_compared_as_equal"] is not False:
+            raise SchemaValidationError("comparación entre galerías F5.2 no válida")
+        _finite_number(row["top1_distance_m"], "cross_gallery.top1_distance_m", minimum=0)
+        _finite_number(row["minimum_top_k_distance_m"], "cross_gallery.minimum_top_k_distance_m", minimum=0)
+        if row["minimum_top_k_distance_m"] > row["top1_distance_m"]:
+            raise SchemaValidationError("distancia mínima entre galerías supera Top-1")
+    from .f5_variant_ranking import variant_ranking_report_id
+    if document["report_id"] != variant_ranking_report_id(document):
+        raise SchemaValidationError("report_id F5.2 no corresponde al contenido")
 
 
 def _validate_crosstext2loc_retrieval_request(document: Mapping[str, Any]) -> None:
@@ -1801,6 +1940,8 @@ def validate_document(document: Any, schema_name: str) -> None:
         "f4_linguistic_query_set": _validate_f4_linguistic_query_set,
         "f4_linguistic_robustness_result": _validate_f4_linguistic_robustness_result,
         "f5_textual_variant_dataset": _validate_f5_textual_variant_dataset,
+        "f5_transformation_run": _validate_f5_transformation_run,
+        "f5_variant_ranking_report": _validate_f5_variant_ranking_report,
         "crosstext2loc_retrieval_request": _validate_crosstext2loc_retrieval_request,
         "crosstext2loc_retrieval_response": _validate_crosstext2loc_retrieval_response,
         "manifest": _validate_manifest,

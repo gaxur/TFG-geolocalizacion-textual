@@ -29,6 +29,7 @@ todas esas acciones estén autorizadas.
 | Google Maps/Earth satélite | [Términos oficiales](https://cloud.google.com/maps-platform/terms) | Satélite opcional/GeoBridge | Términos contractuales | No asumir descarga, cache, transformación o embeddings | No redistribuir | PENDIENTE DE PROVEEDOR | Elegir fuente alternativa o autorización. |
 | Futuro proveedor satelital | Por seleccionar | Extensión satelital | Por revisar | Por revisar | Por revisar | NO CONFIRMADO | Resolver D015 antes de adquirir datos. |
 | LLM/VLM externo | Proveedor por seleccionar | Parsing o verificación | Según cuenta/modelo | Retención y salidas dependen del contrato | No publicar entradas/salidas/pesos sin revisar | NO CONFIRMADO | Auditar al seleccionar proveedor. |
+| Qwen3-8B | [Hugging Face](https://huggingface.co/Qwen/Qwen3-8B) | Transformación textual local experimental F5.2 | Apache-2.0 declarada en la ficha | Pesos no descargados por el proyecto; snapshot y hashes pendientes | No redistribuir pesos desde este repositorio; conservar licencia y procedencia | VIABLE CON CONDICIONES | Obtener snapshot autorizado, fijar revisión y hashes, revisar licencia incluida y validar inferencia ARM64/GB10. |
 | DialogueVPR/DQ-pilot | Publicación/repositorio oficial | Extensión de diálogo | No auditada aquí | Pesos/datos por revisar | No redistribuir por defecto | NO CONFIRMADO | Auditoría específica antes de integrar. |
 | TOL/TOLoc | [GitHub](https://github.com/WHU-USI3DV/TOL) | Refinamiento opcional | No localizada en revisión previa | Pesos/datos por revisar | No copiar o redistribuir por defecto | PENDIENTE DE AUTORES | Solicitar autorización si se integra. |
 | MLLM Retriever | Publicación/recurso oficial pendiente de normalizar | Alternativa opcional | No auditada | Por revisar | Por revisar | NO CONFIRMADO | Identificar artefactos y licencia antes de uso. |
@@ -43,7 +44,8 @@ Fuentes oficiales consultadas: [OSM Copyright](https://www.openstreetmap.org/cop
 [GeoBridge](https://github.com/MiliLab/GeoBridge),
 [GeoLoc](https://huggingface.co/datasets/Son12s/GeoLoc) y
 [OpenAerialMap](https://openaerialmap.org/legal/), y
-[`osm-polygon-features`](https://github.com/tyrasd/osm-polygon-features). La tabla no constituye asesoramiento
+[`osm-polygon-features`](https://github.com/tyrasd/osm-polygon-features) y
+[Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B). La tabla no constituye asesoramiento
 jurídico; las condiciones aplicables a una cuenta o recurso concreto deben
 confirmarse antes de publicar.
 

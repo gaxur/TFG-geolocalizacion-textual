@@ -106,7 +106,7 @@
           "type": "object", "additionalProperties": false,
           "required": ["method", "tool_or_model", "version", "configuration_or_prompt", "transformation_time_ms"],
           "properties": {
-            "method": {"enum": ["pending", "original", "manual_cartographic_rewrite", "manual_translation", "automatic_translation", "model_assisted_translation"]},
+            "method": {"enum": ["pending", "original", "manual_cartographic_rewrite", "model_assisted_cartographic_rewrite", "manual_translation", "automatic_translation", "model_assisted_translation"]},
             "tool_or_model": {"$ref": "#/$defs/nullableNonEmpty"},
             "version": {"$ref": "#/$defs/nullableNonEmpty"},
             "configuration_or_prompt": {"$ref": "#/$defs/nullableNonEmpty"},

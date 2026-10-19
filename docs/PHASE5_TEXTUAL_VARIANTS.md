@@ -384,11 +384,13 @@ topónimos propios, variantes pendientes/revisadas, completitud y disponibilidad
 de métricas. La plantilla actual devuelve cero observaciones y
 `precision_metrics_available: false`; no es un resultado empírico.
 
-## Pendiente para F5.2 y F5.3
+## Continuación en F5.2 y F5.3
 
-F5.2 podrá generar rankings independientes por variante y ejecutar comparaciones
-emparejadas después de recoger datos válidos. No debe elegir traductor o prompt
-con la evaluación final.
+F5.2 implementa la infraestructura de transformación y rankings independientes,
+documentada en [PHASE5_TEXT_TRANSFORMATION.md](PHASE5_TEXT_TRANSFORMATION.md).
+La inferencia real Qwen y los rankings derivados siguen pendientes de disponer
+de pesos autorizados y observaciones revisadas. No debe elegirse traductor o
+prompt con la evaluación final.
 
 F5.3 podrá estudiar extracción automática de topónimos, categorías, objetos,
 relaciones, atributos, negaciones y orientación explícita. Debe preservar texto

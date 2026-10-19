@@ -75,6 +75,8 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D057 | Publicar por defecto el frontend MVP en la LAN de confianza | ACEPTADA | MVP / despliegue |
 | D058 | Extender F4.3 mediante un sidecar F5.1 para variantes textuales | ACEPTADA | F5 / dataset textual |
 | D059 | Mantener la preselección y el reranking OSM en stand-by | ACEPTADA | F5 / alcance |
+| D060 | Implementar F5.2 mediante un adaptador textual local-only y desacoplado | ACEPTADA | F5 / transformación textual |
+| D061 | Exigir revisión humana antes de comparar variantes generadas por modelo real | ACEPTADA | F5 / validación |
 
 ## D053 — API HTTP interna del MVP
 
@@ -295,6 +297,50 @@ entre 25 m y 50 m. El ranking exhaustivo CrossText2Loc permanece intacto.
 El contrato fija `osm_preselection_status: standby_pending_tutor_decision` y
 `fusion_enabled: false`. F3 podrá servir en el futuro para análisis alrededor de
 candidatos únicamente tras una nueva decisión metodológica.
+
+## D060 — Adaptador textual local-only desacoplado
+
+**Estado:** ACEPTADA
+**Componente:** F5 / transformación textual
+**Fecha:** 2026-10-19
+**Origen:** Alcance F5.2 solicitado expresamente por el responsable del TFG.
+
+### Decisión
+
+F5.2 utiliza la interfaz `TextTransformer` independiente del modelo concreto.
+El adaptador inicial para `Qwen/Qwen3-8B` exige un snapshot local, revisión
+explícita, `local_files_only=True`, modo no-thinking y generación sin muestreo.
+No se publica un servidor LLM ni se modifica el backend del MVP.
+
+El LLM y CrossText2Loc se ejecutan en procesos separados para no mezclar
+dependencias ni cargar ambos modelos de forma permanente en la GPU. Un
+`FakeTransformer` determinista queda limitado a tests y smoke técnico.
+
+### Consecuencias
+
+La infraestructura puede cambiar de traductor sin alterar F5.1. La ausencia del
+snapshot exacto Qwen3-8B bloquea la validación real, pero no justifica descargar
+pesos ni sustituirlos por otro modelo local sin decisión expresa.
+
+## D061 — Revisión humana obligatoria de variantes automáticas
+
+**Estado:** ACEPTADA
+**Componente:** F5 / validación
+**Fecha:** 2026-10-19
+**Origen:** Requisitos de validación semántica F5.2.
+
+### Decisión
+
+Las heurísticas automáticas detectan errores estructurales, pero no garantizan
+equivalencia semántica. Toda salida automática queda pendiente de revisión. Los
+rankings reales solo consumen variantes `reviewed`; la excepción para variantes
+`generated` se restringe a un manifiesto fake técnico.
+
+### Consecuencias
+
+No se incorporan silenciosamente salidas con topónimos, negaciones, números u
+orientaciones alterados. Los rankings permanecen independientes y no se fusionan
+scores ni coordenadas.
 
 ## D001 — Identidad del candidato
 

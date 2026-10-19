@@ -234,8 +234,8 @@ def _validate_variant(variant: Mapping[str, Any], source: Mapping[str, Any], pro
             raise F5ValidationError("es_original no conserva la descripción española F4.3")
         if variant["transformations"] != ["preserve_original"] or variant["removed_elements"] or variant["modified_elements"]:
             raise F5ValidationError("es_original declara transformaciones")
-    elif kind == "es_cartographic" and variant["generation"]["method"] != "manual_cartographic_rewrite":
-        raise F5ValidationError("es_cartographic debe ser reescritura manual en F5.1")
+    elif kind == "es_cartographic" and variant["generation"]["method"] not in {"manual_cartographic_rewrite", "model_assisted_cartographic_rewrite"}:
+        raise F5ValidationError("es_cartographic requiere un método de reescritura declarado")
     elif kind in {"en_conventional", "en_toponym_preserved"} and variant["generation"]["method"] not in {"manual_translation", "automatic_translation", "model_assisted_translation"}:
         raise F5ValidationError("variante inglesa sin método de traducción")
     if kind == "en_toponym_preserved":

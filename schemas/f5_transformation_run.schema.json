@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f5_transformation_run.schema.json",
+  "title": "F5.2 textual transformation run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "run_id", "source_sidecar", "derived_sidecar", "transformer", "generation", "environment", "records", "limitations"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "f5-transformation-run-v1"},
+    "run_id": {"type": "string", "pattern": "^f5-transformation-run-sha256-[0-9a-f]{64}$"},
+    "source_sidecar": {"$ref": "#/$defs/artifact"},
+    "derived_sidecar": {"$ref": "#/$defs/artifact"},
+    "transformer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["adapter", "model_id", "revision", "tokenizer_id", "tokenizer_revision", "artifact_manifest_sha256", "real_model_inference"],
+      "properties": {
+        "adapter": {"type": "string", "minLength": 1}, "model_id": {"type": "string", "minLength": 1},
+        "revision": {"type": "string", "minLength": 1}, "tokenizer_id": {"type": "string", "minLength": 1},
+        "tokenizer_revision": {"type": "string", "minLength": 1}, "artifact_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "real_model_inference": {"type": "boolean"}
+      }
+    },
+    "generation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["prompt_version", "do_sample", "temperature", "seed", "max_new_tokens", "enable_thinking"],
+      "properties": {
+        "prompt_version": {"const": "f52-text-transform-v1"}, "do_sample": {"const": false},
+        "temperature": {"const": 0}, "seed": {"type": "integer"}, "max_new_tokens": {"type": "integer", "minimum": 1},
+        "enable_thinking": {"const": false}
+      }
+    },
+    "environment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["python_version", "torch_version", "transformers_version", "device", "hardware"],
+      "properties": {"python_version": {"type": "string", "minLength": 1}, "torch_version": {"type": ["string", "null"]}, "transformers_version": {"type": ["string", "null"]}, "device": {"type": "string", "minLength": 1}, "hardware": {"type": "string", "minLength": 1}}
+    },
+    "records": {"type": "array", "items": {"$ref": "#/$defs/record"}},
+    "limitations": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "artifact": {"type": "object", "additionalProperties": false, "required": ["logical_path", "dataset_id", "sha256"], "properties": {"logical_path": {"type": "string", "minLength": 1}, "dataset_id": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}}},
+    "record": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_query_id", "variant_id", "kind", "task", "status", "input_text_sha256", "output_text_sha256", "protected_toponyms", "prompt_sha256", "raw_output_sha256", "duration_ms", "validation"],
+      "properties": {
+        "source_query_id": {"type": "string", "minLength": 1}, "variant_id": {"type": ["string", "null"]},
+        "kind": {"enum": ["es_cartographic", "en_conventional", "en_toponym_preserved"]},
+        "task": {"enum": ["cartographic_rewrite_es", "translate_en_conventional", "translate_en_preserve_toponyms"]},
+        "status": {"enum": ["generated", "rejected", "error"]}, "input_text_sha256": {"$ref": "#/$defs/sha256"},
+        "output_text_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "protected_toponyms": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "prompt_sha256": {"$ref": "#/$defs/sha256"}, "raw_output_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "duration_ms": {"type": "number", "minimum": 0},
+        "validation": {
+          "type": "object", "additionalProperties": false,
+          "required": ["structurally_valid", "human_review_required", "issues"],
+          "properties": {
+            "structurally_valid": {"type": "boolean"},
+            "human_review_required": {"const": true},
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["code", "severity", "message"],
+                "properties": {
+                  "code": {"type": "string", "minLength": 1},
+                  "severity": {"enum": ["error", "warning"]},
+                  "message": {"type": "string", "minLength": 1}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

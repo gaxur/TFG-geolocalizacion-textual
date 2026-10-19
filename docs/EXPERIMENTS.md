@@ -373,6 +373,41 @@ tests. También pasaron el JSON Schema Draft 2020-12, el CLI de plantilla, los 8
 tests Node y la build Vite. Checkpoint y manifests de embeddings conservaron sus
 hashes. El MVP alcanzó readiness sin cambios de API, runtime o Compose.
 
+## F5.2: transformación textual y comparación exploratoria
+
+La inspección local no encontró un snapshot Hugging Face de `Qwen/Qwen3-8B`.
+Se observaron modelos distintos (`Qwen3.8-27B`, Qwen2.5-7B-AWQ y un artefacto
+Ollama `qwen3.8`), que no se usaron como sustitutos. No se descargaron los pesos
+del candidato, no se instalaron paquetes y no se ejecutó inferencia Qwen real.
+
+La ficha pública consultada declaró revisión
+`b968826d9c46dd6066d109eabc6255188de91218`, 8,2B parámetros, licencia
+Apache-2.0 y soporte non-thinking. Estos metadatos no sustituyen los hashes del
+snapshot que finalmente se autorice.
+
+El smoke técnico se ejecutó con dobles deterministas:
+
+```bash
+.venv-geo/bin/python scripts/smoke_f52_fake.py
+```
+
+Resultado:
+
+```text
+technical_fake_only: true
+real_qwen_inference: false
+rankings independientes: 8
+comparaciones emparejadas: 6
+geographic_accuracy_available: false
+```
+
+El smoke valida prompts, placeholders, artefactos, rankings inyectados y métricas
+descriptivas. No valida Qwen, CrossText2Loc real ni precisión geográfica.
+
+La suite F5.2 completó 11 tests específicos y la regresión Python completa 319
+tests. También pasaron los tres JSON Schema F5, los 8 tests Node, la build Vite y
+readiness del MVP. Checkpoint y manifests de embeddings conservaron sus hashes.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

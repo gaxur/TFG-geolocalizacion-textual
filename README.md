@@ -107,6 +107,11 @@ F5.1 prepara la recogida de observaciones, topónimos, orientación y variantes
 textuales sin ejecutar traducción ni modificar el MVP. Contrato, plantilla y
 procedimiento: [PHASE5_TEXTUAL_VARIANTS.md](docs/PHASE5_TEXTUAL_VARIANTS.md).
 
+F5.2 implementa el adaptador de transformación textual, protección de topónimos,
+validación y comparación independiente de rankings. La inferencia real
+`Qwen/Qwen3-8B` continúa bloqueada hasta disponer de un snapshot local autorizado:
+[PHASE5_TEXT_TRANSFORMATION.md](docs/PHASE5_TEXT_TRANSFORMATION.md).
+
 Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
 
 ```bash

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f5_variant_ranking_report.schema.json",
+  "title": "F5.2 independent variant ranking report",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "report_id", "sidecar", "retrieval", "rankings", "comparisons", "cross_gallery", "geographic_accuracy_available", "limitations"],
+  "properties": {
+    "schema_version": {"const": "1.0"}, "contract_version": {"const": "f5-variant-ranking-report-v1"},
+    "report_id": {"type": "string", "pattern": "^f5-variant-ranking-report-sha256-[0-9a-f]{64}$"},
+    "sidecar": {"type": "object"},
+    "retrieval": {"type": "object", "additionalProperties": false, "required": ["checkpoint_sha256", "gallery_ids", "top_k", "ranking_method", "tie_break", "scores_fused", "coordinates_fused"], "properties": {"checkpoint_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "gallery_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["madrid-25m", "madrid-50m"]}}, "top_k": {"type": "integer", "minimum": 2, "maximum": 10}, "ranking_method": {"const": "exhaustive_cosine"}, "tie_break": {"const": "candidate_id_ascending"}, "scores_fused": {"const": false}, "coordinates_fused": {"const": false}}},
+    "rankings": {"type": "array", "items": {"type": "object"}},
+    "comparisons": {"type": "array", "items": {"type": "object"}},
+    "cross_gallery": {"type": "array", "items": {"type": "object"}},
+    "geographic_accuracy_available": {"const": false},
+    "limitations": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+  }
+}
