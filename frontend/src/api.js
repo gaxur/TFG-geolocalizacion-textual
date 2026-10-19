@@ -67,6 +67,8 @@ export const apiBaseUrl = import.meta.env?.VITE_ATLAS_API_BASE_URL || DEFAULT_BA
 
 function validateCapabilities(document) {
   if (document?.schema_version !== '1.0' || document?.api_version !== 'v1' || !Array.isArray(document.retrievers) || !Array.isArray(document.galleries)) throw new AtlasApiError('La respuesta de capacidades no es válida.', { code: 'INVALID_API_RESPONSE' });
+  const bbox = document.search_area?.bbox;
+  if (document.search_area?.crs !== 'EPSG:4326' || typeof document.search_area.region_id !== 'string' || !bbox || !['north', 'south', 'east', 'west'].every(key => Number.isFinite(bbox[key])) || !(bbox.south < bbox.north && bbox.west < bbox.east) || bbox.south < -90 || bbox.north > 90 || bbox.west < -180 || bbox.east > 180) throw new AtlasApiError('La respuesta de capacidades no contiene un ámbito geográfico válido.', { code: 'INVALID_API_RESPONSE' });
   const galleries = document.galleries.map(item => {
     if (!item || typeof item.gallery_id !== 'string' || !item.gallery_id || !Number.isInteger(item.candidate_count) || item.candidate_count < 1) throw new AtlasApiError('La respuesta de capacidades contiene una galería inválida.', { code: 'INVALID_API_RESPONSE' });
     return item;

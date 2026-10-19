@@ -69,7 +69,8 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D051 | Limitar la provenance de cada artefacto a sus inputs efectivos | ACEPTADA | Provenance / catálogo F1 |
 | D052 | Fijar la serialización, identidad y publicación canónica de F3 | ACEPTADA | OSM / publicación F3 |
 | D053 | Usar FastAPI como capa HTTP fina con un único worker y runtime F4.6 residente | ACEPTADA | MVP / backend |
-| D054 | Integrar el frontend real con contratos F4.6 y Leaflet, conservando demo explícita | ACEPTADA | MVP / frontend |
+| D054 | Integrar el frontend real con contratos F4.6 y Leaflet, conservando demo explícita | SUSTITUIDA | MVP / frontend |
+| D055 | Retirar definitivamente la interfaz sintética del frontend | ACEPTADA | MVP / frontend |
 
 ## D053 — API HTTP interna del MVP
 
@@ -128,7 +129,7 @@ exposición pública en Internet mediante esta decisión.
 
 ## D054 — Integración web real del MVP
 
-**Estado:** ACEPTADA
+**Estado:** SUSTITUIDA por D055
 **Componente:** MVP / frontend
 **Fecha:** 2026-10-16
 **Origen:** Implementación solicitada expresamente para MVP.2.
@@ -159,6 +160,32 @@ MVP.1 y contratos F4.6.
 
 MVP.3 validará despliegue conjunto y navegador en un entorno con Chromium. La
 fuente de teselas definitiva y sus condiciones siguen siendo configurables.
+
+## D055 — Frontend exclusivamente conectado al recuperador real
+
+**Estado:** ACEPTADA
+**Componente:** MVP / frontend
+**Fecha:** 2026-10-16
+**Origen:** Petición expresa del responsable del TFG.
+
+### Decisión
+
+Se retira definitivamente del frontend la interfaz sintética, incluidos su
+parámetro de activación, fixtures, comparación, diálogo, exportación y tests
+específicos. La aplicación presenta únicamente respuestas contractuales de la
+API MVP.1. D055 sustituye la parte de D054 que conservaba una interfaz sintética.
+
+### Justificación
+
+Una única experiencia evita confundir escenarios ilustrativos con inferencias
+reales y reduce código y navegación que ya no forman parte del MVP operativo.
+
+### Consecuencias
+
+Los fallos del backend se muestran como errores y nunca generan candidatos
+alternativos. Los parámetros antiguos de URL no modifican el comportamiento.
+Las futuras funciones se incorporarán únicamente cuando exista su integración
+real y sus resultados estén correctamente identificados.
 
 ## D001 — Identidad del candidato
 

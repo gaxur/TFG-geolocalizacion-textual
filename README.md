@@ -16,8 +16,8 @@ contexto original se conserva sin cambios en [BASELINE.md](BASELINE.md).
 
 Ya existen contratos propios de Fase 0 (`src/tfg_phase0/`, `schemas/`,
 `config/madrid.yaml`), documentación, una memoria LaTeX y un
-[frontend Vite](frontend/README.md) conectado a la API interna. El modo real
-ejecuta CrossText2Loc; la simulación histórica queda aislada en `?mode=demo`.
+[frontend Vite](frontend/README.md) conectado a la API interna. La interfaz
+ejecuta exclusivamente CrossText2Loc y no incluye resultados sintéticos.
 F1, F2 y F3 proporcionan el catálogo geométrico, el snapshot OSM y los
 bundles de asociaciones de Madrid; su cierre está en
 [PHASE3_CLOSURE.md](docs/PHASE3_CLOSURE.md). La reproducción oficial
@@ -43,8 +43,25 @@ o multigalería.
 MVP.1 añade una API FastAPI interna con health, capabilities y retrieval real,
 manteniendo una sola instancia GPU.
 
-MVP.2 conecta el frontend Vite con esa API, muestra candidatos reales sobre
-Leaflet y conserva la simulación únicamente como modo demo explícito.
+MVP.2 conecta el frontend Vite con esa API y muestra candidatos reales sobre
+Leaflet. La interfaz sintética anterior se retiró de forma definitiva.
+
+## Ejecutar el MVP
+
+La guía completa de arranque, uso, parada y diagnóstico está en
+[MVP2_FRONTEND.md](docs/MVP2_FRONTEND.md). Resumen desde la raíz, usando el
+puerto alternativo 18000 si el 8000 está ocupado:
+
+```bash
+# Terminal 1
+ATLAS_API_PORT=18000 scripts/run_mvp1_api_docker.sh
+
+# Terminal 2
+npm --prefix frontend ci
+VITE_PROXY_TARGET=http://127.0.0.1:18000 npm --prefix frontend run dev
+```
+
+Abrir `http://127.0.0.1:5173/`.
 
 El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 

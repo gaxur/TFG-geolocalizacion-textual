@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import os
 from pathlib import Path
 
@@ -18,6 +19,17 @@ class Settings:
     clip_weights_path: str
     allowed_origins: tuple[str, ...]
     reject_when_busy: bool = True
+
+    def region_bbox(self) -> dict[str, float]:
+        try:
+            document = json.loads(self.region_config.read_text(encoding="utf-8"))
+            bbox = document["region"]["bbox"]
+            result = {key: float(bbox[key]) for key in ("north", "south", "east", "west")}
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ValueError(f"configuración regional inválida: {self.region_config}") from error
+        if not (-90 <= result["south"] < result["north"] <= 90 and -180 <= result["west"] < result["east"] <= 180):
+            raise ValueError(f"bbox regional inválida: {self.region_config}")
+        return result
 
     @classmethod
     def from_env(cls) -> "Settings":

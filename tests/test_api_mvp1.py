@@ -48,7 +48,7 @@ class FakeRetriever:
         self.close_calls += 1
 
 
-SETTINGS = Settings(Path("runtime.json"), Path("region.json"), "a" * 64, Path("clip.pt"), (), True)
+SETTINGS = Settings(Path("runtime.json"), Path("config/madrid.yaml"), "a" * 64, Path("clip.pt"), (), True)
 
 
 def request(galleries=None, k=2):
@@ -82,6 +82,7 @@ class MvpApiTests(unittest.TestCase):
         with TestClient(app) as client:
             capabilities = client.get("/api/v1/capabilities").json()
             self.assertEqual(capabilities["galleries"], [{"gallery_id": "madrid-50m", "candidate_count": 253}, {"gallery_id": "madrid-25m", "candidate_count": 1115}])
+            self.assertEqual(capabilities["search_area"], {"region_id": "madrid_pilot", "crs": "EPSG:4326", "bbox": {"north": 40.42, "south": 40.412, "east": -3.699, "west": -3.709}})
             response = client.post("/api/v1/retrievals", json=request(["madrid-25m", "madrid-50m"], 3))
             self.assertEqual(response.status_code, 200)
             document = response.json()

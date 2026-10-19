@@ -22,6 +22,7 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
     app = FastAPI(title="Geolocalización textual", version="1.0", lifespan=build_lifespan(settings, factory))
     app.state.inference_gate = asyncio.Lock()
     app.state.reject_when_busy = settings.reject_when_busy
+    app.state.search_area = {"region_id": "madrid_pilot", "crs": "EPSG:4326", "bbox": settings.region_bbox()}
     if settings.allowed_origins:
         app.add_middleware(CORSMiddleware, allow_origins=list(settings.allowed_origins), allow_credentials=False, allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-Request-ID"], expose_headers=["X-Request-ID"])
 

@@ -4,6 +4,7 @@ import { AtlasApiError, getCapabilities, retrieve } from '../src/api.js';
 import { adaptRetrievalResponse, buildRetrievalRequest, createQueryId, createRequestGuard } from '../src/retrieval.js';
 
 const response = (body, status = 200, headers = {}) => ({ ok: status >= 200 && status < 300, status, headers: { get: key => headers[key.toLowerCase()] || null }, json: async () => body });
+const searchArea = { region_id: 'madrid_pilot', crs: 'EPSG:4326', bbox: { north: 40.42, south: 40.412, east: -3.699, west: -3.709 } };
 
 test('construye exactamente la petición F4.6 y genera query_id', () => {
   const request = buildRetrievalRequest({ text: '  Una plaza  ', galleryIds: ['madrid-50m'], topK: 5 });
@@ -64,7 +65,8 @@ test('rechaza query_id, K y capacidades incompatibles', async () => {
   const request = { query: { query_id: 'q', text: 't', language: 'es' }, gallery_ids: ['madrid-50m'], top_k: 1 };
   const invalid = { schema_version: '1.0', contract_version: 'crosstext2loc-retrieval-response-v1', query: { query_id: 'otra', text: 't', language: 'es' }, model: { name: 'CLIP-L/14@336', checkpoint_sha256: 'd'.repeat(64) }, timings_ms: { text_encoding: 1, ranking_by_gallery: { 'madrid-50m': 1 }, total: 2 }, retrievals: [] };
   assert.throws(() => adaptRetrievalResponse(invalid, request));
-  await assert.rejects(() => getCapabilities({ fetchImpl: async () => response({ schema_version: '1.0', api_version: 'v1', retrievers: [], galleries: [{ gallery_id: '<b>x</b>', candidate_count: '253' }] }) }), error => error.code === 'INVALID_API_RESPONSE');
+  await assert.rejects(() => getCapabilities({ fetchImpl: async () => response({ schema_version: '1.0', api_version: 'v1', retrievers: [], galleries: [{ gallery_id: '<b>x</b>', candidate_count: '253' }], search_area: searchArea }) }), error => error.code === 'INVALID_API_RESPONSE');
+  await assert.rejects(() => getCapabilities({ fetchImpl: async () => response({ schema_version: '1.0', api_version: 'v1', retrievers: [], galleries: [], search_area: { ...searchArea, bbox: { ...searchArea.bbox, north: 100 } } }) }), error => error.code === 'INVALID_API_RESPONSE');
 });
 
 test('el guard impide que respuestas canceladas u obsoletas publiquen estado', () => {

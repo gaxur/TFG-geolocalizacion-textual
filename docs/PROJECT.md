@@ -30,7 +30,7 @@ El objetivo incluye comparar CrossText2Loc y GOTPR como dos variantes de recuper
 
 El objetivo final es implementar y evaluar el recorrido principal del grafo de la sección 5: interpretación, generación geográfica, preselección sobre el catálogo offline, recuperación, verificación visual, diálogo y salida Top-K. El primer hito será un núcleo evaluable con LLM y un recuperador; la verificación y el diálogo son prioridades para alcanzar el sistema final, no requisitos para ejecutar ese primer hito. Wikidata/Wikipedia, las imágenes satelitales y el refinamiento con TOLoc quedan como extensiones condicionadas a su utilidad y al tiempo disponible. La sección 9 establece el orden de implementación y sus criterios de evaluación.
 
-La definición del sistema se acompaña de un [prototipo frontend interactivo: Atlas](../frontend/README.md), con búsqueda, candidatos, comparación, diálogo e historial simulados. Este prototipo permite revisar la interfaz; no ejecuta modelos, no integra el backend y no aporta resultados experimentales. La organización prevista del catálogo y la evaluación se resume en [MADRID_DATASET.md](MADRID_DATASET.md). La localización global y la precisión comparable a un GPS no constituyen compromisos del TFG.
+La definición del sistema se acompaña de un [frontend interactivo](../frontend/README.md) conectado a la API interna y a CrossText2Loc. Presenta candidatos reales del catálogo piloto, pero no aporta por sí solo una evaluación experimental ni confirma la ubicación del usuario. La organización prevista del catálogo y la evaluación se resume en [MADRID_DATASET.md](MADRID_DATASET.md). La localización global y la precisión comparable a un GPS no constituyen compromisos del TFG.
 
 ## 4. Estado del arte de referencia
 

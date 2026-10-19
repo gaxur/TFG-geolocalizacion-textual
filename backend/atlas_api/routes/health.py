@@ -34,4 +34,4 @@ async def capabilities(request: Request):
         galleries = [] if retriever is None else [{"gallery_id": gallery_id, "candidate_count": retriever.gallery_count(gallery_id)} for gallery_id in retriever.gallery_ids]
     except Exception as error:
         raise ApiInternalError("capabilities failure") from error
-    return {"schema_version": "1.0", "api_version": "v1", "retrievers": [{"id": "crosstext2loc", "available": retriever is not None, "scores_are_probabilities": False}], "galleries": galleries, "supported_languages": {"policy_status": "pending", "accepted_codes": ["es", "en"]}}
+    return {"schema_version": "1.0", "api_version": "v1", "retrievers": [{"id": "crosstext2loc", "available": retriever is not None, "scores_are_probabilities": False}], "galleries": galleries, "search_area": request.app.state.search_area, "supported_languages": {"policy_status": "pending", "accepted_codes": ["es", "en"]}}
