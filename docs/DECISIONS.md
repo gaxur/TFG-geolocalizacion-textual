@@ -71,6 +71,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D053 | Usar FastAPI como capa HTTP fina con un único worker y runtime F4.6 residente | ACEPTADA | MVP / backend |
 | D054 | Integrar el frontend real con contratos F4.6 y Leaflet, conservando demo explícita | SUSTITUIDA | MVP / frontend |
 | D055 | Retirar definitivamente la interfaz sintética del frontend | ACEPTADA | MVP / frontend |
+| D056 | Desplegar el MVP integrado con Nginx, proxy interno y una única API GPU | ACEPTADA | MVP / despliegue |
 
 ## D053 — API HTTP interna del MVP
 
@@ -186,6 +187,39 @@ Los fallos del backend se muestran como errores y nunca generan candidatos
 alternativos. Los parámetros antiguos de URL no modifican el comportamiento.
 Las futuras funciones se incorporarán únicamente cuando exista su integración
 real y sus resultados estén correctamente identificados.
+
+## D056 — Despliegue integrado local del MVP
+
+**Estado:** ACEPTADA
+**Componente:** MVP / despliegue
+**Fecha:** 2026-10-19
+**Origen:** Implementación solicitada expresamente para MVP.3.
+
+### Decisión
+
+El despliegue final del MVP utiliza Docker Compose con dos servicios operativos:
+Nginx sirve el frontend estático y actúa como proxy del mismo origen, mientras
+FastAPI permanece sin puerto publicado y ejecuta un único worker con una sola
+instancia residente de CrossText2Loc. El acceso host queda limitado por defecto
+a `127.0.0.1:8080`.
+
+Chromium se ejecuta en un contenedor ARM64 aislado detrás de un perfil de prueba;
+no se instala en el sistema operativo de la PGX. Checkpoint, CLIP, galerías y
+embeddings se montan en solo lectura y no se regeneran durante el arranque.
+
+### Justificación
+
+Esta composición mantiene un único origen HTTP, evita CORS abierto, no expone la
+API ni los artefactos y reutiliza la imagen GPU ya validada por MVP.1. Dos
+servicios y una red Compose son suficientes; no se incorporan colas, bases de
+datos ni orquestadores adicionales.
+
+### Consecuencias
+
+El stack es reproducible en la PGX y dispone de healthchecks, smoke HTTP y prueba
+visual real. Continúa siendo un servicio local experimental sin autenticación,
+TLS, rate limiting ni endurecimiento para Internet. El cierre técnico no implica
+validación de precisión geográfica en Madrid.
 
 ## D001 — Identidad del candidato
 

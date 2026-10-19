@@ -1,0 +1,91 @@
+name: atlas-mvp
+
+services:
+  api:
+    image: ${MVP_API_IMAGE:-crosstext2loc-gb10:ngc26.02}
+    gpus: all
+    init: true
+    read_only: true
+    restart: "no"
+    environment:
+      CUDA_VISIBLE_DEVICES: "0"
+      HOME: /root
+      HF_HOME: /tmp/huggingface
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /workspace/project/external/CVG-Text
+      CLIP_WEIGHTS_PATH: /root/.cache/clip/ViT-L-14-336px.pt
+      ATLAS_API_HOST: 0.0.0.0
+      ATLAS_API_PORT: "8000"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=1g
+    volumes:
+      - .:/workspace/project:ro
+      - ${MVP_CLIP_CACHE_DIR:-${HOME}/.cache/clip}:/root/.cache/clip:ro
+    working_dir: /workspace/project
+    command:
+      - /bin/bash
+      - -lc
+      - >-
+        export ATLAS_CVG_UTILS_SHA256=$$(sha256sum
+        /workspace/project/external/CVG-Text/utils.py | cut -d' ' -f1) &&
+        exec /workspace/project/scripts/run_mvp1_api.sh
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3).read()"]
+      interval: 5s
+      timeout: 4s
+      retries: 24
+      start_period: 10s
+    networks:
+      - internal
+
+  frontend:
+    image: ${MVP_FRONTEND_IMAGE:-atlas-mvp-frontend:local}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_TILE_URL: ${VITE_TILE_URL:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}
+        VITE_TILE_ATTRIBUTION: ${VITE_TILE_ATTRIBUTION:-&copy; OpenStreetMap contributors}
+    init: true
+    read_only: true
+    restart: "no"
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${MVP_BIND_HOST:-127.0.0.1}:${MVP_HTTP_PORT:-8080}:8080"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /var/cache/nginx:rw,noexec,nosuid,size=32m
+      - /var/run:rw,noexec,nosuid,size=1m
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 3s
+    networks:
+      - internal
+
+  browser-check:
+    profiles: ["test"]
+    image: ${MVP_BROWSER_IMAGE:-atlas-mvp-browser-check:local}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.browser
+    init: true
+    shm_size: 512m
+    environment:
+      CHROME_PATH: /usr/bin/chromium
+      MVP_BASE_URL: http://frontend:8080
+    depends_on:
+      frontend:
+        condition: service_healthy
+    networks:
+      - internal
+
+networks:
+  internal: {}

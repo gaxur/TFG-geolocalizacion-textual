@@ -63,6 +63,23 @@ VITE_PROXY_TARGET=http://127.0.0.1:18000 npm --prefix frontend run dev
 
 Abrir `http://127.0.0.1:5173/`.
 
+Para el despliegue integrado de producción local de MVP.3, con frontend estático
+Nginx, proxy interno y API sin puerto publicado:
+
+```bash
+scripts/run_mvp3_stack.sh
+```
+
+Abrir `http://127.0.0.1:8080/` y detener con:
+
+```bash
+docker compose -f compose.mvp.yaml down
+```
+
+La configuración, acceso LAN opcional, healthchecks, pruebas y diagnóstico se
+documentan en [MVP3_DEPLOYMENT.md](docs/MVP3_DEPLOYMENT.md). El alcance y las
+limitaciones del MVP funcional se resumen en [MVP_CLOSURE.md](docs/MVP_CLOSURE.md).
+
 El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 
 ```text

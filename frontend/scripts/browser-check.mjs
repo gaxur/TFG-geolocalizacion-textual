@@ -34,13 +34,18 @@ const server = http.createServer((request, response) => {
   const url = new URL(request.url, 'http://localhost');
   if (url.pathname === '/api/v1/capabilities') {
     response.writeHead(200, { 'Content-Type': 'application/json' });
-    response.end(JSON.stringify({ schema_version: '1.0', api_version: 'v1', retrievers: [{ id: 'crosstext2loc', available: true, scores_are_probabilities: false }], galleries: [{ gallery_id: 'madrid-50m', candidate_count: 253 }, { gallery_id: 'madrid-25m', candidate_count: 1115 }], supported_languages: { policy_status: 'pending', accepted_codes: ['es', 'en'] } }));
+    response.end(JSON.stringify({ schema_version: '1.0', api_version: 'v1', retrievers: [{ id: 'crosstext2loc', available: true, scores_are_probabilities: false }], galleries: [{ gallery_id: 'madrid-50m', candidate_count: 253 }, { gallery_id: 'madrid-25m', candidate_count: 1115 }], search_area: { region_id: 'madrid_pilot', crs: 'EPSG:4326', bbox: { north: 40.42, south: 40.412, east: -3.699, west: -3.709 } }, supported_languages: { policy_status: 'pending', accepted_codes: ['es', 'en'] } }));
     return;
   }
   if (url.pathname === '/api/v1/retrievals' && request.method === 'POST') {
     let raw = '';
     request.on('data', chunk => raw += chunk);
-    request.on('end', () => { const body = JSON.parse(raw); apiRequests.push(body); response.writeHead(200, { 'Content-Type': 'application/json', 'X-Request-ID': body.query.query_id }); response.end(JSON.stringify(fakeRetrieval(body))); });
+    request.on('end', () => {
+      const body = JSON.parse(raw); apiRequests.push(body);
+      if (body.query.text === 'trigger-busy') { response.writeHead(503, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ error: { code: 'RUNTIME_BUSY', message: 'busy', request_id: body.query.query_id } })); return; }
+      const send = () => { response.writeHead(200, { 'Content-Type': 'application/json', 'X-Request-ID': body.query.query_id }); response.end(JSON.stringify(fakeRetrieval(body))); };
+      body.query.text === 'trigger-slow' ? setTimeout(send, 800) : send();
+    });
     return;
   }
   if (url.pathname.startsWith('/tiles/')) { response.writeHead(204); response.end(); return; }
@@ -55,18 +60,19 @@ const baseUrl = `http://127.0.0.1:${server.address().port}`;
 const candidates = process.platform === 'win32' ? ['C:/Program Files/Google/Chrome/Application/chrome.exe'] : ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
 const chromePath = process.env.CHROME_PATH || candidates.find(candidate => fs.existsSync(candidate));
 if (!chromePath) throw new Error('No se encontró Chrome/Chromium. Define CHROME_PATH.');
-const browser = spawn(chromePath, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
+const browser = spawn(chromePath, ['--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
 let launchError, ws;
 browser.on('error', error => { launchError = error; });
 try {
   for (let i = 0; i < 100 && !fs.existsSync(path.join(profile, 'DevToolsActivePort')); i++) { if (launchError) throw launchError; await delay(100); }
+  if (!fs.existsSync(path.join(profile, 'DevToolsActivePort'))) throw new Error('Chromium no publicó el puerto de DevTools.');
   const port = fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0];
   const pages = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
   ws = new WebSocket(pages.find(page => page.type === 'page').webSocketDebuggerUrl);
   await new Promise(resolve => ws.addEventListener('open', resolve, { once: true }));
   let id = 0;
   const pending = new Map(), errors = [];
-  ws.addEventListener('message', event => { const data = JSON.parse(event.data); if (data.method === 'Runtime.exceptionThrown') errors.push(data.params.exceptionDetails.text); const item = pending.get(data.id); if (item) { pending.delete(data.id); data.error ? item.reject(new Error(JSON.stringify(data.error))) : item.resolve(data.result); } });
+  ws.addEventListener('message', event => { const data = JSON.parse(event.data); if (data.method === 'Runtime.exceptionThrown') errors.push(data.params.exceptionDetails.exception?.description || data.params.exceptionDetails.text); const item = pending.get(data.id); if (item) { pending.delete(data.id); data.error ? item.reject(new Error(JSON.stringify(data.error))) : item.resolve(data.result); } });
   const send = (method, params = {}) => new Promise((resolve, reject) => { pending.set(++id, { resolve, reject }); ws.send(JSON.stringify({ id, method, params })); });
   const evaluate = async expression => { const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails)); return result.result.value; };
   const click = selector => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
@@ -75,8 +81,8 @@ try {
   await send('Runtime.enable'); await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1080, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: baseUrl });
-  await waitFor(`!!document.querySelector('#description') && !document.querySelector('#gallery').disabled`);
-  assert.match(await evaluate(`document.querySelector('.mode-badge').textContent`), /Modo real/);
+  await waitFor(`!!document.querySelector('#description') && !document.querySelector('[data-dropdown="gallery"]').disabled`);
+  assert.match(await evaluate(`document.querySelector('.service-badge').textContent`), /CrossText2Loc/);
   assert.equal(await evaluate(`document.querySelectorAll('.result-card').length`), 0);
   await fill('Una plaza amplia rodeada de edificios y calles estrechas');
   await click('.search-button');
@@ -84,23 +90,44 @@ try {
   assert.match(await evaluate(`document.querySelector('.result-card h3').textContent`), /madrid-50m-candidate-1/);
   assert.match(await evaluate(`document.querySelector('.results-footnote').textContent`), /no representa una probabilidad/);
   assert.equal(await evaluate(`document.querySelectorAll('.leaflet-container').length`), 1);
+  assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker').length`), 5);
+  assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker.top-result').length`), 1);
   await click('[data-select="madrid-50m:madrid-50m-candidate-2"]');
   assert.equal(await evaluate(`document.querySelectorAll('.leaflet-container').length`), 1, 'Leaflet sin contenedores duplicados');
   assert.equal(await evaluate(`document.querySelector('[data-select="madrid-50m:madrid-50m-candidate-2"]').getAttribute('aria-pressed')`), 'true');
+  await click('.candidate-marker-shell:nth-of-type(3) .candidate-marker');
+  assert.equal(await evaluate(`document.querySelector('[data-select="madrid-50m:madrid-50m-candidate-3"]').getAttribute('aria-pressed')`), 'true');
   assert.equal(apiRequests.length, 1);
   assert.equal(apiRequests[0].contract_version, 'crosstext2loc-retrieval-request-v1');
   assert.deepEqual(apiRequests[0].gallery_ids, ['madrid-50m']);
   assert.ok(!Object.hasOwn(apiRequests[0], 'ground_truth'));
+  await click('[data-dropdown="gallery"]');
+  await waitFor(`!!document.querySelector('[data-select-id="gallery"][data-select-value="madrid-25m"]')`);
+  await click('[data-select-id="gallery"][data-select-value="madrid-25m"]');
+  await click('[data-dropdown="top-k"]');
+  await click('[data-select-id="top-k"][data-select-value="3"]');
+  assert.match(await evaluate(`document.querySelector('#gallery-value').textContent`), /25 m/);
+  assert.match(await evaluate(`document.querySelector('#top-k-value').textContent`), /Top-3/);
+  await fill('trigger-busy');
+  await click('.search-button');
+  await waitFor(`document.querySelector('.service-state.error')?.textContent.includes('ocupado')`);
+  await fill('trigger-slow');
+  await click('.search-button');
+  await waitFor(`!!document.querySelector('[data-action="cancel"]')`);
+  await click('[data-action="cancel"]');
+  await waitFor(`document.querySelector('#toast')?.textContent.includes('cancelada')`);
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await delay(250);
   assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
+  assert.equal(await evaluate(`document.querySelector('[data-mobile="description"]').getAttribute('aria-pressed')`), 'true');
+  await click('[data-mobile="results"]');
   assert.equal(await evaluate(`document.querySelector('[data-mobile="results"]').getAttribute('aria-pressed')`), 'true');
-  await send('Page.navigate', { url: `${baseUrl}/?mode=demo#explore` });
+  await send('Page.navigate', { url: `${baseUrl}/?legacy=1#explore` });
   await waitFor(`!!document.querySelector('#description')`);
-  assert.match(await evaluate(`document.querySelector('.mode-badge').textContent`), /Demo explícita/);
-  assert.match(await evaluate(`document.querySelector('.result-card h3').textContent`), /Puerta del Sol/);
+  assert.match(await evaluate(`document.querySelector('.service-badge').textContent`), /CrossText2Loc/);
+  assert.equal(await evaluate(`document.querySelectorAll('.result-card').length`), 0, 'El parámetro antiguo no activa datos sintéticos');
   assert.deepEqual(errors, []);
-  console.log('OK: modo real, contrato HTTP, Leaflet, responsive y demo explícita separada.');
+  console.log('OK: contrato HTTP, Leaflet, responsive y ausencia del modo sintético.');
 } finally {
   ws?.close(); browser.kill(); server.close();
 }
