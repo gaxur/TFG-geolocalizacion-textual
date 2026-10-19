@@ -375,10 +375,11 @@ hashes. El MVP alcanzó readiness sin cambios de API, runtime o Compose.
 
 ## F5.2: transformación textual y comparación exploratoria
 
-La inspección local no encontró un snapshot Hugging Face de `Qwen/Qwen3-8B`.
+La inspección inicial no encontró un snapshot Hugging Face de `Qwen/Qwen3-8B`.
 Se observaron modelos distintos (`Qwen3.8-27B`, Qwen2.5-7B-AWQ y un artefacto
-Ollama `qwen3.8`), que no se usaron como sustitutos. No se descargaron los pesos
-del candidato, no se instalaron paquetes y no se ejecutó inferencia Qwen real.
+Ollama `qwen3.8`), que no se usaron como sustitutos. En ese incremento inicial no
+se descargaron pesos ni se ejecutó inferencia Qwen real; F5.2b, documentada a
+continuación, resolvió posteriormente ese bloqueo con autorización expresa.
 
 La ficha pública consultada declaró revisión
 `b968826d9c46dd6066d109eabc6255188de91218`, 8,2B parámetros, licencia
@@ -407,6 +408,24 @@ descriptivas. No valida Qwen, CrossText2Loc real ni precisión geográfica.
 La suite F5.2 completó 11 tests específicos y la regresión Python completa 319
 tests. También pasaron los tres JSON Schema F5, los 8 tests Node, la build Vite y
 readiness del MVP. Checkpoint y manifests de embeddings conservaron sus hashes.
+
+## F5.2b: Qwen3-8B real en PGX GB10
+
+Se descargó exclusivamente `Qwen/Qwen3-8B` en la revisión
+`b968826d9c46dd6066d109eabc6255188de91218` fuera de Git. Los cinco shards BF16
+suman 16.381.470.720 bytes y sus SHA-256 coinciden con los OIDs publicados.
+
+Dos ejecuciones completas en GB10 produjeron 18/18 textos y hashes idénticos. Los
+tiempos de carga fueron 82,04 s y 89,28 s; la generación media fue 1,27 s por
+variante y el pico CUDA asignado 16.425.854.976 B. Tras cerrar, la memoria CUDA
+asignada quedó en 8.519.680 B y la reservada en 20.971.520 B.
+
+Una revisión humana explícita aprobó las 18 variantes técnicas. CrossText2Loc
+generó 48 rankings Top-10 y 36 comparaciones emparejadas sobre ambas galerías.
+El informe declara `geographic_accuracy_available: false`; no se calculó Recall
+ni error geográfico. Los artefactos completos permanecen en
+`results/generated/f5/f52/`, fuera de Git. Véase
+[PHASE5_TEXT_TRANSFORMATION.md](PHASE5_TEXT_TRANSFORMATION.md).
 
 ## CrossText2Loc NewYork-mixed OSM en GB10
 

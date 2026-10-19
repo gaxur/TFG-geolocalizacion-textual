@@ -37,6 +37,8 @@ def main() -> int:
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--allow-unreviewed-technical", action="store_true")
     parser.add_argument("--output-root", required=True, type=Path)
+    parser.add_argument("--output-uid", type=int)
+    parser.add_argument("--output-gid", type=int)
     args = parser.parse_args()
 
     sidecar_raw = args.sidecar.read_bytes()
@@ -47,8 +49,15 @@ def main() -> int:
     transformation_run = json.loads(args.transformation_run.read_text(encoding="utf-8")) if args.transformation_run else None
     if transformation_run is not None:
         validate_document(transformation_run, "f5_transformation_run")
-        if transformation_run["derived_sidecar"] != {"logical_path": "derived-sidecar.json", "dataset_id": sidecar["dataset_id"], "sha256": hashlib.sha256(sidecar_raw.rstrip(b"\n")).hexdigest()}:
-            raise RuntimeError("el sidecar no corresponde al manifiesto de transformación")
+        records = {row["variant_id"]: row for row in transformation_run["records"] if row["variant_id"] is not None}
+        materialized = {variant["variant_id"]: variant for observation in sidecar["observations"] for variant in observation["variants"] if variant["kind"] != "es_original" and variant["variant_id"] is not None}
+        if set(records) != set(materialized):
+            raise RuntimeError("el sidecar revisado no contiene exactamente las variantes del run")
+        for variant_id, variant in materialized.items():
+            record = records[variant_id]
+            output_hash = hashlib.sha256(variant["text"].encode()).hexdigest() if variant["text"] is not None else None
+            if record["output_text_sha256"] != output_hash or record["kind"] != variant["kind"]:
+                raise RuntimeError("el texto revisado no corresponde al output del run")
         if args.allow_unreviewed_technical and transformation_run["transformer"]["real_model_inference"]:
             raise RuntimeError("--allow-unreviewed-technical solo se admite para un smoke fake")
     model, galleries = load_runtime_config(args.runtime_config, project_root=ROOT, cvg_utils_sha256=args.cvg_utils_sha256, clip_weights_path=args.clip_weights)
@@ -69,6 +78,13 @@ def main() -> int:
             path = Path(temporary)
             (path / "report.json").write_bytes(raw)
             os.replace(path, final)
+    if args.output_uid is not None or args.output_gid is not None:
+        if args.output_uid is None or args.output_gid is None or args.output_uid < 0 or args.output_gid < 0:
+            raise ValueError("--output-uid y --output-gid deben proporcionarse juntos y ser no negativos")
+        for path in (final, final / "report.json"):
+            os.chown(path, args.output_uid, args.output_gid)
+        os.chmod(final, 0o755)
+        os.chmod(final / "report.json", 0o644)
     print(json.dumps({"report_id": report["report_id"], "rankings": len(report["rankings"]), "comparisons": len(report["comparisons"]), "geographic_accuracy_available": False}, sort_keys=True))
     return 0
 

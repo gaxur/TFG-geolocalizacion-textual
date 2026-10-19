@@ -90,6 +90,8 @@ class TransformResult:
 class TextTransformer(Protocol):
     @property
     def metadata(self) -> TransformerMetadata: ...
+    @property
+    def resource_usage(self) -> Mapping[str, Any]: ...
     def transform(self, original_text: str, task: str, protected_toponyms: Sequence[str], config: GenerationConfig) -> TransformResult: ...
     def close(self) -> None: ...
 
@@ -101,10 +103,15 @@ class FakeTransformer:
         self._outputs = dict(outputs or {})
         self._closed = False
         self._metadata = TransformerMetadata("fake-deterministic-v1", "fake/f52", "test-v1", "fake/f52", "test-v1", "0" * 64, False)
+        self._resource_usage = {"model_load_ms": 0.0, "cuda_before_load": {"allocated_bytes": None, "reserved_bytes": None}, "cuda_after_load": {"allocated_bytes": None, "reserved_bytes": None}, "cuda_peak_allocated_bytes": None, "cuda_after_close": {"allocated_bytes": None, "reserved_bytes": None}}
 
     @property
     def metadata(self) -> TransformerMetadata:
         return self._metadata
+
+    @property
+    def resource_usage(self) -> Mapping[str, Any]:
+        return self._resource_usage
 
     def transform(self, original_text: str, task: str, protected_toponyms: Sequence[str], config: GenerationConfig) -> TransformResult:
         if self._closed:
@@ -132,16 +139,29 @@ class QwenTransformersAdapter:
         except ImportError as error:
             raise TextTransformationError("entorno Qwen incompleto; se requieren torch y transformers compatibles") from error
         self._torch, self._transformers, self._closed = torch, transformers, False
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
+        before = self._cuda_memory()
+        load_started = time.perf_counter()
         self._tokenizer = AutoTokenizer.from_pretrained(str(model_path), local_files_only=True, trust_remote_code=False)
         self._model = AutoModelForCausalLM.from_pretrained(str(model_path), local_files_only=True, trust_remote_code=False, torch_dtype="auto", device_map=device)
         self._model.eval()
+        loaded_at = time.perf_counter()
         manifest_hash = hash_tree_manifest(model_path)
         tokenizer_revision = getattr(self._tokenizer, "init_kwargs", {}).get("revision") or revision
         self._metadata = TransformerMetadata("transformers-qwen3-v1", model_id, revision, model_id, str(tokenizer_revision), manifest_hash, True)
+        self._resource_usage = {"model_load_ms": (loaded_at - load_started) * 1000, "cuda_before_load": before, "cuda_after_load": self._cuda_memory(), "cuda_peak_allocated_bytes": int(torch.cuda.max_memory_allocated()) if torch.cuda.is_available() else None, "cuda_after_close": {"allocated_bytes": None, "reserved_bytes": None}}
 
     @property
     def metadata(self) -> TransformerMetadata:
         return self._metadata
+
+    @property
+    def resource_usage(self) -> Mapping[str, Any]:
+        if self._torch.cuda.is_available():
+            self._resource_usage["cuda_peak_allocated_bytes"] = max(self._resource_usage["cuda_peak_allocated_bytes"] or 0, int(self._torch.cuda.max_memory_allocated()))
+        return self._resource_usage
 
     def transform(self, original_text: str, task: str, protected_toponyms: Sequence[str], config: GenerationConfig) -> TransformResult:
         if self._closed:
@@ -169,12 +189,18 @@ class QwenTransformersAdapter:
             self._tokenizer = None
             if self._torch.cuda.is_available():
                 self._torch.cuda.empty_cache()
+            self._resource_usage["cuda_after_close"] = self._cuda_memory()
             self._closed = True
+
+    def _cuda_memory(self) -> dict[str, int | None]:
+        if not self._torch.cuda.is_available():
+            return {"allocated_bytes": None, "reserved_bytes": None}
+        return {"allocated_bytes": int(self._torch.cuda.memory_allocated()), "reserved_bytes": int(self._torch.cuda.memory_reserved())}
 
 
 def hash_tree_manifest(root: Path) -> str:
     rows = []
-    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+    for path in sorted(item for item in root.rglob("*") if item.is_file() and ".cache" not in item.relative_to(root).parts):
         relative = path.relative_to(root).as_posix()
         digest = hashlib.sha256()
         with path.open("rb") as handle:
@@ -302,7 +328,7 @@ def materialize_variants(source_sidecar: Mapping[str, Any], transformer: TextTra
                 preserved, removed, modified = transformation_elements(original["text"], output, variant["kind"], proper)
                 variant.update({
                     "variant_id": variant_id, "status": "generated" if status == "generated" else "rejected", "text": output,
-                    "generation": {"method": "model_assisted_cartographic_rewrite" if variant["kind"] == "es_cartographic" else "model_assisted_translation", "tool_or_model": transformer.metadata.model_id, "version": transformer.metadata.revision, "configuration_or_prompt": PROMPT_VERSION, "transformation_time_ms": duration},
+                    "generation": {"method": "model_assisted_cartographic_rewrite" if variant["kind"] == "es_cartographic" else "model_assisted_translation", "tool_or_model": transformer.metadata.model_id, "version": transformer.metadata.revision, "configuration_or_prompt": PROMPT_VERSION, "transformation_time_ms": None},
                     "review_status": "pending" if status == "generated" else "rejected",
                     "transformations": ["cartographic_filter"] if variant["kind"] == "es_cartographic" else (["translation", "toponym_protection"] if variant["kind"] == "en_toponym_preserved" else ["translation"]),
                     "preserved_elements": preserved, "removed_elements": removed, "modified_elements": modified, "protected_toponyms": list(protected),
@@ -323,6 +349,7 @@ def materialize_variants(source_sidecar: Mapping[str, Any], transformer: TextTra
         "transformer": transformer.metadata.__dict__,
         "generation": {"prompt_version": PROMPT_VERSION, "do_sample": config.do_sample, "temperature": config.temperature, "seed": config.seed, "max_new_tokens": config.max_new_tokens, "enable_thinking": config.enable_thinking},
         "environment": environment_metadata(transformer.metadata.real_model_inference),
+        "resource_usage": json.loads(json.dumps(transformer.resource_usage)),
         "records": records,
         "limitations": ["automatic_heuristics_do_not_guarantee_semantic_equivalence", "human_review_required", "no_ground_truth_used", "no_osm_preselection_or_reranking"],
     }
@@ -331,8 +358,14 @@ def materialize_variants(source_sidecar: Mapping[str, Any], transformer: TextTra
 
 
 def transformation_run_id(document: Mapping[str, Any]) -> str:
-    identity = {key: document[key] for key in ("contract_version", "source_sidecar", "derived_sidecar", "transformer", "generation", "environment", "records", "limitations")}
+    identity = {key: document[key] for key in ("contract_version", "source_sidecar", "derived_sidecar", "transformer", "generation", "environment", "resource_usage", "records", "limitations")}
     return RUN_PREFIX + hashlib.sha256(_canonical_bytes(identity)).hexdigest()
+
+
+def finalize_transformation_run_resources(document: dict[str, Any], transformer: TextTransformer) -> None:
+    """Captura memoria tras close y recalcula la identidad del manifiesto."""
+    document["resource_usage"] = json.loads(json.dumps(transformer.resource_usage))
+    document["run_id"] = transformation_run_id(document)
 
 
 def transformation_elements(original: str, output: str, kind: str, proper_toponyms: Sequence[str]) -> tuple[list[str], list[str], list[dict[str, str]]]:

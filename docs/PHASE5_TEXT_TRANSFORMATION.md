@@ -17,16 +17,15 @@ Estado de validación:
 | Rankings F4.6 independientes | Implementados mediante inyección del recuperador |
 | Métricas descriptivas | Implementadas |
 | Smoke fake determinista | PASS |
-| Inferencia real `Qwen/Qwen3-8B` | **Bloqueada: snapshot exacto no disponible localmente** |
-| Ranking real de variantes Qwen | No ejecutado |
+| Inferencia real `Qwen/Qwen3-8B` | PASS en NVIDIA GB10 |
+| Ranking real de variantes Qwen | PASS sobre 25 m y 50 m tras revisión humana |
 | Precisión geográfica | No disponible; no hay ground truth F5.1 |
 
-Validación observada: 11 tests F5.2 y 319 tests Python totales, además de 8 tests
+Validación observada: 13 tests F5.2/F5.2b y 321 tests Python totales, además de 8 tests
 Node, build Vite, schemas F5 y readiness del MVP.
 
-No se descargaron pesos ni se instalaron dependencias. La caché local contiene
-otros modelos (`Qwen3.8-27B`, Qwen2.5-7B-AWQ y un artefacto Ollama `qwen3.8`),
-pero no el candidato exacto `Qwen/Qwen3-8B`; no se sustituyeron silenciosamente.
+El snapshot exacto se descargó fuera de Git tras autorización expresa. No se
+instalaron paquetes globalmente ni se sustituyó por otros modelos locales.
 
 ## Modelo candidato
 
@@ -49,6 +48,25 @@ El adaptador exige `--model-path` local y `--model-revision`; usa
 `local_files_only=True`, `trust_remote_code=False` y no descarga. Calcula un
 manifest hash de todos los ficheros del snapshot. El tokenizer y la revisión se
 registran en el manifiesto de ejecución.
+
+Snapshot validado:
+
+```text
+ubicación local observada: $HOME/models/hf/Qwen3-8B-b968826d9c46
+revisión: b968826d9c46dd6066d109eabc6255188de91218
+pesos: 16.381.470.720 bytes, BF16, 399 tensores, 5 shards
+manifest SHA-256 F5.2: d95b2ee5a666c88adcb53094740c1002718f28e0dcabad56a508a9c66dce1570
+```
+
+Los SHA-256 de los cinco shards coinciden con los OIDs publicados:
+
+```text
+31d6a825ae35f11fb85b195b4c42c146c051e446433125a215336abdf95cbf5f
+5991236cea6fe21f3d43cab0f0e84448734fbbe0789816202989f2ddc9d18282
+c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836
+b5ee7de71fbf17db3d5704e0c8f2bc7d005ca9e1d7ca2aeb19827b0cfcaa917a
+20c2d6366ab85c90786ccdd829cd2b9e7d30ef3b2ebbb998280e7e4014b542ff
+```
 
 ## Arquitectura
 
@@ -177,9 +195,14 @@ results/generated/f5/f52/<report_id>/
 
 El sidecar F5.1 original nunca se sobrescribe.
 
+La fixture técnica se crea fuera de Git con
+`scripts/create_f52_technical_fixture.py`. Las decisiones humanas se aplican con
+`scripts/review_f5_textual_variants.py`, que exige cubrir exactamente todas las
+variantes generadas y nunca autoaprueba.
+
 ## Ejecución Qwen real
 
-Solo después de disponer de un snapshot local autorizado:
+Comando validado con el snapshot local autorizado:
 
 ```bash
 python scripts/generate_f5_textual_variants.py \
@@ -198,6 +221,64 @@ esperadas se registran en `requirements-f52-qwen.txt`, pero no se instalaron
 automáticamente. Se detectó fuera de este repositorio un entorno con versiones
 compatibles de Torch/Transformers, aunque no constituye por sí solo un entorno
 F5.2 aprobado o congelado.
+
+Entorno utilizado:
+
+```text
+arquitectura: ARM64
+GPU: NVIDIA GB10
+Python: 3.12.3
+PyTorch: 2.11.0+cu130
+CUDA PyTorch: 13.0
+Transformers: 5.9.0
+Accelerate: 1.13.0
+Hugging Face Hub: 1.15.0
+```
+
+### Telemetría real y reproducibilidad
+
+| Medición | Ejecución 1 | Ejecución 2 |
+|---|---:|---:|
+| Carga del modelo | 82.035,84 ms | 89.282,41 ms |
+| CUDA asignada tras carga | 16.381.490.176 B | 16.381.490.176 B |
+| Pico CUDA asignado | 16.425.854.976 B | 16.425.854.976 B |
+| Generación total, 18 variantes | 22.782,86 ms | 22.863,73 ms |
+| Generación media | 1.265,71 ms | 1.270,21 ms |
+| Generación mediana | 1.221,37 ms | 1.225,52 ms |
+| CUDA asignada tras cierre | 8.519.680 B | 8.519.680 B |
+| CUDA reservada tras cierre | 20.971.520 B | 20.971.520 B |
+
+La inferencia mínima generó `I am near Plaza Mayor, next to a narrow street.`
+en 2.414,39 ms, sin bloques `<think>` y restaurando el placeholder. Las dos
+ejecuciones completas produjeron 18/18 textos y hashes idénticos. Los `run_id`
+difieren porque incluyen latencias y telemetría. Esto no garantiza identidad en
+otro driver, hardware o versión.
+
+Ejemplos reales:
+
+| Original | Variante generada |
+|---|---|
+| `Estoy cerca de la Plaza Mayor, junto a una calle estrecha.` | `I am near the Plaza Mayor, next to a narrow street.` |
+| `No hay ningún parque cerca de esta intersección.` | `There is no park near this intersection.` |
+| `La estación está al norte de la plaza.` | `The station is to the north of the square.` |
+| `Veo una iglesia a mi izquierda y una calle a la derecha.` | `I see a church on my left and a street on the right.` |
+
+Los topónimos protegidos `Plaza Mayor` y `Gran Vía`, las negaciones y las
+relaciones cardinales/egocéntricas se conservaron según revisión humana.
+
+### Revisión humana
+
+Las 18 variantes quedaron primero `pending`. Un manifiesto local de decisiones
+cubrió exactamente las 18; tras revisar original, salida, topónimos, negación y
+orientación se aprobaron 18 y se rechazaron 0. El sidecar sigue siendo una
+fixture development sin ground truth:
+
+```text
+observaciones: 6
+variantes revisadas: 18
+ground truth validado: 0
+precision_metrics_available: false
+```
 
 ## Rankings CrossText2Loc
 
@@ -220,6 +301,26 @@ Cada variante produce un ranking independiente. Se conserva ranking exhaustivo,
 desempate, checkpoint, embeddings, candidate IDs y ausencia de ground truth en
 inferencia. No se suman scores, no se usa RRF, no se promedian coordenadas y no
 se selecciona una predicción por consenso.
+
+### Resultado real exploratorio
+
+CrossText2Loc produjo 48 rankings Top-10: 6 sondas × 4 variantes × 2 galerías,
+con 36 comparaciones frente a `es_original` y 24 comparaciones entre galerías.
+
+| Galería | Acuerdo Top-1 | Jaccard@10 medio | Distancia Top-1 media | Mediana |
+|---|---:|---:|---:|---:|
+| 50 m | 0,333 | 0,359 | 244,6 m | 161,9 m |
+| 25 m | 0,278 | 0,324 | 281,6 m | 236,9 m |
+
+| Variante | Acuerdo Top-1 | Jaccard@10 medio | Distancia Top-1 media |
+|---|---:|---:|---:|
+| `es_cartographic` | 0,917 | 0,857 | 31,7 m |
+| `en_conventional` | 0,000 | 0,095 | 351,4 m |
+| `en_toponym_preserved` | 0,000 | 0,072 | 406,3 m |
+
+La distancia Top-1 media entre galerías fue 136,4 m. La latencia interna media
+de retrieval fue 6,75 ms y la transformación media 1.265,71 ms, sin contar la
+carga del LLM. Son métricas de estabilidad sobre sondas técnicas, no accuracy.
 
 ## Métricas descriptivas
 
@@ -268,9 +369,8 @@ CrossText2Loc real y no pertenece al dataset de evaluación.
 
 ## Limitaciones y continuación
 
-- El sidecar F5.1 actual tiene cero observaciones elegibles.
-- No se ejecutó ni validó Qwen3-8B real.
-- No se ejecutaron rankings CrossText2Loc con variantes Qwen.
+- Las seis observaciones ejecutadas son sondas técnicas development sin ground
+  truth y no pertenecen a evaluación.
 - No hay métricas de precisión sin ground truth.
 - F5.2 no realiza extracción estructurada automática; eso pertenece a F5.3.
 - Qwen3-8B es textual, no Qwen3-VL ni un VLM.

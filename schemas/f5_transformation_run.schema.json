@@ -4,7 +4,7 @@
   "title": "F5.2 textual transformation run",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "contract_version", "run_id", "source_sidecar", "derived_sidecar", "transformer", "generation", "environment", "records", "limitations"],
+  "required": ["schema_version", "contract_version", "run_id", "source_sidecar", "derived_sidecar", "transformer", "generation", "environment", "resource_usage", "records", "limitations"],
   "properties": {
     "schema_version": {"const": "1.0"},
     "contract_version": {"const": "f5-transformation-run-v1"},
@@ -35,11 +35,23 @@
       "required": ["python_version", "torch_version", "transformers_version", "device", "hardware"],
       "properties": {"python_version": {"type": "string", "minLength": 1}, "torch_version": {"type": ["string", "null"]}, "transformers_version": {"type": ["string", "null"]}, "device": {"type": "string", "minLength": 1}, "hardware": {"type": "string", "minLength": 1}}
     },
+    "resource_usage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["model_load_ms", "cuda_before_load", "cuda_after_load", "cuda_peak_allocated_bytes", "cuda_after_close"],
+      "properties": {
+        "model_load_ms": {"type": ["number", "null"], "minimum": 0},
+        "cuda_before_load": {"$ref": "#/$defs/cudaMemory"},
+        "cuda_after_load": {"$ref": "#/$defs/cudaMemory"},
+        "cuda_peak_allocated_bytes": {"type": ["integer", "null"], "minimum": 0},
+        "cuda_after_close": {"$ref": "#/$defs/cudaMemory"}
+      }
+    },
     "records": {"type": "array", "items": {"$ref": "#/$defs/record"}},
     "limitations": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
   },
   "$defs": {
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "cudaMemory": {"type": "object", "additionalProperties": false, "required": ["allocated_bytes", "reserved_bytes"], "properties": {"allocated_bytes": {"type": ["integer", "null"], "minimum": 0}, "reserved_bytes": {"type": ["integer", "null"], "minimum": 0}}},
     "artifact": {"type": "object", "additionalProperties": false, "required": ["logical_path", "dataset_id", "sha256"], "properties": {"logical_path": {"type": "string", "minLength": 1}, "dataset_id": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}}},
     "record": {
       "type": "object", "additionalProperties": false,

@@ -108,8 +108,9 @@ textuales sin ejecutar traducción ni modificar el MVP. Contrato, plantilla y
 procedimiento: [PHASE5_TEXTUAL_VARIANTS.md](docs/PHASE5_TEXTUAL_VARIANTS.md).
 
 F5.2 implementa el adaptador de transformación textual, protección de topónimos,
-validación y comparación independiente de rankings. La inferencia real
-`Qwen/Qwen3-8B` continúa bloqueada hasta disponer de un snapshot local autorizado:
+validación y comparación independiente de rankings. `Qwen/Qwen3-8B` fue validado
+realmente en la GB10 y comparado con CrossText2Loc sobre sondas técnicas sin
+ground truth:
 [PHASE5_TEXT_TRANSFORMATION.md](docs/PHASE5_TEXT_TRANSFORMATION.md).
 
 Para comprobar pares equivalentes en inglés y español sobre ambas galerías:

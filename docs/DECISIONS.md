@@ -77,6 +77,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D059 | Mantener la preselección y el reranking OSM en stand-by | ACEPTADA | F5 / alcance |
 | D060 | Implementar F5.2 mediante un adaptador textual local-only y desacoplado | ACEPTADA | F5 / transformación textual |
 | D061 | Exigir revisión humana antes de comparar variantes generadas por modelo real | ACEPTADA | F5 / validación |
+| D062 | Validar Qwen3-8B local exacto antes de rankings F5.2 | ACEPTADA | F5 / ejecución local |
 
 ## D053 — API HTTP interna del MVP
 
@@ -341,6 +342,30 @@ rankings reales solo consumen variantes `reviewed`; la excepción para variantes
 No se incorporan silenciosamente salidas con topónimos, negaciones, números u
 orientaciones alterados. Los rankings permanecen independientes y no se fusionan
 scores ni coordenadas.
+
+## D062 — Validación real Qwen3-8B en GB10
+
+**Estado:** ACEPTADA
+**Componente:** F5 / ejecución local
+**Fecha:** 2026-10-19
+**Origen:** Autorización expresa F5.2b para descargar y ejecutar el modelo exacto.
+
+### Decisión
+
+F5.2 utiliza `Qwen/Qwen3-8B` exclusivamente en la revisión
+`b968826d9c46dd6066d109eabc6255188de91218`, almacenada fuera de Git. La
+ejecución usa el adaptador local-only, modo non-thinking, sin muestreo y sin
+fine-tuning. Otros modelos Qwen locales no se consideran sustitutos.
+
+Qwen se cierra antes de cargar CrossText2Loc. Las variantes automáticas se
+revisan mediante decisiones humanas explícitas antes de rankings reales.
+
+### Evidencia y consecuencias
+
+La carga real en GB10, dos lotes reproducibles de 18 variantes y 48 rankings
+CrossText2Loc Top-10 completaron correctamente. Los resultados son sondas
+técnicas sin ground truth; no demuestran mejora de precisión. Pesos y resultados
+permanecen fuera de Git.
 
 ## D001 — Identidad del candidato
 

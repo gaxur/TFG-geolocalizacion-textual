@@ -1291,7 +1291,7 @@ def _validate_f5_variant(variant: Any, label: str) -> None:
 
 
 def _validate_f5_transformation_run(document: Mapping[str, Any]) -> None:
-    fields = {"schema_version", "contract_version", "run_id", "source_sidecar", "derived_sidecar", "transformer", "generation", "environment", "records", "limitations"}
+    fields = {"schema_version", "contract_version", "run_id", "source_sidecar", "derived_sidecar", "transformer", "generation", "environment", "resource_usage", "records", "limitations"}
     if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f5-transformation-run-v1":
         raise SchemaValidationError("f5_transformation_run incompatible")
     if not isinstance(document["run_id"], str) or not re.fullmatch(r"f5-transformation-run-sha256-[0-9a-f]{64}", document["run_id"]):
@@ -1324,6 +1324,19 @@ def _validate_f5_transformation_run(document: Mapping[str, Any]) -> None:
         _non_empty_string(environment[field], f"environment.{field}")
     for field in ("torch_version", "transformers_version"):
         if environment[field] is not None: _non_empty_string(environment[field], f"environment.{field}")
+    usage = document["resource_usage"]
+    usage_fields = {"model_load_ms", "cuda_before_load", "cuda_after_load", "cuda_peak_allocated_bytes", "cuda_after_close"}
+    if not isinstance(usage, Mapping) or set(usage) != usage_fields:
+        raise SchemaValidationError("resource_usage F5.2 no válido")
+    for field in ("model_load_ms", "cuda_peak_allocated_bytes"):
+        if usage[field] is not None: _finite_number(usage[field], f"resource_usage.{field}", minimum=0)
+    for field in ("cuda_before_load", "cuda_after_load", "cuda_after_close"):
+        value = usage[field]
+        if not isinstance(value, Mapping) or set(value) != {"allocated_bytes", "reserved_bytes"}:
+            raise SchemaValidationError(f"resource_usage.{field} no válido")
+        for metric in value.values():
+            if metric is not None and (isinstance(metric, bool) or not isinstance(metric, int) or metric < 0):
+                raise SchemaValidationError(f"resource_usage.{field} contiene memoria no válida")
     if not isinstance(document["records"], list) or not isinstance(document["limitations"], list) or not document["limitations"]:
         raise SchemaValidationError("records o limitations F5.2 no válidos")
     seen = set()

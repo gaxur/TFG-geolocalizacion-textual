@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.tfg_phase0.config import load_region_config
 from src.tfg_phase0.f4_validation import load_verified_f1_catalog
-from src.tfg_phase0.f5_text_transform import FakeTransformer, GenerationConfig, QwenTransformersAdapter, materialize_variants
+from src.tfg_phase0.f5_text_transform import FakeTransformer, GenerationConfig, QwenTransformersAdapter, finalize_transformation_run_resources, materialize_variants
 from src.tfg_phase0.f5_textual_variants import source_dataset_sha256, validate_textual_variant_dataset
 from src.tfg_phase0.validation import validate_document
 
@@ -59,6 +59,7 @@ def main() -> int:
         derived, run = materialize_variants(source_sidecar, transformer, generation, source_logical_path=args.sidecar.name, source_sha256=_sha256(source_sidecar_raw))
     finally:
         transformer.close()
+    finalize_transformation_run_resources(run, transformer)
 
     validate_textual_variant_dataset(derived, source_dataset, source_sha256=source_dataset_sha256(args.source_query_dataset), catalog=catalog)
     validate_document(run, "f5_transformation_run")
