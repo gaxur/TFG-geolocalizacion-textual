@@ -32,7 +32,6 @@ TFG/
 │   ├── anexo_a.tex
 │   ├── anexo_b.tex
 │   ├── anexo_c.tex
-│   └── ejemplos.tex
 ├── imagenes/
 │   └── logo_uz.png
 └── recursos/
@@ -122,7 +121,6 @@ Completa en [metadata.tex](metadata.tex): título castellano, título inglés, n
 Escapa caracteres reservados en textos: `\&`, `\%`, `\_`, `\#`. Usa `\url{...}` para direcciones. Mantén títulos y nombres como texto sencillo para que también sirvan en los metadatos PDF. Revisa visualmente la portada si los nombres o títulos ocupan varias líneas.
 
 - `\agradecimientosfalse`: no incluye agradecimientos. Cambia a `\agradecimientostrue` cuando quieras redactarlos.
-- `\ejemplosfalse`: mantiene fuera de la memoria el anexo de demostración. Las entradas ficticias ya se han sustituido por fuentes reales. No habilitar ejemplos antes de entregar.
 
 Redacta el resumen y abstract en [preliminares/resumen.tex](preliminares/resumen.tex); las palabras clave se obtienen de los metadatos. Se colocan en la misma página bilingüe con ambos títulos. Los agradecimientos opcionales tienen su propio archivo.
 
@@ -157,7 +155,7 @@ La bibliografía actual contiene publicaciones científicas cotejadas con ACL An
 
 El anexo B contiene ahora una lista comentada de los términos empleados en el documento. El paquete `acronym` permanece disponible para incorporar, si se desea, primeras menciones automáticas mediante `\acro{SIGLA}{desarrollo}` y `\ac{SIGLA}`; esa convención no se aplica aún a la lista manual del anexo.
 
-Los fragmentos de código usan `listings`, con captions, numeración y mapeo de caracteres españoles. Consulta [anexos/ejemplos.tex](anexos/ejemplos.tex) para figura, tabla, ecuación, cita, referencia cruzada, código, acrónimo, URL y nota al pie. Para ficheros externos usa `\lstinputlisting[language=Python,caption={Descripción},label={lst:archivo}]{recursos/archivo.py}` después de crear el archivo.
+Los fragmentos de código usan `listings`, con captions, numeración y mapeo de caracteres españoles. Para ficheros externos usa `\lstinputlisting[language=Python,caption={Descripción},label={lst:archivo}]{recursos/archivo.py}` después de crear el archivo.
 
 ## Registro del uso de IA
 

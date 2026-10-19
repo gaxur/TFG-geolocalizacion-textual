@@ -6,7 +6,7 @@ Fecha de revisión: 8 de octubre de 2026.
 
 Desde `latex-memory/` se ejecutó `latexmk -pdf main.tex` con pdfLaTeX de MiKTeX, latexmk 4.88 y Biber 2.22. Tras resolver la interacción entre TikZ y las abreviaturas activas del español de Babel y corregir el desbordamiento de identificadores largos, se completó la compilación hasta obtener `main.pdf` (35 páginas en esta versión). Una ejecución posterior de `latexmk -pdf -silent main.tex` confirmó la estabilización de referencias.
 
-`main.blg` registra 11 claves citadas, lectura de `bibliografia.bib` y escritura de `main.bbl`, sin advertencias de Biber. El último `main.log` no muestra advertencias, referencias indefinidas ni cajas overfull/underfull. Los índices incluyen siete capítulos, bibliografía y anexos A--C; el anexo ficticio está desactivado con `\ejemplosfalse` y las citas ficticias no forman parte de `bibliografia.bib`.
+`main.blg` registra 11 claves citadas, lectura de `bibliografia.bib` y escritura de `main.bbl`, sin advertencias de Biber. El último `main.log` no muestra advertencias, referencias indefinidas ni cajas overfull/underfull. Los índices incluyen siete capítulos, bibliografía y anexos A--C; el anexo ficticio de plantilla se eliminó y sus citas no forman parte de `bibliografia.bib`.
 
 ## Alcance de la comprobación
 
