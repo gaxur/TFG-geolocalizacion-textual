@@ -573,4 +573,4 @@ GPU y las matrices de 25 m y 50 m en CPU. Una petición multigalería codifica e
 texto una vez y conserva `exhaustive_rank` como única implementación matemática.
 
 La interfaz, contratos, errores, memoria medida y ejemplo de uso se documentan
-en [CROSSTEXT2LOC_RETRIEVAL_INTERFACE.md](CROSSTEXT2LOC_RETRIEVAL_INTERFACE.md).
+en [CROSSTEXT2LOC.md](CROSSTEXT2LOC.md#interfaz-residente-f46).

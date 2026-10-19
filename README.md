@@ -46,39 +46,56 @@ manteniendo una sola instancia GPU.
 MVP.2 conecta el frontend Vite con esa API y muestra candidatos reales sobre
 Leaflet. La interfaz sintética anterior se retiró de forma definitiva.
 
+MVP.3 cierra el despliegue integrado mediante `compose.mvp.yaml`: Nginx sirve el
+frontend estático y redirige `/api` a FastAPI dentro de la red Compose. Se
+publica únicamente el frontend en el puerto 8080 de la PGX y CrossText2Loc se
+carga una vez en GPU.
+
 ## Ejecutar el MVP
 
-La guía completa de arranque, uso, parada y diagnóstico está en
-[MVP2_FRONTEND.md](docs/MVP2_FRONTEND.md). Resumen desde la raíz, usando el
-puerto alternativo 18000 si el 8000 está ocupado:
+La guía completa de despliegue, configuración, parada y diagnóstico está en
+[MVP.md](docs/MVP.md). Desde la raíz:
 
-```bash
-# Terminal 1
-ATLAS_API_PORT=18000 scripts/run_mvp1_api_docker.sh
+Antes de arrancar deben existir localmente:
 
-# Terminal 2
-npm --prefix frontend ci
-VITE_PROXY_TARGET=http://127.0.0.1:18000 npm --prefix frontend run dev
-```
+- `external/CVG-Text/` en el commit fijado por `scripts/setup_external.sh`;
+- el checkpoint en `checkpoints/CrossText2Loc/`;
+- CLIP en `$HOME/.cache/clip/ViT-L-14-336px.pt`;
+- manifests, bundles visuales y embeddings indicados por
+  `config/madrid_f46_retriever.json`.
 
-Abrir `http://127.0.0.1:5173/`.
-
-Para el despliegue integrado de producción local de MVP.3, con frontend estático
-Nginx, proxy interno y API sin puerto publicado:
+Los nombres y ubicaciones exactos están en
+[MVP.md](docs/MVP.md#archivos-locales-obligatorios-fuera-de-git).
+No es obligatorio crear `.env`; `.env.mvp.example` es una plantilla opcional que
+el wrapper y Docker Compose leen desde la raíz cuando se copia como `.env`.
 
 ```bash
 scripts/run_mvp3_stack.sh
 ```
 
-Abrir `http://127.0.0.1:8080/` y detener con:
+Este wrapper comprueba los artefactos externos y ejecuta el equivalente a
+`docker compose -f compose.mvp.yaml up --build`. Abrir
+`http://127.0.0.1:8080/` desde la PGX o `http://IP_LOCAL:8080/` desde un
+dispositivo de la misma LAN. El wrapper publica en `0.0.0.0` por defecto. Para
+segundo plano y parada:
 
 ```bash
+scripts/run_mvp3_stack.sh -d
 docker compose -f compose.mvp.yaml down
 ```
 
+Para impedir el acceso LAN:
+
+```bash
+MVP_BIND_HOST=127.0.0.1 scripts/run_mvp3_stack.sh -d
+```
+
+Los contenedores se crean con nombres estables `atlas-mvp-api` y
+`atlas-mvp-frontend`, sin el sufijo automático `-1` de Docker Compose.
+
 La configuración, acceso LAN opcional, healthchecks, pruebas y diagnóstico se
-documentan en [MVP3_DEPLOYMENT.md](docs/MVP3_DEPLOYMENT.md). El alcance y las
-limitaciones del MVP funcional se resumen en [MVP_CLOSURE.md](docs/MVP_CLOSURE.md).
+documentan en [MVP.md](docs/MVP.md), junto con la API, el frontend, la validación
+y las limitaciones del MVP funcional.
 
 El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 
@@ -115,15 +132,16 @@ en Git**. [data/README.md](data/README.md),
 [checkpoints/README.md](checkpoints/README.md) y
 [results/README.md](results/README.md) describen las ubicaciones locales;
 `docs/EXPERIMENTS.md` proporciona la plantilla para registrar versiones,
-comandos, resultados y recursos sin inventar mediciones. Las instrucciones de
-adquisición de los datos y pesos se concretarán después de verificar su formato,
-tamaño y permisos.
+comandos, resultados y recursos sin inventar mediciones. La preparación de los
+artefactos locales y las condiciones pendientes se documentan en las guías de
+datos, modelos, licencias y despliegue; el repositorio no los descarga al
+arrancar el MVP.
 
-La operación del entorno validado de CrossText2Loc se documenta en
-[docs/CROSSTEXT2LOC_DOCKER.md](docs/CROSSTEXT2LOC_DOCKER.md) y utiliza
-`compose.cross-text2loc.yaml`.
-Los resultados y la limitación metodológica del protocolo oficial se resumen en
-[docs/CROSSTEXT2LOC_REPRODUCTION.md](docs/CROSSTEXT2LOC_REPRODUCTION.md).
+El entorno validado, la reproducción oficial, la interfaz residente y las
+limitaciones de CrossText2Loc se documentan en
+[docs/CROSSTEXT2LOC.md](docs/CROSSTEXT2LOC.md). El shell científico utiliza
+`compose.cross-text2loc.yaml`; el despliegue de la aplicación usa
+`compose.mvp.yaml`.
 La implementación del modelo geográfico y manifest del piloto se documenta en
 [docs/PHASE1_GEOGRAPHIC_CATALOG.md](docs/PHASE1_GEOGRAPHIC_CATALOG.md).
 La infraestructura offline para adquirir y congelar un snapshot OSM se describe
@@ -131,19 +149,21 @@ en [docs/PHASE2_OSM_SNAPSHOT.md](docs/PHASE2_OSM_SNAPSHOT.md). La Fase 2 ya
 produjo y validó el primer snapshot real de la bbox D004; el raw permanece fuera
 de Git y las fases posteriores deberán referenciar su `osm_snapshot_id`.
 
-## Organización y ejecución futura en DGX
+## Organización y ejecución en PGX/DGX
 
 | Ruta | Contenido |
 |---|---|
-| `docs/`, `BASELINE.md`, `TFG_COMPONENTS.md` | Alcance, decisiones, requisitos y contexto |
+| `docs/`, `BASELINE.md` | Alcance, decisiones, requisitos, operación y contexto |
 | `config/`, `schemas/`, `src/tfg_phase0/`, `tests/` | Configuración y contratos propios ya existentes |
 | `scripts/` | Preparación reproducible sin instalación implícita |
 | `data/`, `checkpoints/`, `results/` | Ubicaciones locales de artefactos; solo metadatos pequeños seleccionados en Git |
 | `external/` | Clones de terceros excluidos de Git |
-| `frontend/`, `latex-memory/` | Prototipo previo y memoria existentes |
+| `frontend/`, `backend/`, `compose.mvp.yaml` | Aplicación MVP y despliegue integrado |
+| `latex-memory/` | Memoria del TFG |
 
-Los experimentos de GPU se ejecutarán **posteriormente en una NVIDIA DGX**.
-No se presupone su modelo de GPU, driver, CUDA ni VRAM. En la DGX, después de
-clonar este monorepo, se podrán ejecutar `bash scripts/check_dgx.sh` y
-`bash scripts/setup_external.sh`; ninguno instala Python, CUDA ni PyTorch. El
-entorno de inferencia y las descargas se prepararán en una fase posterior.
+El entorno principal validado actualmente es una PGX ARM64 con NVIDIA GB10. Una
+ejecución posterior en otra DGX debe volver a comprobar GPU, driver, CUDA, VRAM,
+arquitectura de las imágenes y rutas locales; no se extrapola automáticamente la
+compatibilidad. `bash scripts/check_dgx.sh` y `bash scripts/setup_external.sh`
+ayudan a inspeccionar y preparar el clon externo, pero no instalan Python, CUDA,
+PyTorch ni los artefactos pesados del MVP.

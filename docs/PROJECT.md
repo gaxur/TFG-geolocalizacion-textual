@@ -4,7 +4,7 @@
 
 Este documento define una propuesta de Trabajo de Fin de Grado cuyo contexto de investigación procede de [BASELINE.md](../BASELINE.md), fechado el 24 de septiembre de 2026. Las prioridades de desarrollo incorporan las decisiones de alcance acordadas posteriormente con el autor del proyecto. No describe un sistema ya implementado ni presenta resultados experimentales propios.
 
-Se distinguen tres niveles: **estado del arte**, que recoge los trabajos descritos en la fuente; **arquitectura propuesta**, que organiza sus ideas para el TFG; y **posibles extensiones**, cuya incorporación no está decidida. Las cifras experimentales se atribuyen a BASELINE.md y requieren contraste bibliográfico. Este documento es la referencia de alcance; [TFG_COMPONENTS.md](../TFG_COMPONENTS.md) resume su implementación y [LICENSES_AND_PERMISSIONS.md](LICENSES_AND_PERMISSIONS.md) registra las condiciones de reutilización.
+Se distinguen tres niveles: **estado del arte**, que recoge los trabajos descritos en la fuente; **arquitectura propuesta**, que organiza sus ideas para el TFG; y **posibles extensiones**, cuya incorporación no está decidida. Las cifras experimentales se atribuyen a BASELINE.md y requieren contraste bibliográfico. Este documento es la referencia de alcance; [MVP.md](MVP.md) describe la implementación funcional actual y [LICENSES_AND_PERMISSIONS.md](LICENSES_AND_PERMISSIONS.md) registra las condiciones de reutilización.
 
 ## 2. Problema que se quiere resolver
 
@@ -30,7 +30,7 @@ El objetivo incluye comparar CrossText2Loc y GOTPR como dos variantes de recuper
 
 El objetivo final es implementar y evaluar el recorrido principal del grafo de la sección 5: interpretación, generación geográfica, preselección sobre el catálogo offline, recuperación, verificación visual, diálogo y salida Top-K. El primer hito será un núcleo evaluable con LLM y un recuperador; la verificación y el diálogo son prioridades para alcanzar el sistema final, no requisitos para ejecutar ese primer hito. Wikidata/Wikipedia, las imágenes satelitales y el refinamiento con TOLoc quedan como extensiones condicionadas a su utilidad y al tiempo disponible. La sección 9 establece el orden de implementación y sus criterios de evaluación.
 
-La definición del sistema se acompaña de un [frontend interactivo](../frontend/README.md) conectado a la API interna y a CrossText2Loc. Presenta candidatos reales del catálogo piloto, pero no aporta por sí solo una evaluación experimental ni confirma la ubicación del usuario. La organización prevista del catálogo y la evaluación se resume en [MADRID_DATASET.md](MADRID_DATASET.md). La localización global y la precisión comparable a un GPS no constituyen compromisos del TFG.
+La definición del sistema se acompaña de un [frontend interactivo](../frontend/README.md) conectado a la API interna y a CrossText2Loc. El MVP funcional se despliega localmente mediante [`compose.mvp.yaml`](../compose.mvp.yaml), con Nginx como servidor estático y proxy del mismo origen hacia FastAPI; su operación se documenta en [MVP.md](MVP.md). Presenta candidatos reales del catálogo piloto, pero no aporta por sí solo una evaluación experimental ni confirma la ubicación del usuario. La organización prevista del catálogo y la evaluación se resume en [MADRID_DATASET.md](MADRID_DATASET.md). La localización global y la precisión comparable a un GPS no constituyen compromisos del TFG.
 
 ## 4. Estado del arte de referencia
 
@@ -405,4 +405,4 @@ El archivo fuente contiene títulos, nombres de proyectos, atribuciones y rótul
 | MLLM Retriever | *Turning Generators into Retrievers*; CVPR Findings 2026 en el texto y CVPR 2026 en la tabla inicial; arXiv; evaluación mencionada en GeoText-1652 y CVG-Text | No se incluye un rótulo de repositorio específico |
 | GeoBridge | CVPR 2026; Open Access CVF; recursos de código, modelo y dataset mencionados | No se incluye un rótulo de repositorio específico |
 
-OSM, Wikidata/Wikipedia y Street View se conservan como fuentes geográficas, de conocimiento y de imágenes propuestas en el contexto. Los enlaces incorporados posteriormente se conservan en [TFG_COMPONENTS.md](../TFG_COMPONENTS.md#7-referencias-conservadas). La verificación de las publicaciones y la normalización bibliográfica siguen pendientes.
+OSM, Wikidata/Wikipedia y Street View se conservan como fuentes geográficas, de conocimiento y de imágenes propuestas en el contexto. Los enlaces de implementación y bibliografía se mantienen en [STATE_OF_THE_ART.md](STATE_OF_THE_ART.md), [DATASET_MODEL_REQUIREMENTS.md](DATASET_MODEL_REQUIREMENTS.md) y [LICENSES_AND_PERMISSIONS.md](LICENSES_AND_PERMISSIONS.md). La verificación de las publicaciones y la normalización bibliográfica siguen pendientes.

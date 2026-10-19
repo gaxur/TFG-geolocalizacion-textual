@@ -117,15 +117,23 @@ lingüística, pero no mide por sí solo la precisión geográfica.
 
 ## Procedimiento recomendado
 
-1. Abrir el frontend y seleccionar la galería de 25 m.
-2. Seleccionar `Top-10` para la primera inspección.
-3. Copiar únicamente la descripción del caso, sin incluir su nombre ni sus
+1. Desplegar el MVP con `scripts/run_mvp3_stack.sh -d` y abrir
+   `http://127.0.0.1:8080/` en la PGX o `http://IP_LOCAL:8080/` desde la LAN.
+2. Seleccionar la galería de 25 m.
+3. Seleccionar `Top-10` para la primera inspección.
+4. Copiar únicamente la descripción del caso, sin incluir su nombre ni sus
    coordenadas.
-4. Ejecutar la búsqueda y localizar la referencia manual en el mapa.
-5. Anotar si algún candidato aparece cerca de la referencia y cuál es su rango.
-6. Repetir la consulta con la galería de 50 m.
-7. Repetir en inglés cuando exista una variante equivalente.
-8. No interpretar la similitud coseno como probabilidad de acierto.
+5. Ejecutar la búsqueda y localizar la referencia manual en el mapa.
+6. Anotar si algún candidato aparece cerca de la referencia y cuál es su rango.
+7. Repetir la consulta con la galería de 50 m.
+8. Repetir en inglés cuando exista una variante equivalente.
+9. No interpretar la similitud coseno como probabilidad de acierto.
+
+Al terminar:
+
+```bash
+docker compose -f compose.mvp.yaml down
+```
 
 Los candidatos representan centros de celdas. Por ello, no se espera una
 coincidencia decimal exacta entre el candidato y la referencia. Para cualquier

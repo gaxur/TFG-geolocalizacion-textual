@@ -301,6 +301,39 @@ Los tests Node y la build Vite pasaron. El browser-check con API fake y Leaflet
 no pudo ejecutarse porque la PGX no dispone de Chrome/Chromium ni `CHROME_PATH`;
 no se presenta como validación visual superada.
 
+## MVP.3: despliegue integrado y browser-check ARM64
+
+El 19 de octubre de 2026 se desplegó la aplicación mediante
+`compose.mvp.yaml`. Nginx sirvió la build estática y redirigió `/api` a FastAPI
+en la red Compose; solo el frontend se publicó en loopback. La imagen API
+`crosstext2loc-gb10:ngc26.02` cargó un único runtime y Uvicorn ejecutó un worker.
+
+```bash
+MVP_HTTP_PORT=18080 scripts/smoke_mvp3_stack.sh
+```
+
+El smoke verificó healthchecks, mismo origen, errores 422/404, repetibilidad,
+shutdown y ausencia de contenedores residuales. Chromium 155 se instaló dentro
+de una imagen Debian ARM64 aislada, sin modificar el sistema operativo host.
+Pasaron tanto la prueba visual con API simulada como el recorrido real:
+
+```text
+Chromium → Nginx → FastAPI → CrossText2Loc GB10 → Top-K → Leaflet
+```
+
+Resultados técnicos de la consulta española utilizada por el smoke:
+
+| Galería | K | Top-1 | Score coseno |
+|---|---:|---|---:|
+| 50 m | 5 | `...S050_L050_R0013_C0009` | 0,2834689915 |
+| 25 m | 3 | `...S025_L025_R0019_C0013` | 0,2912742496 |
+
+La repetición conservó exactamente IDs, orden, scores y coordenadas. Esto
+demuestra integración y determinismo, no precisión geográfica: la consulta no
+dispone de una posición real validada. El informe local se conserva en
+`results/generated/mvp3/stack-smoke.json`, fuera de Git. La operación completa
+se documenta en [MVP.md](MVP.md).
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado
@@ -391,7 +424,7 @@ Los experimentos futuros se separarán en:
   `candidate_id`, CrossText2Loc y Top-K, sin GT en consulta.
 
 No se mezclarán las métricas de A, B y C. La documentación completa está en
-[CROSSTEXT2LOC_REPRODUCTION.md](CROSSTEXT2LOC_REPRODUCTION.md) y el resumen
+[CROSSTEXT2LOC.md](CROSSTEXT2LOC.md#resultado-de-la-reproducción-oficial) y el resumen
 saneado en
 [`results/reproductions/crosstext2loc-newyork-osm-gb10-v1/`](../results/reproductions/crosstext2loc-newyork-osm-gb10-v1/).
 

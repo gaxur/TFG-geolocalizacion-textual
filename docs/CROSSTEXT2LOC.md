@@ -1,9 +1,20 @@
-# Guía de uso de CrossText2Loc con Docker Compose
+# CrossText2Loc: entorno, reproducción e interfaz residente
+
+Este es el único documento específico de CrossText2Loc. Consolida el entorno
+Docker científico, la reproducción oficial NewYork-mixed OSM y la interfaz
+residente utilizada por el MVP. El registro cronológico se conserva en
+[EXPERIMENTS.md](EXPERIMENTS.md).
 
 Esta guía describe el entorno utilizado para reproducir CrossText2Loc en la
 NVIDIA GB10. No ejecuta entrenamiento ni evaluación automáticamente. Antes de
 usar la GPU hay que comprobar `nvidia-smi` y respetar cualquier asignación o
 proceso activo.
+
+Este no es el Compose de despliegue de la aplicación. `compose.cross-text2loc.yaml`
+proporciona un shell científico aislado, sin red y sin servidor web. Para servir
+el MVP completo se usa `compose.mvp.yaml`, documentado en
+[MVP.md](MVP.md): Nginx publica el frontend y conecta con
+FastAPI y el runtime residente dentro de la red Compose.
 
 ## Configuración validada
 
@@ -23,11 +34,76 @@ experimentos baseline no se actualizarán automáticamente NGC, CUDA, PyTorch,
 torchvision ni las dependencias. Un cambio relevante deberá crear una nueva
 versión del entorno y conservar la trazabilidad de v1.
 
-Todos los comandos se ejecutan desde la raíz:
+## Resultado de la reproducción oficial
+
+La reproducción controlada NewYork-mixed con imágenes OSM terminó el 5 de
+octubre de 2026 con estado **REPRODUCIDO**. Solo se ejecutó inferencia, sin
+entrenamiento, fine-tuning ni cambios en la evaluación oficial. La evidencia
+compacta está en
+[`results/reproductions/crosstext2loc-newyork-osm-gb10-v1/result.json`](../results/reproductions/crosstext2loc-newyork-osm-gb10-v1/result.json).
+
+| Subconjunto | Muestras | R@1 | R@5 | R@10 | Desviación media |
+|---|---:|---:|---:|---:|---:|
+| Global | 1200 | 59,08 % | 82,75 % | 90,00 % | 0,18 km |
+| Panorama | 1000 | 59,30 % | 82,90 % | 90,10 % | 0,17 km |
+| Single-view | 200 | 58,00 % | 82,00 % | 89,50 % | 0,23 km |
+
+La evaluación oficial usa la coordenada real para seleccionar los 100 vecinos
+geográficos antes del ranking. Estas métricas no describen una búsqueda global
+ni pueden extrapolarse a Madrid.
 
 ```text
-${HOME}/Projects/TFG_Marcos/TFG-geolocalizacion-textual
+ground truth → 100 vecinos → ranking CrossText2Loc → métricas
 ```
+
+En Madrid, el ground truth no participa en la selección de candidatos.
+
+## Interfaz residente F4.6
+
+`src/tfg_phase0/crosstext2loc_runtime.py` carga explícitamente una instancia
+FP32 en GPU y las matrices de 25 m/50 m en CPU. Importar el módulo no importa
+Torch/CLIP ni inicializa CUDA.
+
+```text
+load()
+  → modelo único en GPU
+  → galerías e IDs residentes
+retrieve_many()
+  → valida la petición
+  → codifica el texto una vez
+  → ranking exhaustivo por galería
+  → Top-K con WGS84 y similitud coseno
+close()
+  → libera el modelo y rechaza consultas nuevas
+```
+
+Configuración: `config/madrid_f46_retriever.json`. Galerías:
+
+| Galería | Matriz | Candidatos |
+|---|---:|---:|
+| `madrid-50m` | `(253, 768)` | 253 |
+| `madrid-25m` | `(1115, 768)` | 1.115 |
+
+Los contratos JSON están en
+`schemas/crosstext2loc_retrieval_request.schema.json` y
+`schemas/crosstext2loc_retrieval_response.schema.json`. La petición no admite
+ground truth, coordenadas, paths ni selección de checkpoint. La similitud coseno
+no es una confianza calibrada.
+
+Medición observada en GB10: inicialización aproximada de 5.571,25 ms y primera
+consulta Top-10 multigalería de 154,19 ms. Son observaciones, no un SLA.
+
+Errores públicos del runtime: `RetrievalInputError`, `GalleryNotLoadedError`,
+`ResourceIntegrityError`, `ModelCompatibilityError`, `InferenceError` y
+`RuntimeClosedError`. No existe fallback silencioso a CPU, otro checkpoint u
+otra galería.
+
+El runner no HTTP `scripts/run_f46_retriever.py` mantiene el modelo residente en
+modo JSONL. El MVP envuelve la misma interfaz con FastAPI; no reimplementa carga,
+ranking ni coordenadas. Véase [MVP.md](MVP.md).
+
+Todos los comandos se ejecutan desde la raíz del clon local, sin depender de una
+ruta absoluta concreta.
 
 ## Comprobar la imagen
 
@@ -95,7 +171,7 @@ La configuración Compose:
 F4.6 añade un proceso Python residente sobre este mismo entorno. Mantener vivo
 solo `sleep infinity` no mantiene el modelo: debe permanecer vivo el proceso que
 contiene `CrossText2LocRetriever`. Véase
-[la interfaz de retrieval](CROSSTEXT2LOC_RETRIEVAL_INTERFACE.md).
+[la interfaz residente](#interfaz-residente-f46).
 
 Compose resuelve `${HOME}/.cache/clip` contra el directorio personal del usuario
 que ejecuta el comando, sin fijar en el archivo una ruta privada concreta.
@@ -282,7 +358,8 @@ entorno y podrían eliminar recursos de otros proyectos.
 | Driver NVIDIA | Host | Sí; no pertenece al contenedor |
 | CVG-Text | `external/CVG-Text/` del host | Sí |
 | Dataset | `data/cvg_text/` del host | Sí |
-| Checkpoint | `external/CVG-Text/checkpoints/` del host | Sí |
+| Checkpoint del MVP | `checkpoints/CrossText2Loc/` del host | Sí |
+| Checkpoints de reproducción oficial | `external/CVG-Text/checkpoints/` del host | Sí, si se prepararon allí |
 | Resultados manuales | `results/cross_text2loc_docker/manual/` | Sí |
 | Dockerfile y Compose | `docker/` y `compose.cross-text2loc.yaml` | Sí |
 | `/tmp` del contenedor | `tmpfs` efímero | No |
@@ -292,40 +369,5 @@ Ejecutar `docker compose down` no elimina el dataset, checkpoint, repositorio ni
 resultados, porque son archivos montados desde el host. El proyecto se monta en
 solo lectura para evitar modificaciones accidentales.
 
-## Uso diario
-
-Levantar CrossText2Loc con GPU:
-
-```bash
-docker compose -f compose.cross-text2loc.yaml up -d crosstext2loc
-```
-
-Entrar en el shell:
-
-```bash
-docker compose -f compose.cross-text2loc.yaml exec crosstext2loc bash
-```
-
-Salir del shell sin detener el contenedor:
-
-```bash
-exit
-```
-
-Detenerlo y conservar el contenedor:
-
-```bash
-docker compose -f compose.cross-text2loc.yaml stop
-```
-
-Volver a iniciarlo:
-
-```bash
-docker compose -f compose.cross-text2loc.yaml start
-```
-
-Detener y eliminar el contenedor de Compose:
-
-```bash
-docker compose -f compose.cross-text2loc.yaml down
-```
+Para la aplicación completa, no para el shell científico, utilizar los comandos
+de [MVP.md](MVP.md).

@@ -41,7 +41,7 @@ oficial de GOTPR.
 La auditoría inicial se realizó sobre código local clonado, sin descargar
 datasets, imágenes masivas ni checkpoints. Posteriormente se completó una
 reproducción separada de NewYork-mixed OSM con los artefactos oficiales; véase
-[`CROSSTEXT2LOC_REPRODUCTION.md`](CROSSTEXT2LOC_REPRODUCTION.md). Esa reproducción
+[`CROSSTEXT2LOC.md`](CROSSTEXT2LOC.md#resultado-de-la-reproducción-oficial). Esa reproducción
 no resuelve la generación de una galería compatible ni la transferencia a
 Madrid.
 

@@ -192,7 +192,7 @@ El refinamiento métrico inspirado en TOLoc y las alternativas multimodales como
 
 ## 11. Referencias identificadas y pendientes de normalización
 
-Los identificadores de este documento remiten a los trabajos mencionados en BASELINE.md. El archivo original no conserva URL explícitas ni destinos recuperables de los enlaces. El inventario [TFG_COMPONENTS.md](../TFG_COMPONENTS.md#7-referencias-conservadas) conserva los enlaces incorporados posteriormente. Completar y verificar las citas académicas sigue pendiente.
+Los identificadores de este documento remiten a los trabajos mencionados en BASELINE.md. El archivo original no conserva URL explícitas ni destinos recuperables de los enlaces. Los enlaces incorporados posteriormente se conservan en este documento, [DATASET_MODEL_REQUIREMENTS.md](DATASET_MODEL_REQUIREMENTS.md) y [LICENSES_AND_PERMISSIONS.md](LICENSES_AND_PERMISSIONS.md). Completar y verificar las citas académicas sigue pendiente.
 
 | Identificador | Trabajo o recurso identificado | Atribución conservada de la fuente |
 | --- | --- | --- |

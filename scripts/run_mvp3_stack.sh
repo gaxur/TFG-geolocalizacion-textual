@@ -2,6 +2,20 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+if [[ -f "$ROOT/.env" ]]; then
+  declare -A ENV_OVERRIDES=()
+  for name in MVP_BIND_HOST MVP_HTTP_PORT MVP_API_CONTAINER_NAME MVP_FRONTEND_CONTAINER_NAME MVP_API_IMAGE MVP_FRONTEND_IMAGE MVP_BROWSER_IMAGE MVP_CLIP_CACHE_DIR VITE_TILE_URL VITE_TILE_ATTRIBUTION; do
+    if [[ -v "$name" ]]; then ENV_OVERRIDES["$name"]=${!name}; fi
+  done
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT/.env"
+  set +a
+  for name in "${!ENV_OVERRIDES[@]}"; do
+    printf -v "$name" '%s' "${ENV_OVERRIDES[$name]}"
+    export "$name"
+  done
+fi
 COMPOSE=(docker compose)
 if [[ -n "${MVP_COMPOSE_PROJECT:-}" ]]; then COMPOSE+=(-p "$MVP_COMPOSE_PROJECT"); fi
 COMPOSE+=(-f "$ROOT/compose.mvp.yaml")
@@ -25,4 +39,5 @@ if missing:
 PY
 
 export MVP_CLIP_CACHE_DIR=$CLIP_DIR
+export MVP_BIND_HOST=${MVP_BIND_HOST:-0.0.0.0}
 exec "${COMPOSE[@]}" up --build "$@"

@@ -72,6 +72,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D054 | Integrar el frontend real con contratos F4.6 y Leaflet, conservando demo explícita | SUSTITUIDA | MVP / frontend |
 | D055 | Retirar definitivamente la interfaz sintética del frontend | ACEPTADA | MVP / frontend |
 | D056 | Desplegar el MVP integrado con Nginx, proxy interno y una única API GPU | ACEPTADA | MVP / despliegue |
+| D057 | Publicar por defecto el frontend MVP en la LAN de confianza | ACEPTADA | MVP / despliegue |
 
 ## D053 — API HTTP interna del MVP
 
@@ -117,7 +118,7 @@ externas, base de datos, HTTP público ni funcionalidades F5.
 - `backend/atlas_api/`
 - `scripts/run_mvp1_api.sh`
 - `tests/test_api_mvp1.py`
-- `docs/MVP1_API.md`
+- `docs/MVP.md`
 
 ### Dependencias
 
@@ -220,6 +221,28 @@ El stack es reproducible en la PGX y dispone de healthchecks, smoke HTTP y prueb
 visual real. Continúa siendo un servicio local experimental sin autenticación,
 TLS, rate limiting ni endurecimiento para Internet. El cierre técnico no implica
 validación de precisión geográfica en Madrid.
+
+## D057 — Acceso LAN predeterminado al frontend
+
+**Estado:** ACEPTADA
+**Componente:** MVP / despliegue
+**Fecha:** 2026-10-19
+**Origen:** Petición expresa para acceder desde un dispositivo móvil.
+
+### Decisión
+
+`compose.mvp.yaml` y `scripts/run_mvp3_stack.sh` publican Nginx en `0.0.0.0:8080`
+por defecto. FastAPI sigue sin publicar ningún puerto y solo es accesible por el
+proxy `/api` dentro de Compose. `MVP_BIND_HOST=127.0.0.1` permite recuperar el
+modo exclusivo de la PGX.
+
+### Consecuencias
+
+Los dispositivos de la misma LAN pueden abrir `http://IP_LOCAL:8080/`. El
+operador debe usar una red de confianza y revisar firewall y aislamiento de
+clientes. No se habilitan reglas de firewall, TLS ni exposición a Internet.
+D057 sustituye únicamente el binding predeterminado de D056; conserva el resto
+de su arquitectura y restricciones.
 
 ## D001 — Identidad del candidato
 
