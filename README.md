@@ -113,6 +113,9 @@ realmente en la GB10 y comparado con CrossText2Loc sobre sondas técnicas sin
 ground truth:
 [PHASE5_TEXT_TRANSFORMATION.md](docs/PHASE5_TEXT_TRANSFORMATION.md).
 
+La guía práctica exclusiva del modelo, traducción, topónimos, ejecución, memoria
+y limitaciones está en [QWEN.md](docs/QWEN.md).
+
 Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
 
 ```bash

@@ -1,5 +1,9 @@
 # F5.2: transformación textual local y rankings independientes
 
+Guía práctica del modelo y su uso:
+[QWEN.md](QWEN.md). Este documento conserva el protocolo y la evidencia
+experimental de F5.2.
+
 ## Estado
 
 F5.2 implementa la infraestructura para transformar textos F5.1 y comparar sus
