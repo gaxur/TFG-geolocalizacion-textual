@@ -121,6 +121,11 @@ infraestructura y Qwen real se validaron, pero la tasa de cumplimiento del
 contrato fue insuficiente para integrarla automáticamente:
 [PHASE5_GEOGRAPHIC_EXTRACTION.md](docs/PHASE5_GEOGRAPHIC_EXTRACTION.md).
 
+F5.4 implementa el contrato, recopilación y evaluador geográfico de las cinco
+variantes sobre galerías 25 m/50 m. La auditoría actual encontró cero
+observaciones humanas con GT validado, por lo que no publica precisión todavía:
+[PHASE5_GEOGRAPHIC_EVALUATION.md](docs/PHASE5_GEOGRAPHIC_EVALUATION.md).
+
 Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
 
 ```bash

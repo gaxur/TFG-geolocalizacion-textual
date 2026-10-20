@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "f5-ground-truth-dataset-v1",
+  "dataset_id": "f5-madrid-ground-truth-sha256-a5a82b4eb2181b060cf3582eaa51657ace3ca61c2cf1416c647df8d959fc9a7e",
+  "dataset_version": "madrid-f54-collection-template-v1",
+  "source_query_dataset": {
+    "dataset_id": "f4-madrid-queries-sha256-081605e242a4df54ead19f757cbb6f490e1907cf9cd1e92926214280cbb5b4e2",
+    "sha256": "e0c710d43e848353b0116bdffacb926f321a11ed3f615cf21934fd052514562a"
+  },
+  "catalogs": {
+    "madrid-25m": {"manifest_id": "madrid-pilot-grid-v1-s25-l25", "manifest_sha256": "a23d3f3b54958661db76914dff9ff40a3f01a133ee86499fb9e4ddf706a49f11", "candidate_count": 1115, "cell_size_m": 25},
+    "madrid-50m": {"manifest_id": "madrid-pilot-grid-v1-s50-l50", "manifest_sha256": "ad35d5cb3b602a9ce313e06e10f913f169430d62a948c0f5e77b396bc810f2aa", "candidate_count": 253, "cell_size_m": 50}
+  },
+  "collection_protocol": {
+    "version": "f54-madrid-observer-collection-v1",
+    "target_observations": {"minimum": 20, "maximum": 30},
+    "observer_position_policy": "observer_wgs84_not_mentioned_object",
+    "description_policy": "original_spanish_independent_observation",
+    "ground_truth_capture_before_ranking": true,
+    "evidence_required": true,
+    "orientation_policy": "explicit_evidence_no_egocentric_to_cardinal_inference",
+    "synthetic_excluded_from_accuracy": true
+  },
+  "observations": []
+}

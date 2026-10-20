@@ -1529,6 +1529,44 @@ def _validate_f5_geographic_extraction_comparison(document: Mapping[str, Any]) -
     if document["comparison_id"] != extraction_comparison_id(document): raise SchemaValidationError("comparison_id F5.3 no corresponde al contenido")
 
 
+def _validate_f5_ground_truth_dataset(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "dataset_id", "dataset_version", "source_query_dataset", "catalogs", "collection_protocol", "observations"}
+    if set(document) != fields or document.get("schema_version") != "1.0" or document.get("contract_version") != "f5-ground-truth-dataset-v1":
+        raise SchemaValidationError("f5_ground_truth_dataset incompatible")
+    if not isinstance(document["dataset_id"], str) or not re.fullmatch(r"f5-madrid-ground-truth-sha256-[0-9a-f]{64}", document["dataset_id"]):
+        raise SchemaValidationError("dataset_id F5.4 no válido")
+    _non_empty_string(document["dataset_version"], "f54.dataset_version")
+    source = document["source_query_dataset"]
+    if not isinstance(source, Mapping) or set(source) != {"dataset_id", "sha256"}:
+        raise SchemaValidationError("source_query_dataset F5.4 no válido")
+    _sha256(source["sha256"], "f54.source.sha256")
+    catalogs = document["catalogs"]
+    if not isinstance(catalogs, Mapping) or set(catalogs) != {"madrid-25m", "madrid-50m"}:
+        raise SchemaValidationError("catálogos F5.4 no válidos")
+    if not isinstance(document["observations"], list):
+        raise SchemaValidationError("observations F5.4 debe ser lista")
+    protocol = document["collection_protocol"]
+    if not isinstance(protocol, Mapping) or protocol.get("version") != "f54-madrid-observer-collection-v1" or protocol.get("ground_truth_capture_before_ranking") is not True or protocol.get("synthetic_excluded_from_accuracy") is not True:
+        raise SchemaValidationError("protocolo F5.4 no válido")
+
+
+def _validate_f5_geographic_evaluation(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "evaluation_id", "protocol", "inputs", "coverage", "metrics", "variant_comparisons", "per_query", "osm_future_baseline"}
+    if set(document) != fields or document.get("schema_version") != "1.0" or document.get("contract_version") != "f54-geographic-evaluation-v1":
+        raise SchemaValidationError("f5_geographic_evaluation incompatible")
+    if not isinstance(document["evaluation_id"], str) or not re.fullmatch(r"f54-geographic-evaluation-sha256-[0-9a-f]{64}", document["evaluation_id"]):
+        raise SchemaValidationError("evaluation_id F5.4 no válido")
+    if not isinstance(document["metrics"], list) or not isinstance(document["variant_comparisons"], list) or not isinstance(document["per_query"], list):
+        raise SchemaValidationError("colecciones de evaluación F5.4 no válidas")
+    if document["protocol"].get("ground_truth_ranking_use") is not False or document["protocol"].get("prefiltering") is not False or document["protocol"].get("reranking") is not False:
+        raise SchemaValidationError("evaluación F5.4 permite fuga o modifica el baseline")
+    if document["osm_future_baseline"].get("absence_of_osm_data_is_contradiction") is not False:
+        raise SchemaValidationError("ausencia OSM no puede ser contradicción automática")
+    from .f5_ground_truth_evaluation import geographic_evaluation_id
+    if document["evaluation_id"] != geographic_evaluation_id(document):
+        raise SchemaValidationError("evaluation_id F5.4 no corresponde al contenido")
+
+
 def _validate_crosstext2loc_retrieval_request(document: Mapping[str, Any]) -> None:
     fields = {"schema_version", "contract_version", "query", "gallery_ids", "top_k"}
     if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "crosstext2loc-retrieval-request-v1":
@@ -2044,6 +2082,8 @@ def validate_document(document: Any, schema_name: str) -> None:
         "f5_variant_ranking_report": _validate_f5_variant_ranking_report,
         "f5_geographic_extraction_set": _validate_f5_geographic_extraction_set,
         "f5_geographic_extraction_comparison": _validate_f5_geographic_extraction_comparison,
+        "f5_ground_truth_dataset": _validate_f5_ground_truth_dataset,
+        "f5_geographic_evaluation": _validate_f5_geographic_evaluation,
         "crosstext2loc_retrieval_request": _validate_crosstext2loc_retrieval_request,
         "crosstext2loc_retrieval_response": _validate_crosstext2loc_retrieval_response,
         "manifest": _validate_manifest,

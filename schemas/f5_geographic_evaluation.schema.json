@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f5_geographic_evaluation.schema.json",
+  "title": "F5.4 five-variant geographic evaluation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "evaluation_id", "protocol", "inputs", "coverage", "metrics", "variant_comparisons", "per_query", "osm_future_baseline"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "f54-geographic-evaluation-v1"},
+    "evaluation_id": {"type": "string", "pattern": "^f54-geographic-evaluation-sha256-[0-9a-f]{64}$"},
+    "protocol": {"type": "object"}, "inputs": {"type": "object"}, "coverage": {"type": "object"},
+    "metrics": {"type": "array", "items": {"type": "object"}}, "variant_comparisons": {"type": "array", "items": {"type": "object"}}, "per_query": {"type": "array", "items": {"type": "object"}},
+    "osm_future_baseline": {"type": "object"}
+  }
+}

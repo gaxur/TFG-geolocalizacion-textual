@@ -472,6 +472,34 @@ variantes produjo 15/30 records válidos, 3/6 para cada tipo; no se observó ven
 de `en_cartographic`. El resumen permanece fuera de Git en
 `results/generated/f5/f53b/`.
 
+## F5.4: auditoría de Ground Truth y plantilla
+
+La auditoría de F4.3/F5 no encontró observaciones `human_in_situ` ni referencias
+geográficas `validated`. Los únicos textos disponibles son tres sondas técnicas
+F4.3 y fixtures de desarrollo sin GT. No se ejecutó una evaluación de precisión
+ni se publicaron Recall/error de Madrid.
+
+Se materializó la plantilla F5.4 contra los catálogos reales:
+
+```bash
+.venv-geo/bin/python scripts/prepare_f54_ground_truth_template.py \
+  --output results/generated/f5/f54/ground-truth-template.json
+```
+
+Resultado:
+
+```text
+observation_count: 0
+validated_count: 0
+pending_count: 0
+geographic_evaluation_ready: false
+```
+
+El artefacto permanece fuera de Git. Los manifests auditados contienen 1.115
+candidatos de 25 m y 253 de 50 m. La infraestructura y métricas se verificaron
+con fixtures sintéticos identificados exclusivamente como tests de software.
+Procedimiento: [PHASE5_GEOGRAPHIC_EVALUATION.md](PHASE5_GEOGRAPHIC_EVALUATION.md).
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

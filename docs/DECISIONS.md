@@ -82,6 +82,8 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D064 | No integrar F5.3 mientras su calidad contractual sea insuficiente | ACEPTADA | F5 / alcance |
 | D065 | Mantener bloqueada la integración automática tras comparar estrategias F5.3b | ACEPTADA | F5 / generación estructurada |
 | D066 | Versionar el contrato textual para añadir `en_cartographic` sin reinterpretar v1 | ACEPTADA | F5 / variantes textuales |
+| D067 | Reutilizar F4.3 y añadir un sidecar F5.4 de evidencia/asignación multigalería | ACEPTADA | F5 / evaluación geográfica |
+| D068 | No publicar precisión de Madrid hasta disponer de GT real verificado | ACEPTADA | F5 / integridad experimental |
 
 ## D053 — API HTTP interna del MVP
 
@@ -455,6 +457,50 @@ reinterpretan artefactos históricos. La nueva tarea usa
 Los rankings continúan siendo exhaustivos e independientes, sin fusión. Los
 resultados observados son estabilidad sin ground truth y no demuestran que la
 variante mejore precisión geográfica o extracción.
+
+## D067 — Sidecar F5.4 de evidencia y asignación multigalería
+
+**Estado:** ACEPTADA
+**Componente:** F5 / evaluación geográfica
+**Fecha:** 2026-10-20
+**Origen:** Implementación F5.4 solicitada por el responsable.
+
+### Decisión
+
+F4.3 continúa siendo la fuente de descripción, procedencia, partición y referencia
+WGS84. F5.4 añade un sidecar content-addressed para evidencia de verificación,
+orientación y asignaciones independientes a los catálogos 25 m y 50 m. No se
+duplica ni sustituye el evaluador geométrico F4.3.
+
+La posición GT representa al observador. Las asignaciones se recalculan con
+`assign_reference()` y distinguen punto, celda, centro y candidato recuperado.
+Las variantes y rankings se enlazan por IDs y SHA-256; el GT no entra en prompts
+ni retrieval.
+
+### Consecuencias
+
+El reporte F5.4 sirve como baseline A y reserva campos nulos para futuras
+comparaciones B/C con OSM. Prefiltrado y reranking permanecen en stand-by.
+
+## D068 — Precisión de Madrid condicionada a GT real verificado
+
+**Estado:** ACEPTADA
+**Componente:** F5 / integridad experimental
+**Fecha:** 2026-10-20
+**Origen:** Auditoría inicial F5.4.
+
+### Decisión
+
+No se calculan ni publican métricas geográficas de Madrid con sondas técnicas,
+fixtures sintéticos, centros de candidato usados como supuesto observador o
+referencias pendientes. Una observación evaluable debe ser humana in situ o de un
+dataset existente autorizado, independiente, española, con coordenada del
+observador, precisión, método y evidencia revisada.
+
+### Consecuencias
+
+La auditoría actual registra cero observaciones evaluables. F5.4 queda preparada
+pero no produce resultados empíricos hasta recopilar y congelar GT válido.
 
 ## D001 — Identidad del candidato
 
