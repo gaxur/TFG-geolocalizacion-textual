@@ -427,6 +427,23 @@ ni error geográfico. Los artefactos completos permanecen en
 `results/generated/f5/f52/`, fuera de Git. Véase
 [PHASE5_TEXT_TRANSFORMATION.md](PHASE5_TEXT_TRANSFORMATION.md).
 
+## F5.3: extracción geográfica estructurada real
+
+Se implementaron schemas, extractor desacoplado, parser JSON, validación de
+evidencia/semántica, provenance, identidad y comparación entre variantes. El
+smoke fake cubrió diez casos y produjo 10/10 extracciones válidas.
+
+Qwen3-8B real se ejecutó en tres campañas de diez sondas técnicas sin ground
+truth. La campaña inicial produjo 1/10 válida; el reintento explícito 0/10; y el
+prompt con mapa índice-caracter 0/10. Los errores principales fueron spans
+incorrectos, formato de negaciones/ambigüedades, referencias inexistentes y
+frames incompatibles. No se repararon salidas ni se relajó el contrato.
+
+Una muestra se repitió dos veces: raw JSON y SHA-256 idénticos, pero ambas salidas
+fueron rechazadas. La inferencia es reproducible para esa muestra, aunque la
+calidad contractual sigue siendo insuficiente. Accuracy permanece no disponible.
+Detalles: [PHASE5_GEOGRAPHIC_EXTRACTION.md](PHASE5_GEOGRAPHIC_EXTRACTION.md).
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

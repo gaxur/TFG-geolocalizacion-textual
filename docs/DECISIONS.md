@@ -78,6 +78,8 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D060 | Implementar F5.2 mediante un adaptador textual local-only y desacoplado | ACEPTADA | F5 / transformación textual |
 | D061 | Exigir revisión humana antes de comparar variantes generadas por modelo real | ACEPTADA | F5 / validación |
 | D062 | Validar Qwen3-8B local exacto antes de rankings F5.2 | ACEPTADA | F5 / ejecución local |
+| D063 | Exigir evidencia textual exacta en extracciones F5.3 | ACEPTADA | F5 / extracción estructurada |
+| D064 | No integrar F5.3 mientras su calidad contractual sea insuficiente | ACEPTADA | F5 / alcance |
 
 ## D053 — API HTTP interna del MVP
 
@@ -366,6 +368,46 @@ La carga real en GB10, dos lotes reproducibles de 18 variantes y 48 rankings
 CrossText2Loc Top-10 completaron correctamente. Los resultados son sondas
 técnicas sin ground truth; no demuestran mejora de precisión. Pesos y resultados
 permanecen fuera de Git.
+
+## D063 — Evidencia textual exacta en F5.3
+
+**Estado:** ACEPTADA
+**Componente:** F5 / extracción estructurada
+**Fecha:** 2026-10-20
+**Origen:** Requisitos F5.3 solicitados por el responsable.
+
+### Decisión
+
+Toda entidad, atributo, relación y negación F5.3 debe enlazar un substring exacto
+del texto de la variante mediante span Unicode verificable. El extractor no
+puede emitir coordenadas, distancias inventadas o referencias inexistentes.
+Izquierda/derecha permanecen egocéntricas y una orientación no puede declararse
+verificada a partir del texto.
+
+### Consecuencias
+
+Los outputs no se reparan silenciosamente. Un error de span, negación, referencia
+o frame rechaza el record y conserva la salida raw para auditoría.
+
+## D064 — F5.3 no apta todavía para integración automática
+
+**Estado:** ACEPTADA
+**Componente:** F5 / alcance
+**Fecha:** 2026-10-20
+**Origen:** Resultado del smoke real Qwen3-8B.
+
+### Decisión
+
+Aunque la infraestructura y la inferencia real F5.3 funcionan, Qwen3-8B no
+cumplió de forma fiable el contrato estricto: la mejor campaña obtuvo 1/10
+extracciones válidas. Por ello no se conecta a preselección OSM, diálogo, VLM,
+API ni ranking.
+
+### Consecuencias
+
+El resultado se documenta como limitación experimental, no se oculta ni se
+compensa relajando validadores. Una fase posterior deberá estudiar otra estrategia
+de evidencia/offsets y un dataset anotado antes de integrar el componente.
 
 ## D001 — Identidad del candidato
 

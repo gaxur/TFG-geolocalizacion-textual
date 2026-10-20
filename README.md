@@ -116,6 +116,11 @@ ground truth:
 La guía práctica exclusiva del modelo, traducción, topónimos, ejecución, memoria
 y limitaciones está en [QWEN.md](docs/QWEN.md).
 
+F5.3 implementa extracción geográfica estructurada con evidencia textual. La
+infraestructura y Qwen real se validaron, pero la tasa de cumplimiento del
+contrato fue insuficiente para integrarla automáticamente:
+[PHASE5_GEOGRAPHIC_EXTRACTION.md](docs/PHASE5_GEOGRAPHIC_EXTRACTION.md).
+
 Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
 
 ```bash

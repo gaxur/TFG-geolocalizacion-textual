@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f5_geographic_extraction_comparison.schema.json",
+  "title": "F5.3 extraction comparison report",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "comparison_id", "extraction_set_id", "extraction_set_sha256", "comparisons", "accuracy_available", "limitations"],
+  "properties": {
+    "schema_version": {"const": "1.0"}, "contract_version": {"const": "f5-geographic-extraction-comparison-v1"},
+    "comparison_id": {"type": "string", "pattern": "^f5-geographic-extraction-comparison-sha256-[0-9a-f]{64}$"},
+    "extraction_set_id": {"type": "string", "minLength": 1}, "extraction_set_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "comparisons": {"type": "array", "items": {"type": "object"}}, "accuracy_available": {"const": false},
+    "limitations": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+  }
+}

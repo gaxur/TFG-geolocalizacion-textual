@@ -392,9 +392,12 @@ La inferencia real Qwen y los rankings derivados siguen pendientes de disponer
 de pesos autorizados y observaciones revisadas. No debe elegirse traductor o
 prompt con la evaluación final.
 
-F5.3 podrá estudiar extracción automática de topónimos, categorías, objetos,
-relaciones, atributos, negaciones y orientación explícita. Debe preservar texto
-original y revisión. No está implementada en F5.1.
+F5.3 implementa la infraestructura de extracción automática de topónimos,
+categorías, objetos, relaciones, atributos, negaciones y orientación explícita,
+documentada en
+[PHASE5_GEOGRAPHIC_EXTRACTION.md](PHASE5_GEOGRAPHIC_EXTRACTION.md). La inferencia
+real se ejecutó, pero su cumplimiento contractual fue insuficiente para integrar
+el componente automáticamente.
 
 La preselección, filtrado o reranking OSM sigue en stand-by hasta decisión del
 tutor. F3 puede utilizarse posteriormente para análisis de objetos alrededor de

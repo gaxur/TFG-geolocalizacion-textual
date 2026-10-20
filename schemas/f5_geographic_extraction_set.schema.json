@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f5_geographic_extraction_set.schema.json",
+  "title": "F5.3 structured geographic extraction set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "extraction_set_id", "protocol_version", "source_sidecar", "extractor", "generation", "resource_usage", "records", "limitations"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "f5-geographic-extraction-set-v1"},
+    "extraction_set_id": {"type": "string", "pattern": "^f5-geographic-extractions-sha256-[0-9a-f]{64}$"},
+    "protocol_version": {"const": "f53-geographic-extraction-v1"},
+    "source_sidecar": {"$ref": "#/$defs/sourceSidecar"},
+    "extractor": {"$ref": "#/$defs/extractor"},
+    "generation": {"$ref": "#/$defs/generation"},
+    "resource_usage": {"$ref": "#/$defs/resourceUsage"},
+    "records": {"type": "array", "items": {"$ref": "#/$defs/record"}},
+    "limitations": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sourceSidecar": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dataset_id", "sha256", "logical_path"],
+      "properties": {"dataset_id": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}, "logical_path": {"type": "string", "minLength": 1}}
+    },
+    "extractor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["adapter", "model_id", "revision", "tokenizer_id", "tokenizer_revision", "artifact_manifest_sha256", "real_model_inference"],
+      "properties": {
+        "adapter": {"type": "string", "minLength": 1}, "model_id": {"type": "string", "minLength": 1},
+        "revision": {"type": "string", "minLength": 1}, "tokenizer_id": {"type": "string", "minLength": 1},
+        "tokenizer_revision": {"type": "string", "minLength": 1}, "artifact_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "real_model_inference": {"type": "boolean"}
+      }
+    },
+    "generation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["prompt_version", "do_sample", "temperature", "seed", "max_new_tokens", "enable_thinking", "max_attempts"],
+      "properties": {
+        "prompt_version": {"const": "f53-geographic-extraction-v1"}, "do_sample": {"const": false},
+        "temperature": {"const": 0}, "seed": {"type": "integer"}, "max_new_tokens": {"type": "integer", "minimum": 1},
+        "enable_thinking": {"const": false}, "max_attempts": {"type": "integer", "minimum": 1, "maximum": 2}
+      }
+    },
+    "cudaMemory": {"type": "object", "additionalProperties": false, "required": ["allocated_bytes", "reserved_bytes"], "properties": {"allocated_bytes": {"type": ["integer", "null"], "minimum": 0}, "reserved_bytes": {"type": ["integer", "null"], "minimum": 0}}},
+    "resourceUsage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["model_load_ms", "cuda_before_load", "cuda_after_load", "cuda_peak_allocated_bytes", "cuda_after_close"],
+      "properties": {"model_load_ms": {"type": ["number", "null"], "minimum": 0}, "cuda_before_load": {"$ref": "#/$defs/cudaMemory"}, "cuda_after_load": {"$ref": "#/$defs/cudaMemory"}, "cuda_peak_allocated_bytes": {"type": ["integer", "null"], "minimum": 0}, "cuda_after_close": {"$ref": "#/$defs/cudaMemory"}}
+    },
+    "span": {
+      "type": "object", "additionalProperties": false, "required": ["start", "end"],
+      "properties": {"start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 1}}
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false, "required": ["text", "span", "support"],
+      "properties": {"text": {"type": "string", "minLength": 1}, "span": {"$ref": "#/$defs/span"}, "support": {"enum": ["explicit", "linguistic_interpretation"]}}
+    },
+    "attribute": {
+      "type": "object", "additionalProperties": false, "required": ["attribute_id", "key", "value", "negated", "evidence"],
+      "properties": {"attribute_id": {"type": "string", "pattern": "^at[1-9][0-9]*$"}, "key": {"type": "string", "minLength": 1}, "value": {"type": "string", "minLength": 1}, "negated": {"type": "boolean"}, "evidence": {"$ref": "#/$defs/evidence"}}
+    },
+    "entity": {
+      "type": "object", "additionalProperties": false, "required": ["entity_id", "type", "name", "negated", "attributes", "evidence"],
+      "properties": {
+        "entity_id": {"type": "string", "pattern": "^e[1-9][0-9]*$"},
+        "type": {"enum": ["street", "road", "intersection", "square", "park", "building", "church", "station", "bridge", "river", "monument", "other", "unknown"]},
+        "name": {"type": ["string", "null"]}, "negated": {"type": "boolean"},
+        "attributes": {"type": "array", "items": {"$ref": "#/$defs/attribute"}}, "evidence": {"$ref": "#/$defs/evidence"}
+      }
+    },
+    "relation": {
+      "type": "object", "additionalProperties": false, "required": ["relation_id", "subject", "predicate", "object_ids", "negated", "reference_frame", "evidence"],
+      "properties": {
+        "relation_id": {"type": "string", "pattern": "^r[1-9][0-9]*$"}, "subject": {"type": "string", "minLength": 1},
+        "predicate": {"enum": ["near", "next_to", "inside", "between", "in_front_of", "behind", "left_of_observer", "right_of_observer", "north_of", "south_of", "east_of", "west_of", "intersects", "unknown"]},
+        "object_ids": {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "negated": {"type": "boolean"},
+        "reference_frame": {"enum": ["none", "egocentric", "cardinal", "unknown"]}, "evidence": {"$ref": "#/$defs/evidence"}
+      }
+    },
+    "negation": {
+      "type": "object", "additionalProperties": false, "required": ["negation_id", "target_kind", "target_id", "evidence"],
+      "properties": {"negation_id": {"type": "string", "pattern": "^n[1-9][0-9]*$"}, "target_kind": {"enum": ["entity", "relation", "attribute"]}, "target_id": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/evidence"}}
+    },
+    "ambiguity": {
+      "type": "object", "additionalProperties": false, "required": ["ambiguity_id", "kind", "description", "entity_ids", "relation_ids", "evidence"],
+      "properties": {
+        "ambiguity_id": {"type": "string", "pattern": "^a[1-9][0-9]*$"},
+        "kind": {"enum": ["ambiguous_reference", "incomplete_relation", "uncertain_entity_type", "insufficient_information", "other"]},
+        "description": {"type": "string", "minLength": 1}, "entity_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "relation_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "evidence": {"anyOf": [{"$ref": "#/$defs/evidence"}, {"type": "null"}]}
+      }
+    },
+    "orientation": {
+      "type": "object", "additionalProperties": false, "required": ["status", "cardinal", "bearing_degrees", "reference_frame", "evidence"],
+      "properties": {
+        "status": {"enum": ["unknown", "reported", "verified"]},
+        "cardinal": {"enum": ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest", null]},
+        "bearing_degrees": {"type": ["number", "null"], "minimum": 0, "exclusiveMaximum": 360},
+        "reference_frame": {"enum": ["unknown", "cardinal"]},
+        "evidence": {"anyOf": [{"$ref": "#/$defs/evidence"}, {"type": "null"}]}
+      }
+    },
+    "extraction": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "entities", "relations", "negations", "observer_orientation", "ambiguities"],
+      "properties": {
+        "schema_version": {"const": "1.0"}, "entities": {"type": "array", "items": {"$ref": "#/$defs/entity"}},
+        "relations": {"type": "array", "items": {"$ref": "#/$defs/relation"}}, "negations": {"type": "array", "items": {"$ref": "#/$defs/negation"}},
+        "observer_orientation": {"$ref": "#/$defs/orientation"}, "ambiguities": {"type": "array", "items": {"$ref": "#/$defs/ambiguity"}}
+      }
+    },
+    "issue": {
+      "type": "object", "additionalProperties": false, "required": ["code", "severity", "message"],
+      "properties": {"code": {"type": "string", "minLength": 1}, "severity": {"enum": ["error", "warning"]}, "message": {"type": "string", "minLength": 1}}
+    },
+    "validation": {
+      "type": "object", "additionalProperties": false, "required": ["structurally_valid", "semantically_valid", "human_review_required", "issues"],
+      "properties": {"structurally_valid": {"type": "boolean"}, "semantically_valid": {"type": "boolean"}, "human_review_required": {"const": true}, "issues": {"type": "array", "items": {"$ref": "#/$defs/issue"}}}
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["model_id", "revision", "tokenizer_id", "tokenizer_revision", "artifact_manifest_sha256", "prompt_version", "do_sample", "temperature", "seed", "enable_thinking", "real_model_inference"],
+      "properties": {
+        "model_id": {"type": "string", "minLength": 1}, "revision": {"type": "string", "minLength": 1},
+        "tokenizer_id": {"type": "string", "minLength": 1}, "tokenizer_revision": {"type": "string", "minLength": 1},
+        "artifact_manifest_sha256": {"$ref": "#/$defs/sha256"}, "prompt_version": {"const": "f53-geographic-extraction-v1"},
+        "do_sample": {"const": false}, "temperature": {"const": 0}, "seed": {"type": "integer"},
+        "enable_thinking": {"const": false}, "real_model_inference": {"type": "boolean"}
+      }
+    },
+    "record": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_query_id", "derivation_group_id", "partition", "variant_id", "variant_kind", "language", "input_text", "input_text_sha256", "protected_toponyms", "status", "attempt_count", "raw_outputs", "raw_outputs_sha256", "prompt_sha256", "duration_ms", "extraction", "validation", "provenance"],
+      "properties": {
+        "source_query_id": {"type": "string", "minLength": 1}, "derivation_group_id": {"type": "string", "minLength": 1},
+        "partition": {"enum": ["development", "evaluation"]}, "variant_id": {"type": "string", "minLength": 1},
+        "variant_kind": {"enum": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"]},
+        "language": {"enum": ["es", "en"]}, "input_text": {"type": "string", "minLength": 1},
+        "input_text_sha256": {"$ref": "#/$defs/sha256"}, "protected_toponyms": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "status": {"enum": ["valid", "rejected", "error"]}, "attempt_count": {"type": "integer", "minimum": 1, "maximum": 2},
+        "raw_outputs": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"type": "string"}}, "raw_outputs_sha256": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"$ref": "#/$defs/sha256"}},
+        "prompt_sha256": {"$ref": "#/$defs/sha256"}, "duration_ms": {"type": "number", "minimum": 0},
+        "extraction": {"anyOf": [{"$ref": "#/$defs/extraction"}, {"type": "null"}]},
+        "validation": {"$ref": "#/$defs/validation"}, "provenance": {"$ref": "#/$defs/provenance"}
+      }
+    }
+  }
+}

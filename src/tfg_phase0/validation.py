@@ -8,6 +8,7 @@ libre de dependencias externas.
 from __future__ import annotations
 
 from collections.abc import Mapping
+import hashlib
 import math
 import re
 import urllib.parse
@@ -1442,6 +1443,82 @@ def _validate_f5_variant_ranking_report(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("report_id F5.2 no corresponde al contenido")
 
 
+def _validate_f5_geographic_extraction_set(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "extraction_set_id", "protocol_version", "source_sidecar", "extractor", "generation", "resource_usage", "records", "limitations"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f5-geographic-extraction-set-v1" or document["protocol_version"] != "f53-geographic-extraction-v1":
+        raise SchemaValidationError("f5_geographic_extraction_set incompatible")
+    if not isinstance(document["extraction_set_id"], str) or not re.fullmatch(r"f5-geographic-extractions-sha256-[0-9a-f]{64}", document["extraction_set_id"]):
+        raise SchemaValidationError("extraction_set_id F5.3 no válido")
+    source = document["source_sidecar"]
+    if not isinstance(source, Mapping) or set(source) != {"dataset_id", "sha256", "logical_path"}:
+        raise SchemaValidationError("source_sidecar F5.3 no válido")
+    _non_empty_string(source["dataset_id"], "f53.source_sidecar.dataset_id"); _sha256(source["sha256"], "f53.source_sidecar.sha256"); _logical_path(source["logical_path"], "f53.source_sidecar.logical_path")
+    extractor = document["extractor"]
+    extractor_fields = {"adapter", "model_id", "revision", "tokenizer_id", "tokenizer_revision", "artifact_manifest_sha256", "real_model_inference"}
+    if not isinstance(extractor, Mapping) or set(extractor) != extractor_fields or not isinstance(extractor["real_model_inference"], bool): raise SchemaValidationError("extractor F5.3 no válido")
+    for field in extractor_fields - {"real_model_inference"}:
+        if field == "artifact_manifest_sha256": _sha256(extractor[field], "f53.extractor.hash")
+        else: _non_empty_string(extractor[field], f"f53.extractor.{field}")
+    generation = document["generation"]
+    generation_fields = {"prompt_version", "do_sample", "temperature", "seed", "max_new_tokens", "enable_thinking", "max_attempts"}
+    if not isinstance(generation, Mapping) or set(generation) != generation_fields or generation["prompt_version"] != "f53-geographic-extraction-v1" or generation["do_sample"] is not False or generation["temperature"] != 0 or generation["enable_thinking"] is not False or generation["max_attempts"] not in {1, 2}:
+        raise SchemaValidationError("generation F5.3 no válida")
+    usage = document["resource_usage"]
+    if not isinstance(usage, Mapping) or set(usage) != {"model_load_ms", "cuda_before_load", "cuda_after_load", "cuda_peak_allocated_bytes", "cuda_after_close"}: raise SchemaValidationError("resource_usage F5.3 no válido")
+    if not isinstance(document["records"], list) or not isinstance(document["limitations"], list) or not document["limitations"]: raise SchemaValidationError("records/limitations F5.3 no válidos")
+    seen = set()
+    for record in document["records"]:
+        required = {"source_query_id", "derivation_group_id", "partition", "variant_id", "variant_kind", "language", "input_text", "input_text_sha256", "protected_toponyms", "status", "attempt_count", "raw_outputs", "raw_outputs_sha256", "prompt_sha256", "duration_ms", "extraction", "validation", "provenance"}
+        if not isinstance(record, Mapping) or set(record) != required: raise SchemaValidationError("record F5.3 no válido")
+        if record["variant_id"] in seen: raise SchemaValidationError("variant_id F5.3 duplicado")
+        seen.add(record["variant_id"])
+        if record["partition"] not in {"development", "evaluation"} or record["variant_kind"] not in {"es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"} or record["language"] not in {"es", "en"} or record["status"] not in {"valid", "rejected", "error"} or record["attempt_count"] not in {1, 2}:
+            raise SchemaValidationError("record F5.3 contiene estado incompatible")
+        _sha256(record["input_text_sha256"], "f53.input_hash"); _sha256(record["prompt_sha256"], "f53.prompt_hash")
+        if not isinstance(record["protected_toponyms"], list) or len(record["protected_toponyms"]) != len(set(record["protected_toponyms"])) or any(not isinstance(value, str) or not value for value in record["protected_toponyms"]): raise SchemaValidationError("protected_toponyms F5.3 no válido")
+        if not isinstance(record["raw_outputs"], list) or len(record["raw_outputs"]) != record["attempt_count"] or len(record["raw_outputs_sha256"]) != record["attempt_count"]: raise SchemaValidationError("raw outputs/hashes no corresponden a intentos")
+        for raw, value in zip(record["raw_outputs"], record["raw_outputs_sha256"]):
+            _sha256(value, "f53.raw_hash")
+            if hashlib.sha256(raw.encode()).hexdigest() != value: raise SchemaValidationError("hash de raw output F5.3 inconsistente")
+        _finite_number(record["duration_ms"], "f53.duration_ms", minimum=0)
+        validation = record["validation"]
+        if not isinstance(validation, Mapping) or set(validation) != {"structurally_valid", "semantically_valid", "human_review_required", "issues"} or validation["human_review_required"] is not True: raise SchemaValidationError("validation F5.3 no válida")
+        if record["status"] == "valid" and (record["extraction"] is None or not validation["structurally_valid"] or not validation["semantically_valid"]): raise SchemaValidationError("record válido sin extracción validada")
+        if record["status"] != "valid" and record["extraction"] is not None and validation["structurally_valid"] is False: raise SchemaValidationError("record rechazado conserva extracción estructuralmente inválida")
+        if record["extraction"] is not None:
+            from .f5_geographic_extraction import validate_extraction_semantics, validate_extraction_structure
+            structural_issues = validate_extraction_structure(record["extraction"])
+            semantic_issues = validate_extraction_semantics(record["input_text"], record["language"], record["protected_toponyms"], record["extraction"])
+            if any(row["severity"] == "error" for row in structural_issues + semantic_issues):
+                raise SchemaValidationError("extracción F5.3 persistida no supera revalidación")
+    from .f5_geographic_extraction import extraction_set_id
+    if document["extraction_set_id"] != extraction_set_id(document): raise SchemaValidationError("extraction_set_id no corresponde al contenido")
+
+
+def _validate_f5_geographic_extraction_comparison(document: Mapping[str, Any]) -> None:
+    fields = {"schema_version", "contract_version", "comparison_id", "extraction_set_id", "extraction_set_sha256", "comparisons", "accuracy_available", "limitations"}
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f5-geographic-extraction-comparison-v1" or document["accuracy_available"] is not False:
+        raise SchemaValidationError("f5_geographic_extraction_comparison incompatible")
+    if not isinstance(document["comparison_id"], str) or not re.fullmatch(r"f5-geographic-extraction-comparison-sha256-[0-9a-f]{64}", document["comparison_id"]): raise SchemaValidationError("comparison_id F5.3 no válido")
+    _non_empty_string(document["extraction_set_id"], "f53.comparison.extraction_set_id"); _sha256(document["extraction_set_sha256"], "f53.comparison.sha256")
+    if not isinstance(document["comparisons"], list) or not isinstance(document["limitations"], list) or not document["limitations"]: raise SchemaValidationError("comparison collections F5.3 no válidas")
+    required = {"source_query_id", "anchor_variant_id", "variant_id", "variant_kind", "entities_anchor", "entities_variant", "entities_common", "entity_jaccard", "entities_omitted", "entities_added", "toponyms_anchor", "toponyms_variant", "toponyms_preserved", "relations_anchor", "relations_variant", "relations_common", "relation_jaccard", "negations_anchor", "negations_variant", "negations_common", "orientation_changed", "potential_contradictions", "anchor_warning_count", "variant_warning_count", "anchor_duration_ms", "variant_duration_ms"}
+    seen = set()
+    for row in document["comparisons"]:
+        if not isinstance(row, Mapping) or set(row) != required: raise SchemaValidationError("comparison row F5.3 no válida")
+        key = (row["source_query_id"], row["variant_id"])
+        if key in seen: raise SchemaValidationError("comparison row F5.3 duplicada")
+        seen.add(key)
+        for field in ("entity_jaccard", "relation_jaccard"):
+            _finite_number(row[field], f"f53.{field}", minimum=0)
+            if row[field] > 1: raise SchemaValidationError("Jaccard F5.3 fuera de rango")
+        if not isinstance(row["orientation_changed"], bool): raise SchemaValidationError("orientation_changed no booleano")
+        for field in ("anchor_duration_ms", "variant_duration_ms"):
+            _finite_number(row[field], f"f53.{field}", minimum=0)
+    from .f5_geographic_extraction import extraction_comparison_id
+    if document["comparison_id"] != extraction_comparison_id(document): raise SchemaValidationError("comparison_id F5.3 no corresponde al contenido")
+
+
 def _validate_crosstext2loc_retrieval_request(document: Mapping[str, Any]) -> None:
     fields = {"schema_version", "contract_version", "query", "gallery_ids", "top_k"}
     if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "crosstext2loc-retrieval-request-v1":
@@ -1955,6 +2032,8 @@ def validate_document(document: Any, schema_name: str) -> None:
         "f5_textual_variant_dataset": _validate_f5_textual_variant_dataset,
         "f5_transformation_run": _validate_f5_transformation_run,
         "f5_variant_ranking_report": _validate_f5_variant_ranking_report,
+        "f5_geographic_extraction_set": _validate_f5_geographic_extraction_set,
+        "f5_geographic_extraction_comparison": _validate_f5_geographic_extraction_comparison,
         "crosstext2loc_retrieval_request": _validate_crosstext2loc_retrieval_request,
         "crosstext2loc_retrieval_response": _validate_crosstext2loc_retrieval_response,
         "manifest": _validate_manifest,

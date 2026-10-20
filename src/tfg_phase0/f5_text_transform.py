@@ -167,6 +167,12 @@ class QwenTransformersAdapter:
         if self._closed:
             raise TextTransformationError("transformador Qwen cerrado")
         prompt, mapping = prepare_prompt(original_text, task, protected_toponyms)
+        return self.generate_prompt(prompt, config, restore_mapping=mapping)
+
+    def generate_prompt(self, prompt: str, config: GenerationConfig, *, restore_mapping: Mapping[str, str] | None = None) -> TransformResult:
+        """Genera desde un prompt versionado reutilizando modelo y tokenizer cargados."""
+        if self._closed:
+            raise TextTransformationError("transformador Qwen cerrado")
         started = time.perf_counter()
         random.seed(config.seed)
         self._torch.manual_seed(config.seed)
@@ -180,7 +186,7 @@ class QwenTransformersAdapter:
             generated = self._model.generate(**inputs, max_new_tokens=config.max_new_tokens, do_sample=False, temperature=None)
         output_tokens = generated[0, inputs["input_ids"].shape[1]:]
         raw = self._tokenizer.decode(output_tokens, skip_special_tokens=True).strip()
-        text = restore_toponyms(raw, mapping) if mapping else raw
+        text = restore_toponyms(raw, restore_mapping) if restore_mapping else raw
         return TransformResult(text, raw, (time.perf_counter() - started) * 1000)
 
     def close(self) -> None:
