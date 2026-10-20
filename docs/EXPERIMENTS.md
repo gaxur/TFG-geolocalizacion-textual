@@ -536,6 +536,32 @@ Un intento anterior quedó invalidado por identidad tras detectar aliasing y no 
 usa como resultado.
 Detalles: [PHASE5_EVIDENCE_ACQUISITION.md](PHASE5_EVIDENCE_ACQUISITION.md).
 
+## F5.5b: revisión visual y cola complementaria
+
+La revisión manual comunicada por el responsable se materializó en un contrato
+Panoramax v2 sin modificar la aprobación GT:
+
+```text
+suitable: 1
+limited: 2
+unsuitable: 2
+GT pending: 5
+GT approved: 0
+GT rejected: 0
+```
+
+La única imagen `suitable` conserva una descripción española propuesta pendiente
+de revisión final y asignaciones `accuracy_insufficient` en 25 m/50 m. Una imagen
+`unsuitable` tiene celda 50 m `assigned`, demostrando que calidad visual y
+asignación geométrica son dimensiones independientes.
+
+Los cinco items restantes se publicaron como segunda cola, con cinco thumbnails
+y estado visual/GT `pending`. Ninguno mejora automáticamente la cobertura exacta:
+tres tienen precisión declarada pero asignaciones insuficientes o fuera de
+cobertura y dos no declaran precisión. Los artefactos permanecen fuera de Git en
+`results/generated/f5/f55b/`. Detalles:
+[PHASE5_VISUAL_REVIEW.md](PHASE5_VISUAL_REVIEW.md).
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

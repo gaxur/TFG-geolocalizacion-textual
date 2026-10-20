@@ -1577,7 +1577,7 @@ def _validate_f5_panoramax_inventory(document: Mapping[str, Any]) -> None:
 
 def _validate_f5_panoramax_review(document: Mapping[str, Any]) -> None:
     fields = {"schema_version", "contract_version", "review_queue_id", "inventory", "selection", "records", "limitations"}
-    if set(document) != fields or document.get("schema_version") != "1.0" or document.get("contract_version") != "f55-panoramax-review-v1" or not isinstance(document["records"], list) or len(document["records"]) > 5:
+    if set(document) != fields or document.get("schema_version") != "1.0" or document.get("contract_version") not in {"f55-panoramax-review-v1", "f55-panoramax-review-v2"} or not isinstance(document["records"], list) or len(document["records"]) > 5:
         raise SchemaValidationError("f5_panoramax_review incompatible")
     from .f5_evidence_acquisition import validate_review_queue
     try: validate_review_queue(document)

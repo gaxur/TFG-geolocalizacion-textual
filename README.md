@@ -131,6 +131,10 @@ ligera para cinco candidatos y prepara revisión humana y recogida propia, sin
 aprobar automáticamente ningún GT:
 [PHASE5_EVIDENCE_ACQUISITION.md](docs/PHASE5_EVIDENCE_ACQUISITION.md).
 
+F5.5b registra por separado aptitud visual y aprobación GT, y ofrece una segunda
+galería offline con los cinco items Panoramax restantes:
+[PHASE5_VISUAL_REVIEW.md](docs/PHASE5_VISUAL_REVIEW.md).
+
 Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
 
 ```bash

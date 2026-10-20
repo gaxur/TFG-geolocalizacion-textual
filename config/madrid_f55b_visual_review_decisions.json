@@ -1,0 +1,12 @@
+{
+  "contract_version": "f55b-visual-review-decisions-v1",
+  "reviewer": "responsable del TFG",
+  "recorded_at_utc": "2026-10-20T11:55:44Z",
+  "decisions": [
+    {"item_id": "fdf10c50-11ee-4f43-af3f-5704f8fed2a1", "suitability": "suitable", "visible_observations": ["Espacio peatonal pavimentado", "Árboles sin hojas", "Gran árbol navideño", "Personas caminando", "Edificios de varias plantas", "Comercios", "Torre con reloj al fondo"], "proposed_spanish_description": "Estoy junto a una zona peatonal pavimentada, con árboles sin hojas y comercios a un lado. Delante se abre una plaza concurrida donde hay un gran árbol navideño. Al fondo se observa un edificio con una torre y un reloj.", "notes": "Apta visualmente para descripción piloto; GT geográfico no aprobado."},
+    {"item_id": "091933c1-c0a1-4132-b0f6-54082712fdff", "suitability": "unsuitable", "visible_observations": ["Primer plano de un monumento o escultura", "Pedestal con placa", "Contexto urbano muy limitado"], "proposed_spanish_description": null, "notes": "No apta para el benchmark principal de descripciones espaciales ricas; la fotografía no se considera incorrecta."},
+    {"item_id": "d766c3b3-875a-4442-8f0b-56b0f26d49bf", "suitability": "limited", "visible_observations": ["Fachada de varias plantas", "Balcones", "Revestimiento cerámico decorativo", "Accesos comerciales", "Edificios contiguos"], "proposed_spanish_description": null, "notes": "Candidata secundaria con contexto limitado y sin precisión horizontal declarada."},
+    {"item_id": "a36f42ac-816c-4de1-8f70-3f88bf1fb80b", "suitability": "limited", "visible_observations": ["Fachada comercial de piedra", "Puertas y ventanas", "Balcones", "Calle pavimentada"], "proposed_spanish_description": null, "notes": "Candidata secundaria con contexto limitado y sin precisión horizontal declarada."},
+    {"item_id": "08b1f259-52a8-4c86-814e-46f99bc85dc7", "suitability": "unsuitable", "visible_observations": ["Primer plano de una placa y fotografías", "Escaso contexto urbano exterior"], "proposed_spanish_description": null, "notes": "No apta para benchmark principal; una asignación 50 m inequívoca no implica calidad descriptiva."}
+  ]
+}

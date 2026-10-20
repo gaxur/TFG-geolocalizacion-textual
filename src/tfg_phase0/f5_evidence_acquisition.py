@@ -180,6 +180,57 @@ def build_review_queue(inventory: Mapping[str, Any], selected_ids: Sequence[str]
     return document
 
 
+def upgrade_visual_review_queue(queue: Mapping[str, Any], decisions: Mapping[str, Any]) -> dict[str, Any]:
+    if queue.get("contract_version") != "f55-panoramax-review-v1":
+        raise F55EvidenceError("la revisión visual F5.5b parte de una cola v1")
+    output = copy.deepcopy(queue)
+    rows = decisions.get("decisions")
+    if decisions.get("contract_version") != "f55b-visual-review-decisions-v1" or not isinstance(decisions.get("reviewer"), str) or not decisions["reviewer"].strip() or not isinstance(decisions.get("recorded_at_utc"), str) or not decisions["recorded_at_utc"].endswith("Z") or not isinstance(rows, list):
+        raise F55EvidenceError("manifiesto de revisión visual incompatible")
+    by_id = {row.get("item_id"): row for row in rows}
+    expected = {row["item_id"] for row in output["records"]}
+    if set(by_id) != expected or len(by_id) != len(rows):
+        raise F55EvidenceError("la revisión visual debe cubrir exactamente la cola")
+    for record in output["records"]:
+        decision = by_id[record["item_id"]]
+        suitability = decision.get("suitability")
+        observations = decision.get("visible_observations")
+        if suitability not in {"suitable", "limited", "unsuitable"} or not isinstance(observations, list) or not observations or any(not isinstance(value, str) or not value.strip() for value in observations):
+            raise F55EvidenceError("decisión visual incompleta")
+        description = decision.get("proposed_spanish_description")
+        if description is not None and (not isinstance(description, str) or not description.strip()):
+            raise F55EvidenceError("descripción propuesta vacía")
+        if suitability == "suitable" and not description:
+            raise F55EvidenceError("imagen apta sin descripción piloto propuesta")
+        record["visual_review"] = {
+            "status": "reviewed", "suitability": suitability, "reviewer": decisions["reviewer"], "recorded_at_utc": decisions["recorded_at_utc"],
+            "visible_observations": list(observations), "proposed_spanish_description": description,
+            "description_final_review_status": "pending" if description else "not_applicable", "benchmark_main_eligible": suitability == "suitable",
+            "notes": decision.get("notes"),
+        }
+        if record["review"]["status"] != "pending":
+            raise F55EvidenceError("la revisión visual no puede modificar aprobación GT")
+    output["contract_version"] = "f55-panoramax-review-v2"
+    output["limitations"] = sorted(set([*output["limitations"], "visual_suitability_does_not_approve_ground_truth", "proposed_descriptions_require_final_review"]))
+    output["review_queue_id"] = review_queue_id(output)
+    return output
+
+
+def build_complementary_review_queue(inventory: Mapping[str, Any], primary_queue: Mapping[str, Any]) -> dict[str, Any]:
+    selected = {row["item_id"] for row in primary_queue["records"]}
+    remaining = sorted(item["item_id"] for item in inventory["items"] if item["item_id"] not in selected)
+    if len(selected) + len(remaining) != len(inventory["items"]):
+        raise F55EvidenceError("cola primaria contiene items ajenos o duplicados")
+    output = build_review_queue(inventory, remaining[:5])
+    output["contract_version"] = "f55-panoramax-review-v2"
+    output["selection"] = {"method": "complement_of_primary_queue_item_id_order_v1", "limit": len(output["records"]), "max_per_collection": None, "uses_model_outputs": False, "primary_review_queue_id": primary_queue["review_queue_id"], "primary_review_queue_sha256": sha256_bytes(canonical_bytes(primary_queue) + b"\n")}
+    for record in output["records"]:
+        record["visual_review"] = {"status": "pending", "suitability": None, "reviewer": None, "recorded_at_utc": None, "visible_observations": [], "proposed_spanish_description": None, "description_final_review_status": "pending", "benchmark_main_eligible": False, "notes": None}
+    output["limitations"] = sorted(set([*output["limitations"], "complementary_batch_not_spatially_selected", "visual_suitability_pending"]))
+    output["review_queue_id"] = review_queue_id(output)
+    return output
+
+
 def validate_inventory(document: Mapping[str, Any], catalogs: Mapping[str, Any]) -> dict[str, Any]:
     if document.get("inventory_id") != inventory_id(document):
         raise F55EvidenceError("inventory_id no corresponde al contenido")
@@ -226,7 +277,15 @@ def validate_review_queue(queue: Mapping[str, Any]) -> dict[str, int]:
     if queue["review_queue_id"] != review_queue_id(queue):
         raise F55EvidenceError("review_queue_id no corresponde al contenido")
     counts = Counter(); downloaded_hashes = {}
+    contract = queue.get("contract_version")
+    if contract not in {"f55-panoramax-review-v1", "f55-panoramax-review-v2"}:
+        raise F55EvidenceError("versión de cola Panoramax no soportada")
     for record in queue["records"]:
+        visual = record.get("visual_review")
+        if contract == "f55-panoramax-review-v1" and visual is not None:
+            raise F55EvidenceError("cola v1 contiene revisión visual v2")
+        if contract == "f55-panoramax-review-v2":
+            _validate_visual_review(visual)
         for role in ("thumb", "sd"):
             value = record["assets"].get(role)
             if value and value.get("download"):
@@ -257,13 +316,36 @@ def validate_review_queue(queue: Mapping[str, Any]) -> dict[str, int]:
     return {key: counts[key] for key in ("pending", "approved", "rejected")}
 
 
+def _validate_visual_review(visual: Any) -> None:
+    fields = {"status", "suitability", "reviewer", "recorded_at_utc", "visible_observations", "proposed_spanish_description", "description_final_review_status", "benchmark_main_eligible", "notes"}
+    if not isinstance(visual, Mapping) or set(visual) != fields or visual["status"] not in {"pending", "reviewed"} or not isinstance(visual["benchmark_main_eligible"], bool):
+        raise F55EvidenceError("revisión visual v2 incompatible")
+    if visual["status"] == "pending":
+        if visual["suitability"] is not None or visual["reviewer"] is not None or visual["recorded_at_utc"] is not None or visual["visible_observations"] or visual["proposed_spanish_description"] is not None or visual["benchmark_main_eligible"]:
+            raise F55EvidenceError("revisión visual pending contiene valoración")
+        return
+    if visual["suitability"] not in {"suitable", "limited", "unsuitable"} or not visual["reviewer"] or not str(visual["recorded_at_utc"]).endswith("Z") or not visual["visible_observations"]:
+        raise F55EvidenceError("revisión visual reviewed incompleta")
+    if visual["benchmark_main_eligible"] != (visual["suitability"] == "suitable"):
+        raise F55EvidenceError("aptitud principal inconsistente")
+    expected_description_status = "pending" if visual["proposed_spanish_description"] else "not_applicable"
+    if visual["description_final_review_status"] != expected_description_status:
+        raise F55EvidenceError("estado de descripción propuesta inconsistente")
+
+
 def render_review_html(queue: Mapping[str, Any], output: Path) -> None:
     cards = []
     for record in queue["records"]:
         asset = next((value for role in ("sd", "thumb") if (value := record["assets"].get(role)) and value.get("download")), None)
         image = f'<img src="{escape(asset["download"]["logical_path"])}" alt="Evidencia {escape(record["item_id"])}">' if asset else "<p>Asset no descargado.</p>"
         assignments = "".join(f"<li>{escape(gallery)}: <code>{escape(value['status'])}</code></li>" for gallery, value in sorted(record["catalog_assignments"].items()))
-        cards.append(f'<article><h2>{record["selection_order"]}. <code>{escape(record["item_id"])}</code></h2>{image}<ul><li>Captura: {escape(str(record["captured_at_utc"]))}</li><li>Posición: {record["camera_position"]["latitude"]}, {record["camera_position"]["longitude"]}</li><li>Precisión: {escape(str(record["camera_position"]["horizontal_accuracy_m"]))} m</li><li>Azimut cámara: {escape(str(record["orientation"]["camera_azimuth_degrees"]))}°</li>{assignments}<li>Licencia: <a href="{escape(record["license"]["url"] or "#")}">{escape(record["license"]["identifier"] or "ausente")}</a></li></ul><p>Estado: <strong>{escape(record["review"]["status"])}</strong></p></article>')
+        visual = record.get("visual_review")
+        visual_html = ""
+        if visual:
+            observations = "".join(f"<li>{escape(value)}</li>" for value in visual["visible_observations"])
+            description = f'<blockquote>{escape(visual["proposed_spanish_description"])}</blockquote>' if visual["proposed_spanish_description"] else ""
+            visual_html = f'<h3>Revisión visual: {escape(visual["status"])}</h3><p>Aptitud: <strong>{escape(str(visual["suitability"]))}</strong>; elegible benchmark principal: {visual["benchmark_main_eligible"]}</p><ul>{observations}</ul>{description}'
+        cards.append(f'<article><h2>{record["selection_order"]}. <code>{escape(record["item_id"])}</code></h2>{image}<ul><li>Captura: {escape(str(record["captured_at_utc"]))}</li><li>Posición: {record["camera_position"]["latitude"]}, {record["camera_position"]["longitude"]}</li><li>Precisión: {escape(str(record["camera_position"]["horizontal_accuracy_m"]))} m</li><li>Azimut cámara: {escape(str(record["orientation"]["camera_azimuth_degrees"]))}°</li>{assignments}<li>Licencia: <a href="{escape(record["license"]["url"] or "#")}">{escape(record["license"]["identifier"] or "ausente")}</a></li></ul>{visual_html}<p>Aprobación GT: <strong>{escape(record["review"]["status"])}</strong></p></article>')
     html = "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><title>Revisión Panoramax F5.5</title><style>body{font:16px system-ui;max-width:1100px;margin:auto;padding:2rem;background:#f4f1e8;color:#18201d}article{background:white;padding:1.2rem;margin:1rem 0;border-left:6px solid #b84b2d}img{max-width:100%;height:auto}code{overflow-wrap:anywhere}</style></head><body><h1>Cola Panoramax F5.5</h1><p>Todos los registros comienzan pendientes. No usar como GT hasta revisión humana y validación F5.4.</p>" + "".join(cards) + "</body></html>"
     output.parent.mkdir(parents=True, exist_ok=True); output.write_text(html, encoding="utf-8")
 

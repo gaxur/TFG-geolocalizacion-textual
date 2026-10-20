@@ -86,6 +86,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D068 | No publicar precisión de Madrid hasta disponer de GT real verificado | ACEPTADA | F5 / integridad experimental |
 | D069 | Adoptar Panoramax solo como inventario y cola de revisión F5.5 | ACEPTADA | F5 / evidencia fotográfica |
 | D070 | Priorizar recogida propia para GT exacto y bloquear aprobación automática | ACEPTADA | F5 / recopilación |
+| D071 | Separar aptitud visual Panoramax de aprobación de Ground Truth | ACEPTADA | F5 / revisión humana |
 
 ## D053 — API HTTP interna del MVP
 
@@ -549,6 +550,31 @@ Los registros Panoramax se importan como `existing_dataset`, nunca como
 
 No se ejecutan variantes o rankings hasta disponer de GT aprobado. La orientación
 de cámara no se convierte automáticamente en orientación de una persona.
+
+## D071 — Aptitud visual separada de aprobación GT
+
+**Estado:** ACEPTADA
+**Componente:** F5 / revisión humana
+**Fecha:** 2026-10-20
+**Origen:** Revisión visual F5.5b comunicada por el responsable.
+
+### Decisión
+
+La cola Panoramax v2 registra `suitable`, `limited` o `unsuitable`, observaciones
+visibles y una descripción propuesta opcional sin modificar `review.status`. Una
+imagen visualmente apta sigue `pending` hasta revisar licencia, posición,
+precisión, correspondencia textual y criterios F5.4.
+
+La asignación `assigned` de una celda no convierte una fotografía con escaso
+contexto en muestra útil. A la inversa, una imagen rica con
+`accuracy_insufficient` puede apoyar análisis visual o Haversine, pero no Recall
+exacto.
+
+### Consecuencias
+
+Se crea una segunda cola complementaria para los cinco items restantes sin
+reseleccionar por resultados del modelo. CrossText2Loc y Qwen permanecen sin
+ejecutarse hasta disponer de GT aprobado.
 
 ## D001 — Identidad del candidato
 
