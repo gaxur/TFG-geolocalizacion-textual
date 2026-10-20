@@ -126,6 +126,11 @@ variantes sobre galerías 25 m/50 m. La auditoría actual encontró cero
 observaciones humanas con GT validado, por lo que no publica precisión todavía:
 [PHASE5_GEOGRAPHIC_EVALUATION.md](docs/PHASE5_GEOGRAPHIC_EVALUATION.md).
 
+F5.5 congela un inventario Panoramax de D004, descarga una evidencia visual
+ligera para cinco candidatos y prepara revisión humana y recogida propia, sin
+aprobar automáticamente ningún GT:
+[PHASE5_EVIDENCE_ACQUISITION.md](docs/PHASE5_EVIDENCE_ACQUISITION.md).
+
 Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
 
 ```bash

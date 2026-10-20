@@ -84,6 +84,8 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D066 | Versionar el contrato textual para añadir `en_cartographic` sin reinterpretar v1 | ACEPTADA | F5 / variantes textuales |
 | D067 | Reutilizar F4.3 y añadir un sidecar F5.4 de evidencia/asignación multigalería | ACEPTADA | F5 / evaluación geográfica |
 | D068 | No publicar precisión de Madrid hasta disponer de GT real verificado | ACEPTADA | F5 / integridad experimental |
+| D069 | Adoptar Panoramax solo como inventario y cola de revisión F5.5 | ACEPTADA | F5 / evidencia fotográfica |
+| D070 | Priorizar recogida propia para GT exacto y bloquear aprobación automática | ACEPTADA | F5 / recopilación |
 
 ## D053 — API HTTP interna del MVP
 
@@ -501,6 +503,52 @@ observador, precisión, método y evidencia revisada.
 
 La auditoría actual registra cero observaciones evaluables. F5.4 queda preparada
 pero no produce resultados empíricos hasta recopilar y congelar GT válido.
+
+## D069 — Panoramax como inventario y cola de revisión
+
+**Estado:** ACEPTADA
+**Componente:** F5 / evidencia fotográfica
+**Fecha:** 2026-10-20
+**Origen:** Auditoría y adquisición real F5.5.
+
+### Decisión
+
+Panoramax se utiliza mediante su catálogo STAC público para congelar metadatos y
+evidencias ligeras dentro de D004. Cada item conserva coordenada de cámara,
+precisión declarada o ausencia, azimut, productor, licencia, assets y hashes. La
+selección espacial no usa OSM, CrossText2Loc ni contenido visual.
+
+Todos los items comienzan `pending`. La metadata Panoramax no aprueba por sí sola
+posición, orientación, descripción o licencia para F5.4. No se infiere precisión
+desde decimales ni se sustituye una asignación ambigua por el candidato próximo.
+
+### Consecuencias
+
+Se descargan thumbnails para hasta cinco candidatos; SD requiere una decisión
+concreta y HD no se usa por defecto. Commons queda como fuente suplementaria,
+Mapillary bloqueada por token y KartaView sin cobertura local observada.
+
+## D070 — Recogida propia y barrera de aprobación humana
+
+**Estado:** ACEPTADA
+**Componente:** F5 / recopilación
+**Fecha:** 2026-10-20
+**Origen:** Requisitos de GT verificable F5.5.
+
+### Decisión
+
+La vía prioritaria para Recall exacto es `human_in_situ` con múltiples lecturas
+GNSS, posición del observador, precisión, fotografías, orientación evidenciada,
+descripción in situ y revisión independiente. El importador F5.5 consume solo
+registros `approved` cuyos ficheros existen y conservan SHA-256.
+
+Los registros Panoramax se importan como `existing_dataset`, nunca como
+`human_in_situ`. `pending` y `rejected` permanecen fuera de F4.3/F5.4.
+
+### Consecuencias
+
+No se ejecutan variantes o rankings hasta disponer de GT aprobado. La orientación
+de cámara no se convierte automáticamente en orientación de una persona.
 
 ## D001 — Identidad del candidato
 

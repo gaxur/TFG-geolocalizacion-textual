@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "f5_field_observation.schema.json", "title": "F5.5 human in-situ observation record",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "record_id", "location_id", "derivation_group_id", "partition", "captured_at_utc", "device", "observer_position", "gnss_readings", "orientation", "original_spanish_description", "evidence", "consent_or_data_policy", "limitations", "review"],
+  "properties": {"schema_version": {"const": "1.0"}, "contract_version": {"const": "f55-field-observation-v1"}, "record_id": {"type": "string", "minLength": 1}, "location_id": {"type": "string", "minLength": 1}, "derivation_group_id": {"type": "string", "minLength": 1}, "partition": {"enum": ["development", "evaluation"]}, "captured_at_utc": {"type": ["string", "null"]}, "device": {"type": ["string", "null"]}, "observer_position": {"type": "object"}, "gnss_readings": {"type": "array"}, "orientation": {"type": "object"}, "original_spanish_description": {"type": ["string", "null"]}, "evidence": {"type": "array"}, "consent_or_data_policy": {"type": ["string", "null"]}, "limitations": {"type": "array"}, "review": {"type": "object"}}
+}

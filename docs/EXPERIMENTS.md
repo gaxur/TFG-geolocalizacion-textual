@@ -500,6 +500,42 @@ candidatos de 25 m y 253 de 50 m. La infraestructura y métricas se verificaron
 con fixtures sintéticos identificados exclusivamente como tests de software.
 Procedimiento: [PHASE5_GEOGRAPHIC_EVALUATION.md](PHASE5_GEOGRAPHIC_EVALUATION.md).
 
+## F5.5: snapshot Panoramax y cola piloto
+
+Se consultó el catálogo federado Panoramax sobre D004 y se congelaron los bytes
+reales de la respuesta:
+
+```bash
+.venv-geo/bin/python scripts/acquire_f55_panoramax.py \
+  --output-root results/generated/f5/f55/panoramax \
+  --review-limit 5 \
+  --asset-role thumb
+```
+
+Resultado:
+
+```text
+items: 10
+colecciones: 2
+thumbnails descargados: 5
+pending: 5
+approved: 0
+rejected: 0
+```
+
+Asignación geométrica: 25 m produjo 6 `accuracy_insufficient` y 4
+`accuracy_unavailable`; 50 m produjo 1 `assigned`, 3
+`accuracy_insufficient`, 2 `outside_catalog_coverage` y 4
+`accuracy_unavailable`. No se ejecutó CrossText2Loc ni se generaron descripciones
+o variantes. El snapshot de 456 KiB y la galería HTML permanecen fuera de Git.
+El snapshot válido es
+`f55-panoramax-inventory-sha256-0664a7bdcb06c84d46dc81b03f8ea9f468da2bab7ac695b3f7b9ce523ca19e89`,
+con raw SHA-256
+`67882b891ac6a6523ea93ba1d8a3e99a047b4cbf7a4c6354a87483b7187b2d1a`.
+Un intento anterior quedó invalidado por identidad tras detectar aliasing y no se
+usa como resultado.
+Detalles: [PHASE5_EVIDENCE_ACQUISITION.md](PHASE5_EVIDENCE_ACQUISITION.md).
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

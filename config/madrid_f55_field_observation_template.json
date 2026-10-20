@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "f55-field-observation-v1",
+  "record_id": "<stable-record-id>",
+  "location_id": "<stable-location-id>",
+  "derivation_group_id": "<stable-derivation-group-id>",
+  "partition": "development",
+  "captured_at_utc": null,
+  "device": null,
+  "observer_position": {
+    "latitude": null,
+    "longitude": null,
+    "crs": "EPSG:4326",
+    "horizontal_accuracy_m": null,
+    "source": "measured_observer_position"
+  },
+  "gnss_readings": [],
+  "orientation": {
+    "status": "absent",
+    "cardinal": null,
+    "bearing_degrees": null,
+    "uncertainty_degrees": null,
+    "verification_method": null,
+    "evidence_ids": [],
+    "egocentric_relations_present": false,
+    "notes": null
+  },
+  "original_spanish_description": null,
+  "evidence": [],
+  "consent_or_data_policy": null,
+  "limitations": [],
+  "review": {
+    "status": "pending",
+    "reviewer": null,
+    "reviewed_at_utc": null,
+    "validation_method": null,
+    "notes": null
+  }
+}
