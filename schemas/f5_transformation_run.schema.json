@@ -25,7 +25,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["prompt_version", "do_sample", "temperature", "seed", "max_new_tokens", "enable_thinking"],
       "properties": {
-        "prompt_version": {"const": "f52-text-transform-v1"}, "do_sample": {"const": false},
+        "prompt_version": {"enum": ["f52-text-transform-v1", "f53b-text-transform-v2"]}, "do_sample": {"const": false},
         "temperature": {"const": 0}, "seed": {"type": "integer"}, "max_new_tokens": {"type": "integer", "minimum": 1},
         "enable_thinking": {"const": false}
       }
@@ -58,8 +58,8 @@
       "required": ["source_query_id", "variant_id", "kind", "task", "status", "input_text_sha256", "output_text_sha256", "protected_toponyms", "prompt_sha256", "raw_output_sha256", "duration_ms", "validation"],
       "properties": {
         "source_query_id": {"type": "string", "minLength": 1}, "variant_id": {"type": ["string", "null"]},
-        "kind": {"enum": ["es_cartographic", "en_conventional", "en_toponym_preserved"]},
-        "task": {"enum": ["cartographic_rewrite_es", "translate_en_conventional", "translate_en_preserve_toponyms"]},
+        "kind": {"enum": ["es_cartographic", "en_conventional", "en_toponym_preserved", "en_cartographic"]},
+        "task": {"enum": ["cartographic_rewrite_es", "translate_en_conventional", "translate_en_preserve_toponyms", "translate_en_cartographic"]},
         "status": {"enum": ["generated", "rejected", "error"]}, "input_text_sha256": {"$ref": "#/$defs/sha256"},
         "output_text_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
         "protected_toponyms": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},

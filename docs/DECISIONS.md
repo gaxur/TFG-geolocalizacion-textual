@@ -80,6 +80,8 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D062 | Validar Qwen3-8B local exacto antes de rankings F5.2 | ACEPTADA | F5 / ejecución local |
 | D063 | Exigir evidencia textual exacta en extracciones F5.3 | ACEPTADA | F5 / extracción estructurada |
 | D064 | No integrar F5.3 mientras su calidad contractual sea insuficiente | ACEPTADA | F5 / alcance |
+| D065 | Mantener bloqueada la integración automática tras comparar estrategias F5.3b | ACEPTADA | F5 / generación estructurada |
+| D066 | Versionar el contrato textual para añadir `en_cartographic` sin reinterpretar v1 | ACEPTADA | F5 / variantes textuales |
 
 ## D053 — API HTTP interna del MVP
 
@@ -408,6 +410,51 @@ API ni ranking.
 El resultado se documenta como limitación experimental, no se oculta ni se
 compensa relajando validadores. Una fase posterior deberá estudiar otra estrategia
 de evidencia/offsets y un dataset anotado antes de integrar el componente.
+
+## D065 — F5.3b mantiene bloqueada la integración automática
+
+**Estado:** ACEPTADA
+**Componente:** F5 / generación estructurada
+**Fecha:** 2026-10-20
+**Origen:** Resultado experimental F5.3b solicitado por el responsable.
+
+### Decisión
+
+F5.3b compara baseline, evidencia literal con offsets deterministas y JSON Schema
+guiado. Los offsets solo se resuelven cuando la evidencia tiene una aparición
+literal única; cero o varias coincidencias se rechazan. El validador final no se
+relaja.
+
+LM Format Enforcer 0.11.3 queda aceptado como dependencia opcional y aislada para
+el experimento guiado. No se incorpora al MVP ni al entorno CrossText2Loc. La
+mejor estrategia produjo 5/10 records contractualmente válidos sobre sondas
+development, por lo que F5.3/F5.3b sigue sin conectarse a componentes posteriores.
+
+### Consecuencias
+
+La mejora estructural no se presenta como exactitud semántica. Se mantienen la
+revisión humana y D064. Una evaluación futura necesita anotaciones humanas
+congeladas y particiones separadas.
+
+## D066 — Contrato textual v2 para `en_cartographic`
+
+**Estado:** ACEPTADA
+**Componente:** F5 / variantes textuales
+**Fecha:** 2026-10-20
+**Origen:** Alcance F5.3b solicitado expresamente.
+
+### Decisión
+
+`f5-textual-variant-dataset-v2` exige cinco variantes y añade
+`en_cartographic`. El contrato v1 conserva exactamente cuatro; no se migran ni
+reinterpretan artefactos históricos. La nueva tarea usa
+`f53b-text-transform-v2`, protección de topónimos y revisión humana obligatoria.
+
+### Consecuencias
+
+Los rankings continúan siendo exhaustivos e independientes, sin fusión. Los
+resultados observados son estabilidad sin ground truth y no demuestran que la
+variante mejore precisión geográfica o extracción.
 
 ## D001 — Identidad del candidato
 

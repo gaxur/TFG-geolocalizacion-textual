@@ -7,7 +7,7 @@
   "required": ["schema_version", "contract_version", "dataset_id", "dataset_version", "source_query_dataset", "protocol", "comparison_protocol", "observations"],
   "properties": {
     "schema_version": {"const": "1.0"},
-    "contract_version": {"const": "f5-textual-variant-dataset-v1"},
+    "contract_version": {"enum": ["f5-textual-variant-dataset-v1", "f5-textual-variant-dataset-v2"]},
     "dataset_id": {"type": "string", "pattern": "^f5-madrid-textual-variants-sha256-[0-9a-f]{64}$"},
     "dataset_version": {"type": "string", "minLength": 1},
     "source_query_dataset": {
@@ -22,8 +22,8 @@
       "type": "object", "additionalProperties": false,
       "required": ["version", "variant_kinds", "ground_truth_source", "orientation_policy", "toponym_policy", "osm_preselection_status", "ranking_policy"],
       "properties": {
-        "version": {"const": "f5-madrid-textual-variants-v1"},
-        "variant_kinds": {"const": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"]},
+        "version": {"enum": ["f5-madrid-textual-variants-v1", "f5-madrid-textual-variants-v2"]},
+        "variant_kinds": {"oneOf": [{"const": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"]}, {"const": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved", "en_cartographic"]}]},
         "ground_truth_source": {"const": "f4_query_dataset_reference_only"},
         "orientation_policy": {"const": "optional_explicit_only_no_egocentric_to_cardinal_inference"},
         "toponym_policy": {"const": "manual_annotation_no_osm_lookup"},
@@ -60,7 +60,7 @@
         "derivation_group_id": {"type": "string", "minLength": 1},
         "toponyms": {"type": "array", "items": {"$ref": "#/$defs/toponym"}},
         "orientation": {"$ref": "#/$defs/orientation"},
-        "variants": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"$ref": "#/$defs/variant"}},
+        "variants": {"type": "array", "minItems": 4, "maxItems": 5, "items": {"$ref": "#/$defs/variant"}},
         "notes": {"type": ["string", "null"]}
       }
     },
@@ -98,7 +98,7 @@
       "required": ["variant_id", "kind", "status", "text", "language", "generation", "review_status", "transformations", "preserved_elements", "removed_elements", "modified_elements", "protected_toponyms"],
       "properties": {
         "variant_id": {"$ref": "#/$defs/nullableNonEmpty"},
-        "kind": {"enum": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"]},
+        "kind": {"enum": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved", "en_cartographic"]},
         "status": {"enum": ["pending", "generated", "reviewed", "rejected"]},
         "text": {"$ref": "#/$defs/nullableNonEmpty"},
         "language": {"enum": ["es", "en"]},

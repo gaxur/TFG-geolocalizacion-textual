@@ -444,6 +444,34 @@ fueron rechazadas. La inferencia es reproducible para esa muestra, aunque la
 calidad contractual sigue siendo insuficiente. Accuracy permanece no disponible.
 Detalles: [PHASE5_GEOGRAPHIC_EXTRACTION.md](PHASE5_GEOGRAPHIC_EXTRACTION.md).
 
+## F5.3b: generación guiada y variante inglesa cartográfica
+
+Se diagnosticaron de forma reproducible las tres campañas F5.3 históricas. Sus
+30 records acumularon 16 issues estructurales y 42 semánticos; 39 fueron spans
+incorrectos. Los artefactos históricos se conservaron sin cambios.
+
+Se compararon tres estrategias reales con `Qwen/Qwen3-8B`, revisión
+`b968826d9c46dd6066d109eabc6255188de91218`, un intento, 512 tokens, seed 0 y
+non-thinking:
+
+| Estrategia | JSON válido | Estructura válida | Contrato final | Media por caso |
+|---|---:|---:|---:|---:|
+| Baseline F5.3 | 10/10 | 6/10 | 1/10 | 15.881,92 ms |
+| Evidencia literal y offset determinista | 10/10 | 5/10 | 4/10 | 11.575,19 ms |
+| LM Format Enforcer 0.11.3 + evidencia literal | 8/10 | 6/10 | 5/10 | 18.493,57 ms |
+
+Dos salidas guiadas quedaron truncadas al alcanzar 512 tokens. Persistieron
+errores semánticos y de referencias; la integración automática continúa
+bloqueada.
+
+El contrato textual v2 añadió `en_cartographic` sin modificar v1. CrossText2Loc
+produjo 60 rankings Top-10. `en_cartographic` obtuvo acuerdo Top-1 0,000,
+Jaccard@10 0,079 y distancia Top-1 media 328,2 m frente a `es_original`. Son
+métricas de estabilidad sin ground truth. La extracción guiada sobre las cinco
+variantes produjo 15/30 records válidos, 3/6 para cada tipo; no se observó ventaja
+de `en_cartographic`. El resumen permanece fuera de Git en
+`results/generated/f5/f53b/`.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

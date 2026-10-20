@@ -12,11 +12,13 @@ from src.tfg_phase0.f5_geographic_extraction import (
     GeographicExtractionError,
     QwenGeographicExtractor,
     build_extraction_prompt,
+    literal_evidence_schema,
     compare_extraction_set,
     extraction_comparison_id,
     extraction_set_id,
     materialize_extractions,
     parse_and_validate_extraction,
+    parse_resolve_and_validate_extraction,
     validate_extraction_set_against_sidecar,
 )
 from src.tfg_phase0.f5_text_transform import TransformResult, TransformerMetadata
@@ -85,6 +87,17 @@ class Phase5GeographicExtractionTests(unittest.TestCase):
         jsonschema.Draft202012Validator.check_schema(schema); jsonschema.validate(document, schema); validate_document(document, "f5_geographic_extraction_set")
         self.assertEqual(document["extraction_set_id"], extraction_set_id(document)); self.assertEqual(len(document["records"]), 4)
 
+    def test_literal_evidence_generation_schema_is_valid(self):
+        jsonschema.Draft202012Validator.check_schema(literal_evidence_schema())
+
+    def test_fake_extractor_uses_literal_resolution_strategy(self):
+        text = "Estoy en una plaza"
+        value = extraction([entity(text, "e1", "square", "una plaza")])
+        del value["entities"][0]["evidence"]["span"]
+        result = FakeGeographicExtractor({text: json.dumps(value)}).extract(text, "es", [], ExtractionConfig(max_attempts=1, strategy="literal_evidence"))
+        self.assertTrue(result.validation["semantically_valid"])
+        self.assertEqual(result.extraction["entities"][0]["evidence"]["span"], {"start": 9, "end": 18})
+
     def test_invalid_json_can_retry_and_raw_hashes_are_preserved(self):
         text = "Estoy en una plaza"
         valid = json.dumps(extraction([entity(text, "e1", "square", "una plaza")]))
@@ -116,6 +129,19 @@ class Phase5GeographicExtractionTests(unittest.TestCase):
         _, validation = parse_and_validate_extraction(text, "es", ["Plaza Mayor"], json.dumps(ext)); self.assertIn("evidence_span_mismatch", {row["code"] for row in validation["issues"]})
         ext = extraction([entity(text, "e1", "square", "Plaza Mayor")])
         _, validation = parse_and_validate_extraction(text, "es", ["Plaza Mayor"], json.dumps(ext)); self.assertIn("protected_toponym_missing", {row["code"] for row in validation["issues"]})
+
+    def test_literal_evidence_offsets_are_resolved_only_when_unique(self):
+        text = "Estoy cerca de Plaza Mayor"
+        ext = extraction([entity(text, "e1", "square", "Plaza Mayor", name="Plaza Mayor")])
+        del ext["entities"][0]["evidence"]["span"]
+        parsed, validation = parse_resolve_and_validate_extraction(text, "es", ["Plaza Mayor"], json.dumps(ext))
+        self.assertTrue(validation["semantically_valid"])
+        self.assertEqual(parsed["entities"][0]["evidence"]["span"], {"start": 15, "end": 26})
+        repeated = "plaza y plaza"
+        ext = extraction([entity(repeated, "e1", "square", "plaza")])
+        del ext["entities"][0]["evidence"]["span"]
+        _, validation = parse_resolve_and_validate_extraction(repeated, "es", [], json.dumps(ext))
+        self.assertIn("evidence_not_unique", {row["code"] for row in validation["issues"]})
 
     def test_negation_requires_explicit_index_and_target_kind(self):
         text = "No hay ningún parque cerca"

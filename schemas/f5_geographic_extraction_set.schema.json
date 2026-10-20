@@ -9,7 +9,7 @@
     "schema_version": {"const": "1.0"},
     "contract_version": {"const": "f5-geographic-extraction-set-v1"},
     "extraction_set_id": {"type": "string", "pattern": "^f5-geographic-extractions-sha256-[0-9a-f]{64}$"},
-    "protocol_version": {"const": "f53-geographic-extraction-v1"},
+    "protocol_version": {"enum": ["f53-geographic-extraction-v1", "f53b-literal-evidence-v1"]},
     "source_sidecar": {"$ref": "#/$defs/sourceSidecar"},
     "extractor": {"$ref": "#/$defs/extractor"},
     "generation": {"$ref": "#/$defs/generation"},
@@ -38,7 +38,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["prompt_version", "do_sample", "temperature", "seed", "max_new_tokens", "enable_thinking", "max_attempts"],
       "properties": {
-        "prompt_version": {"const": "f53-geographic-extraction-v1"}, "do_sample": {"const": false},
+        "prompt_version": {"enum": ["f53-geographic-extraction-v1", "f53b-literal-evidence-v1"]}, "strategy": {"enum": ["baseline", "literal_evidence", "guided_schema_literal_evidence"]}, "do_sample": {"const": false},
         "temperature": {"const": 0}, "seed": {"type": "integer"}, "max_new_tokens": {"type": "integer", "minimum": 1},
         "enable_thinking": {"const": false}, "max_attempts": {"type": "integer", "minimum": 1, "maximum": 2}
       }
@@ -126,7 +126,7 @@
       "properties": {
         "model_id": {"type": "string", "minLength": 1}, "revision": {"type": "string", "minLength": 1},
         "tokenizer_id": {"type": "string", "minLength": 1}, "tokenizer_revision": {"type": "string", "minLength": 1},
-        "artifact_manifest_sha256": {"$ref": "#/$defs/sha256"}, "prompt_version": {"const": "f53-geographic-extraction-v1"},
+        "artifact_manifest_sha256": {"$ref": "#/$defs/sha256"}, "prompt_version": {"enum": ["f53-geographic-extraction-v1", "f53b-literal-evidence-v1"]}, "strategy": {"enum": ["baseline", "literal_evidence", "guided_schema_literal_evidence"]},
         "do_sample": {"const": false}, "temperature": {"const": 0}, "seed": {"type": "integer"},
         "enable_thinking": {"const": false}, "real_model_inference": {"type": "boolean"}
       }
@@ -137,7 +137,7 @@
       "properties": {
         "source_query_id": {"type": "string", "minLength": 1}, "derivation_group_id": {"type": "string", "minLength": 1},
         "partition": {"enum": ["development", "evaluation"]}, "variant_id": {"type": "string", "minLength": 1},
-        "variant_kind": {"enum": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"]},
+        "variant_kind": {"enum": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved", "en_cartographic"]},
         "language": {"enum": ["es", "en"]}, "input_text": {"type": "string", "minLength": 1},
         "input_text_sha256": {"$ref": "#/$defs/sha256"}, "protected_toponyms": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "status": {"enum": ["valid", "rejected", "error"]}, "attempt_count": {"type": "integer", "minimum": 1, "maximum": 2},

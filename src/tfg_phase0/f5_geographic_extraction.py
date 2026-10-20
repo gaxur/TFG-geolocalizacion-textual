@@ -15,6 +15,8 @@ from .f5_textual_variants import F5ValidationError
 
 
 PROMPT_VERSION = "f53-geographic-extraction-v1"
+LITERAL_PROMPT_VERSION = "f53b-literal-evidence-v1"
+STRATEGIES = {"baseline", "literal_evidence", "guided_schema_literal_evidence"}
 EXTRACTION_PREFIX = "f5-geographic-extractions-sha256-"
 COMPARISON_PREFIX = "f5-geographic-extraction-comparison-sha256-"
 ENTITY_TYPES = {"street", "road", "intersection", "square", "park", "building", "church", "station", "bridge", "river", "monument", "other", "unknown"}
@@ -34,9 +36,10 @@ class ExtractionConfig:
     max_new_tokens: int = 768
     seed: int = 0
     max_attempts: int = 2
+    strategy: str = "baseline"
 
     def __post_init__(self):
-        if self.max_new_tokens < 1 or not 1 <= self.max_attempts <= 2:
+        if self.max_new_tokens < 1 or not 1 <= self.max_attempts <= 2 or self.strategy not in STRATEGIES:
             raise ValueError("configuración F5.3 fuera de rango")
 
     def generation_config(self) -> GenerationConfig:
@@ -83,7 +86,14 @@ class FakeGeographicExtractor:
             outputs = self._outputs[text]
         except KeyError as error:
             raise GeographicExtractionError("fixture fake sin output para el texto") from error
-        return extract_from_raw_outputs(text, language, protected_toponyms, outputs[:config.max_attempts])
+        if config.strategy == "baseline":
+            return extract_from_raw_outputs(text, language, protected_toponyms, outputs[:config.max_attempts])
+        started = time.perf_counter(); validation = validation_result(False, False, [issue("no_output", "error", "Sin salida.")]); extraction = None
+        attempted = outputs[:config.max_attempts]
+        for raw in attempted:
+            extraction, validation = parse_resolve_and_validate_extraction(text, language, protected_toponyms, raw)
+            if extraction is not None and validation["structurally_valid"] and validation["semantically_valid"]: break
+        return ExtractionResult(tuple(attempted), extraction if validation["structurally_valid"] and validation["semantically_valid"] else None, validation, (time.perf_counter() - started) * 1000)
 
     def close(self) -> None:
         self._closed = True
@@ -94,6 +104,7 @@ class QwenGeographicExtractor:
 
     def __init__(self, adapter: QwenTransformersAdapter):
         self._adapter = adapter
+        self._guided_prefix_fn = None
 
     @property
     def metadata(self) -> TransformerMetadata:
@@ -103,19 +114,42 @@ class QwenGeographicExtractor:
     def resource_usage(self) -> Mapping[str, Any]: return self._adapter.resource_usage
 
     def extract(self, text: str, language: str, protected_toponyms: Sequence[str], config: ExtractionConfig) -> ExtractionResult:
-        prompt = build_extraction_prompt(text, language, protected_toponyms)
-        raw_outputs = []
         started = time.perf_counter()
+        prompt = build_extraction_prompt(text, language, protected_toponyms) if config.strategy == "baseline" else build_literal_evidence_prompt(text, language, protected_toponyms)
+        prefix_allowed_tokens_fn = self._guided_prefix() if config.strategy == "guided_schema_literal_evidence" else None
+        raw_outputs = []
         for attempt in range(config.max_attempts):
-            result = self._adapter.generate_prompt(prompt, config.generation_config())
+            if prefix_allowed_tokens_fn is None:
+                result = self._adapter.generate_prompt(prompt, config.generation_config())
+            else:
+                result = self._adapter.generate_prompt(prompt, config.generation_config(), prefix_allowed_tokens_fn=prefix_allowed_tokens_fn)
             raw_outputs.append(result.raw_output)
-            parsed, validation = parse_and_validate_extraction(text, language, protected_toponyms, result.raw_output)
+            if config.strategy == "baseline":
+                parsed, validation = parse_and_validate_extraction(text, language, protected_toponyms, result.raw_output)
+            else:
+                parsed, validation = parse_resolve_and_validate_extraction(text, language, protected_toponyms, result.raw_output)
             if parsed is not None and validation["structurally_valid"] and validation["semantically_valid"]:
                 return ExtractionResult(tuple(raw_outputs), parsed, validation, (time.perf_counter() - started) * 1000)
             if attempt + 1 < config.max_attempts:
                 codes = ", ".join(issue["code"] for issue in validation["issues"] if issue["severity"] == "error") or "invalid_json"
                 prompt = build_retry_prompt(prompt, result.raw_output, codes)
         return ExtractionResult(tuple(raw_outputs), None, validation, (time.perf_counter() - started) * 1000)
+
+    def _guided_prefix(self):
+        if self._guided_prefix_fn is not None:
+            return self._guided_prefix_fn
+        try:
+            import transformers.tokenization_utils as tokenization_utils
+            if not hasattr(tokenization_utils, "PreTrainedTokenizerBase"):
+                from transformers import PreTrainedTokenizerBase
+                tokenization_utils.PreTrainedTokenizerBase = PreTrainedTokenizerBase
+            from lmformatenforcer import JsonSchemaParser
+            from lmformatenforcer.integrations.transformers import build_transformers_prefix_allowed_tokens_fn
+        except ImportError as error:
+            raise GeographicExtractionError("la estrategia guided_schema requiere lm-format-enforcer") from error
+        parser = JsonSchemaParser(literal_evidence_schema())
+        self._guided_prefix_fn = build_transformers_prefix_allowed_tokens_fn(self._adapter._tokenizer, parser)
+        return self._guided_prefix_fn
 
     def close(self) -> None:
         self._adapter.close()
@@ -141,6 +175,88 @@ def build_retry_prompt(original_prompt: str, raw_output: str, error_codes: str) 
 El intento anterior fue rechazado por: {error_codes}.
 Salida anterior: {json.dumps(raw_output, ensure_ascii=False)}
 Genera de nuevo desde cero. Devuelve solo un objeto JSON válido y no copies texto fuera del JSON."""
+
+
+def build_literal_evidence_prompt(text: str, language: str, protected_toponyms: Sequence[str]) -> str:
+    protected = json.dumps(list(protected_toponyms), ensure_ascii=False)
+    return f"""Extrae únicamente información geográfica explícita y devuelve solo JSON válido, sin Markdown ni explicación.
+No inventes nombres, objetos, relaciones, orientación, coordenadas o distancias. No conviertas relaciones egocéntricas a cardinales. Cada evidence debe contener exactamente text y support; NO generes span. evidence.text debe ser un fragmento literal copiado del texto exacto y debe aparecer una sola vez. Si aparece varias veces, no elijas una ocurrencia arbitraria: omite ese elemento y registra una ambiguity. Usa IDs e1..., r1..., at1..., n1... y a1.... Referencias permitidas: observer o IDs declarados. between requiere exactamente dos object_ids. Toda negación requiere negated=true y una entrada negations con target_kind y target_id. observer_orientation nunca puede ser verified.
+Tipos de entidad: {', '.join(sorted(ENTITY_TYPES))}.
+Predicados: {', '.join(sorted(PREDICATES))}.
+Topónimos protegidos: {protected}
+Idioma: {language}
+Texto exacto: {json.dumps(text, ensure_ascii=False)}
+Formato obligatorio: {json.dumps(literal_evidence_example(), ensure_ascii=False, separators=(',', ':'))}"""
+
+
+def literal_evidence_example() -> dict[str, Any]:
+    return {"schema_version": "1.0", "entities": [], "relations": [], "negations": [], "observer_orientation": {"status": "unknown", "cardinal": None, "bearing_degrees": None, "reference_frame": "unknown", "evidence": None}, "ambiguities": []}
+
+
+def literal_evidence_schema() -> dict[str, Any]:
+    from pathlib import Path
+    schema = json.loads((Path(__file__).resolve().parents[2] / "schemas/f5_geographic_extraction_set.schema.json").read_text(encoding="utf-8"))
+    evidence = schema["$defs"]["evidence"]
+    evidence["required"] = ["text", "support"]
+    evidence["properties"].pop("span")
+    _split_nullable_enums(schema)
+    extraction = dict(schema["$defs"]["extraction"])
+    return {"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "#/$defs/extraction", "$defs": schema["$defs"]}
+
+
+def _split_nullable_enums(value: Any) -> None:
+    if isinstance(value, dict):
+        enum = value.get("enum")
+        if isinstance(enum, list) and None in enum:
+            value.pop("enum")
+            value["anyOf"] = [{"enum": [item for item in enum if item is not None]}, {"type": "null"}]
+        for child in value.values():
+            _split_nullable_enums(child)
+    elif isinstance(value, list):
+        for child in value:
+            _split_nullable_enums(child)
+
+
+def parse_resolve_and_validate_extraction(text: str, language: str, protected_toponyms: Sequence[str], raw_output: str) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    try:
+        parsed = json.loads(raw_output)
+    except json.JSONDecodeError as error:
+        return None, validation_result(False, False, [issue("invalid_json", "error", f"JSON inválido: {error.msg}")])
+    if not isinstance(parsed, dict):
+        return None, validation_result(False, False, [issue("root_not_object", "error", "La raíz debe ser un objeto JSON.")])
+    resolution_issues = resolve_literal_evidence_spans(text, parsed)
+    if resolution_issues:
+        return parsed, validation_result(False, False, resolution_issues)
+    structural = validate_extraction_structure(parsed)
+    if any(row["severity"] == "error" for row in structural):
+        return parsed, validation_result(False, False, structural)
+    semantic = validate_extraction_semantics(text, language, protected_toponyms, parsed)
+    return parsed, validation_result(True, not any(row["severity"] == "error" for row in semantic), semantic)
+
+
+def resolve_literal_evidence_spans(text: str, extraction: Mapping[str, Any]) -> list[dict[str, str]]:
+    issues = []
+    evidences = []
+    for entity in extraction.get("entities", []):
+        if isinstance(entity, Mapping):
+            evidences.append(entity.get("evidence"))
+            for attribute in entity.get("attributes", []):
+                if isinstance(attribute, Mapping): evidences.append(attribute.get("evidence"))
+    for field in ("relations", "negations", "ambiguities"):
+        for row in extraction.get(field, []):
+            if isinstance(row, Mapping) and row.get("evidence") is not None: evidences.append(row.get("evidence"))
+    orientation = extraction.get("observer_orientation")
+    if isinstance(orientation, Mapping) and orientation.get("evidence") is not None: evidences.append(orientation.get("evidence"))
+    for evidence in evidences:
+        if not isinstance(evidence, dict) or set(evidence) != {"text", "support"} or not isinstance(evidence.get("text"), str) or not evidence["text"]:
+            issues.append(issue("invalid_literal_evidence", "error", "Evidence debe contener únicamente text literal y support.")); continue
+        starts = [match.start() for match in re.finditer(re.escape(evidence["text"]), text)]
+        if not starts:
+            issues.append(issue("evidence_not_literal", "error", f"La evidencia no aparece literalmente: {evidence['text']}")); continue
+        if len(starts) != 1:
+            issues.append(issue("evidence_not_unique", "error", f"La evidencia aparece {len(starts)} veces: {evidence['text']}")); continue
+        evidence["span"] = {"start": starts[0], "end": starts[0] + len(evidence["text"])}
+    return issues
 
 
 def parse_and_validate_extraction(text: str, language: str, protected_toponyms: Sequence[str], raw_output: str) -> tuple[dict[str, Any] | None, dict[str, Any]]:
@@ -295,8 +411,11 @@ def materialize_extractions(sidecar: Mapping[str, Any], extractor: GeographicExt
                 status = "valid" if result.extraction is not None and result.validation["semantically_valid"] else "rejected"
             except Exception as error:
                 result = ExtractionResult((str(error),), None, validation_result(False, False, [issue("extractor_error", "error", str(error))]), 0.0); status = "error"
-            records.append({"source_query_id": observation["source_query_id"], "derivation_group_id": observation["derivation_group_id"], "partition": observation["partition"], "variant_id": variant["variant_id"], "variant_kind": variant["kind"], "language": variant["language"], "input_text": variant["text"], "input_text_sha256": sha256_text(variant["text"]), "protected_toponyms": protected, "status": status, "attempt_count": len(result.raw_outputs), "raw_outputs": list(result.raw_outputs), "raw_outputs_sha256": [sha256_text(raw) for raw in result.raw_outputs], "prompt_sha256": sha256_text(build_extraction_prompt(variant["text"], variant["language"], protected)), "duration_ms": result.duration_ms, "extraction": result.extraction, "validation": result.validation, "provenance": {"model_id": extractor.metadata.model_id, "revision": extractor.metadata.revision, "tokenizer_id": extractor.metadata.tokenizer_id, "tokenizer_revision": extractor.metadata.tokenizer_revision, "artifact_manifest_sha256": extractor.metadata.artifact_manifest_sha256, "prompt_version": PROMPT_VERSION, "do_sample": False, "temperature": 0, "seed": config.seed, "enable_thinking": False, "real_model_inference": extractor.metadata.real_model_inference}})
-    document = {"schema_version": "1.0", "contract_version": "f5-geographic-extraction-set-v1", "extraction_set_id": EXTRACTION_PREFIX + "0" * 64, "protocol_version": PROMPT_VERSION, "source_sidecar": {"dataset_id": sidecar["dataset_id"], "sha256": sidecar_sha256, "logical_path": sidecar_logical_path}, "extractor": extractor.metadata.__dict__, "generation": {"prompt_version": PROMPT_VERSION, "do_sample": False, "temperature": 0, "seed": config.seed, "max_new_tokens": config.max_new_tokens, "enable_thinking": False, "max_attempts": config.max_attempts}, "resource_usage": json.loads(json.dumps(extractor.resource_usage)), "records": records, "limitations": ["heuristics_do_not_guarantee_semantic_correctness", "human_review_required", "no_ground_truth_accuracy", "no_osm_filtering_or_reranking"]}
+            prompt = build_extraction_prompt(variant["text"], variant["language"], protected) if config.strategy == "baseline" else build_literal_evidence_prompt(variant["text"], variant["language"], protected)
+            prompt_version = PROMPT_VERSION if config.strategy == "baseline" else LITERAL_PROMPT_VERSION
+            records.append({"source_query_id": observation["source_query_id"], "derivation_group_id": observation["derivation_group_id"], "partition": observation["partition"], "variant_id": variant["variant_id"], "variant_kind": variant["kind"], "language": variant["language"], "input_text": variant["text"], "input_text_sha256": sha256_text(variant["text"]), "protected_toponyms": protected, "status": status, "attempt_count": len(result.raw_outputs), "raw_outputs": list(result.raw_outputs), "raw_outputs_sha256": [sha256_text(raw) for raw in result.raw_outputs], "prompt_sha256": sha256_text(prompt), "duration_ms": result.duration_ms, "extraction": result.extraction, "validation": result.validation, "provenance": {"model_id": extractor.metadata.model_id, "revision": extractor.metadata.revision, "tokenizer_id": extractor.metadata.tokenizer_id, "tokenizer_revision": extractor.metadata.tokenizer_revision, "artifact_manifest_sha256": extractor.metadata.artifact_manifest_sha256, "prompt_version": prompt_version, "strategy": config.strategy, "do_sample": False, "temperature": 0, "seed": config.seed, "enable_thinking": False, "real_model_inference": extractor.metadata.real_model_inference}})
+    prompt_version = PROMPT_VERSION if config.strategy == "baseline" else LITERAL_PROMPT_VERSION
+    document = {"schema_version": "1.0", "contract_version": "f5-geographic-extraction-set-v1", "extraction_set_id": EXTRACTION_PREFIX + "0" * 64, "protocol_version": prompt_version, "source_sidecar": {"dataset_id": sidecar["dataset_id"], "sha256": sidecar_sha256, "logical_path": sidecar_logical_path}, "extractor": extractor.metadata.__dict__, "generation": {"prompt_version": prompt_version, "strategy": config.strategy, "do_sample": False, "temperature": 0, "seed": config.seed, "max_new_tokens": config.max_new_tokens, "enable_thinking": False, "max_attempts": config.max_attempts}, "resource_usage": json.loads(json.dumps(extractor.resource_usage)), "records": records, "limitations": ["heuristics_do_not_guarantee_semantic_correctness", "human_review_required", "no_ground_truth_accuracy", "no_osm_filtering_or_reranking"]}
     document["extraction_set_id"] = extraction_set_id(document)
     return document
 

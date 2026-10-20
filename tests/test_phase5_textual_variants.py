@@ -125,6 +125,15 @@ class Phase5TextualVariantTests(unittest.TestCase):
         self.assertEqual(summary["validated_ground_truth_count"], 0)
         self.assertFalse(summary["precision_metrics_available"])
 
+    def test_v2_template_adds_en_cartographic_without_reinterpreting_v1(self):
+        legacy = json.loads((ROOT / "config/madrid_f51_textual_variants_template.json").read_text(encoding="utf-8"))
+        current = json.loads((ROOT / "config/madrid_f53b_textual_variants_template.json").read_text(encoding="utf-8"))
+        self.assertEqual(legacy["contract_version"], "f5-textual-variant-dataset-v1")
+        self.assertEqual(legacy["protocol"]["variant_kinds"], ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"])
+        self.assertEqual(current["contract_version"], "f5-textual-variant-dataset-v2")
+        self.assertEqual(current["protocol"]["variant_kinds"][-1], "en_cartographic")
+        validate_document(legacy, "f5_textual_variant_dataset")
+
     def test_valid_partial_observation_preserves_pending_variants(self):
         query = self.source_query()
         source = self.source_dataset([query])

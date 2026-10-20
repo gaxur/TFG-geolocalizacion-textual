@@ -380,3 +380,48 @@ CrossText2Loc real y no pertenece al dataset de evaluación.
 - Qwen3-8B es textual, no Qwen3-VL ni un VLM.
 - Qwen3-VL, DialogueChat, Street View, TOLoc y fine-tuning no están implementados.
 - La preselección/reranking OSM permanece en stand-by.
+
+## F5.3b: variante `en_cartographic`
+
+El contrato `f5-textual-variant-dataset-v2` añade un quinto slot sin modificar el
+contrato v1 ni sus artefactos históricos:
+
+```text
+en_cartographic
+```
+
+La tarea `translate_en_cartographic` traduce al inglés, conserva topónimos con
+placeholders, relaciones, negaciones, números, distancias y orientación, y elimina
+solo detalles visuales sin representación cartográfica evidente. Su prompt se
+versiona como `f53b-text-transform-v2`. La plantilla v2 está en
+`config/madrid_f53b_textual_variants_template.json`; la plantilla F5.1 v1 continúa
+con cuatro variantes.
+
+Se generaron y revisaron seis salidas reales: 6 aprobadas y 0 rechazadas. Los
+ejemplos incluyen:
+
+```text
+Estoy cerca de la Plaza Mayor, junto a una calle estrecha.
+→ I am near the Plaza Mayor, adjacent to a narrow street.
+
+No hay ningún parque cerca de esta intersección.
+→ There is no park near this intersection.
+```
+
+La campaña v2 completa generó 24 variantes derivadas, todas revisadas, y 60
+rankings Top-10 sobre 6 sondas × 5 variantes × 2 galerías. Frente al original,
+`en_cartographic` obtuvo:
+
+| Métrica de estabilidad | Total | 25 m | 50 m |
+|---|---:|---:|---:|
+| Acuerdo Top-1 | 0,000 | 0,000 | 0,000 |
+| Jaccard@10 medio | 0,079 | 0,055 | 0,103 |
+| Distancia Top-1 media | 328,2 m | 391,4 m | 264,9 m |
+
+La transformación media fue 1.284,26 ms y el retrieval medio 7,15 ms. No hay
+ground truth: estos valores no demuestran mejora o empeoramiento geográfico.
+
+En extracción estructurada guiada, las cinco variantes obtuvieron 3/6 records
+contractualmente válidos cada una. No existe evidencia de superioridad de
+`en_cartographic` para Qwen. La comparación y sus límites se documentan en
+[PHASE5_GEOGRAPHIC_EXTRACTION.md](PHASE5_GEOGRAPHIC_EXTRACTION.md#f53b-generación-estructurada-y-evidencias-literales).

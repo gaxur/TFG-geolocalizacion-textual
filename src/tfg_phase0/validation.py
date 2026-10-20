@@ -1156,7 +1156,8 @@ def _validate_f4_linguistic_robustness_result(document: Mapping[str, Any]) -> No
 
 def _validate_f5_textual_variant_dataset(document: Mapping[str, Any]) -> None:
     fields = {"schema_version", "contract_version", "dataset_id", "dataset_version", "source_query_dataset", "protocol", "comparison_protocol", "observations"}
-    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f5-textual-variant-dataset-v1":
+    contract_version = document.get("contract_version")
+    if set(document) != fields or document["schema_version"] != "1.0" or contract_version not in {"f5-textual-variant-dataset-v1", "f5-textual-variant-dataset-v2"}:
         raise SchemaValidationError("f5_textual_variant_dataset incompatible")
     if not isinstance(document["dataset_id"], str) or not re.fullmatch(r"f5-madrid-textual-variants-sha256-[0-9a-f]{64}", document["dataset_id"]):
         raise SchemaValidationError("dataset_id F5.1 no válido")
@@ -1166,9 +1167,12 @@ def _validate_f5_textual_variant_dataset(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("referencia F5.1 a F4.3 no válida")
     _sha256(source["sha256"], "f5.source_query_dataset.sha256")
     protocol = document["protocol"]
+    variant_kinds = ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"]
+    if contract_version == "f5-textual-variant-dataset-v2":
+        variant_kinds.append("en_cartographic")
     expected_protocol = {
-        "version": "f5-madrid-textual-variants-v1",
-        "variant_kinds": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"],
+        "version": "f5-madrid-textual-variants-v1" if contract_version.endswith("v1") else "f5-madrid-textual-variants-v2",
+        "variant_kinds": variant_kinds,
         "ground_truth_source": "f4_query_dataset_reference_only",
         "orientation_policy": "optional_explicit_only_no_egocentric_to_cardinal_inference",
         "toponym_policy": "manual_annotation_no_osm_lookup",
@@ -1193,10 +1197,10 @@ def _validate_f5_textual_variant_dataset(document: Mapping[str, Any]) -> None:
     if not isinstance(observations, list):
         raise SchemaValidationError("observations F5.1 debe ser lista")
     for index, observation in enumerate(observations):
-        _validate_f5_observation(observation, f"observations[{index}]")
+        _validate_f5_observation(observation, f"observations[{index}]", expected_variant_count=len(variant_kinds))
 
 
-def _validate_f5_observation(observation: Any, label: str) -> None:
+def _validate_f5_observation(observation: Any, label: str, *, expected_variant_count: int) -> None:
     fields = {"source_query_id", "source_input_sha256", "partition", "location_id", "derivation_group_id", "toponyms", "orientation", "variants", "notes"}
     if not isinstance(observation, Mapping) or set(observation) != fields:
         raise SchemaValidationError(f"{label} incompatible")
@@ -1207,8 +1211,8 @@ def _validate_f5_observation(observation: Any, label: str) -> None:
     if observation["location_id"] is not None:
         _non_empty_string(observation["location_id"], f"{label}.location_id")
     _non_empty_string(observation["derivation_group_id"], f"{label}.derivation_group_id")
-    if not isinstance(observation["toponyms"], list) or not isinstance(observation["variants"], list) or len(observation["variants"]) != 4:
-        raise SchemaValidationError(f"{label} requiere topónimos y cuatro variantes")
+    if not isinstance(observation["toponyms"], list) or not isinstance(observation["variants"], list) or len(observation["variants"]) != expected_variant_count:
+        raise SchemaValidationError(f"{label} no contiene las variantes requeridas por el contrato")
     if observation["notes"] is not None:
         _non_empty_string(observation["notes"], f"{label}.notes")
     for index, toponym in enumerate(observation["toponyms"]):
@@ -1263,7 +1267,7 @@ def _validate_f5_variant(variant: Any, label: str) -> None:
         raise SchemaValidationError(f"{label} incompatible")
     if variant["variant_id"] is not None:
         _non_empty_string(variant["variant_id"], f"{label}.variant_id")
-    if variant["kind"] not in {"es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"} or variant["status"] not in {"pending", "generated", "reviewed", "rejected"} or variant["language"] not in {"es", "en"} or variant["review_status"] not in {"pending", "reviewed", "rejected"}:
+    if variant["kind"] not in {"es_original", "es_cartographic", "en_conventional", "en_toponym_preserved", "en_cartographic"} or variant["status"] not in {"pending", "generated", "reviewed", "rejected"} or variant["language"] not in {"es", "en"} or variant["review_status"] not in {"pending", "reviewed", "rejected"}:
         raise SchemaValidationError(f"{label} contiene kind, status, idioma o revisión no válidos")
     if variant["text"] is not None:
         _non_empty_string(variant["text"], f"{label}.text")
@@ -1313,7 +1317,7 @@ def _validate_f5_transformation_run(document: Mapping[str, Any]) -> None:
         else: _non_empty_string(transformer[field], f"transformer.{field}")
     generation = document["generation"]
     expected_generation_fields = {"prompt_version", "do_sample", "temperature", "seed", "max_new_tokens", "enable_thinking"}
-    if not isinstance(generation, Mapping) or set(generation) != expected_generation_fields or generation["prompt_version"] != "f52-text-transform-v1" or generation["do_sample"] is not False or generation["temperature"] != 0 or generation["enable_thinking"] is not False:
+    if not isinstance(generation, Mapping) or set(generation) != expected_generation_fields or generation["prompt_version"] not in {"f52-text-transform-v1", "f53b-text-transform-v2"} or generation["do_sample"] is not False or generation["temperature"] != 0 or generation["enable_thinking"] is not False:
         raise SchemaValidationError("generación F5.2 no determinista o incompatible")
     if isinstance(generation["seed"], bool) or not isinstance(generation["seed"], int):
         raise SchemaValidationError("seed F5.2 no válida")
@@ -1348,7 +1352,7 @@ def _validate_f5_transformation_run(document: Mapping[str, Any]) -> None:
         key = (record["source_query_id"], record["kind"])
         if key in seen: raise SchemaValidationError("record F5.2 duplicado")
         seen.add(key)
-        if record["kind"] not in {"es_cartographic", "en_conventional", "en_toponym_preserved"} or record["task"] not in {"cartographic_rewrite_es", "translate_en_conventional", "translate_en_preserve_toponyms"} or record["status"] not in {"generated", "rejected", "error"}:
+        if record["kind"] not in {"es_cartographic", "en_conventional", "en_toponym_preserved", "en_cartographic"} or record["task"] not in {"cartographic_rewrite_es", "translate_en_conventional", "translate_en_preserve_toponyms", "translate_en_cartographic"} or record["status"] not in {"generated", "rejected", "error"}:
             raise SchemaValidationError("record F5.2 contiene tarea o estado no válido")
         for field in ("input_text_sha256", "prompt_sha256"):
             _sha256(record[field], f"record.{field}")
@@ -1445,7 +1449,7 @@ def _validate_f5_variant_ranking_report(document: Mapping[str, Any]) -> None:
 
 def _validate_f5_geographic_extraction_set(document: Mapping[str, Any]) -> None:
     fields = {"schema_version", "contract_version", "extraction_set_id", "protocol_version", "source_sidecar", "extractor", "generation", "resource_usage", "records", "limitations"}
-    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f5-geographic-extraction-set-v1" or document["protocol_version"] != "f53-geographic-extraction-v1":
+    if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "f5-geographic-extraction-set-v1" or document["protocol_version"] not in {"f53-geographic-extraction-v1", "f53b-literal-evidence-v1"}:
         raise SchemaValidationError("f5_geographic_extraction_set incompatible")
     if not isinstance(document["extraction_set_id"], str) or not re.fullmatch(r"f5-geographic-extractions-sha256-[0-9a-f]{64}", document["extraction_set_id"]):
         raise SchemaValidationError("extraction_set_id F5.3 no válido")
@@ -1461,7 +1465,9 @@ def _validate_f5_geographic_extraction_set(document: Mapping[str, Any]) -> None:
         else: _non_empty_string(extractor[field], f"f53.extractor.{field}")
     generation = document["generation"]
     generation_fields = {"prompt_version", "do_sample", "temperature", "seed", "max_new_tokens", "enable_thinking", "max_attempts"}
-    if not isinstance(generation, Mapping) or set(generation) != generation_fields or generation["prompt_version"] != "f53-geographic-extraction-v1" or generation["do_sample"] is not False or generation["temperature"] != 0 or generation["enable_thinking"] is not False or generation["max_attempts"] not in {1, 2}:
+    allowed_generation_fields = generation_fields | {"strategy"}
+    strategy = generation.get("strategy", "baseline") if isinstance(generation, Mapping) else None
+    if not isinstance(generation, Mapping) or frozenset(generation) not in {frozenset(generation_fields), frozenset(allowed_generation_fields)} or generation["prompt_version"] not in {"f53-geographic-extraction-v1", "f53b-literal-evidence-v1"} or strategy not in {"baseline", "literal_evidence", "guided_schema_literal_evidence"} or generation["do_sample"] is not False or generation["temperature"] != 0 or generation["enable_thinking"] is not False or generation["max_attempts"] not in {1, 2}:
         raise SchemaValidationError("generation F5.3 no válida")
     usage = document["resource_usage"]
     if not isinstance(usage, Mapping) or set(usage) != {"model_load_ms", "cuda_before_load", "cuda_after_load", "cuda_peak_allocated_bytes", "cuda_after_close"}: raise SchemaValidationError("resource_usage F5.3 no válido")
@@ -1472,7 +1478,7 @@ def _validate_f5_geographic_extraction_set(document: Mapping[str, Any]) -> None:
         if not isinstance(record, Mapping) or set(record) != required: raise SchemaValidationError("record F5.3 no válido")
         if record["variant_id"] in seen: raise SchemaValidationError("variant_id F5.3 duplicado")
         seen.add(record["variant_id"])
-        if record["partition"] not in {"development", "evaluation"} or record["variant_kind"] not in {"es_original", "es_cartographic", "en_conventional", "en_toponym_preserved"} or record["language"] not in {"es", "en"} or record["status"] not in {"valid", "rejected", "error"} or record["attempt_count"] not in {1, 2}:
+        if record["partition"] not in {"development", "evaluation"} or record["variant_kind"] not in {"es_original", "es_cartographic", "en_conventional", "en_toponym_preserved", "en_cartographic"} or record["language"] not in {"es", "en"} or record["status"] not in {"valid", "rejected", "error"} or record["attempt_count"] not in {1, 2}:
             raise SchemaValidationError("record F5.3 contiene estado incompatible")
         _sha256(record["input_text_sha256"], "f53.input_hash"); _sha256(record["prompt_sha256"], "f53.prompt_hash")
         if not isinstance(record["protected_toponyms"], list) or len(record["protected_toponyms"]) != len(set(record["protected_toponyms"])) or any(not isinstance(value, str) or not value for value in record["protected_toponyms"]): raise SchemaValidationError("protected_toponyms F5.3 no válido")
@@ -1491,6 +1497,10 @@ def _validate_f5_geographic_extraction_set(document: Mapping[str, Any]) -> None:
             semantic_issues = validate_extraction_semantics(record["input_text"], record["language"], record["protected_toponyms"], record["extraction"])
             if any(row["severity"] == "error" for row in structural_issues + semantic_issues):
                 raise SchemaValidationError("extracción F5.3 persistida no supera revalidación")
+        provenance = record["provenance"]
+        provenance_fields = {"model_id", "revision", "tokenizer_id", "tokenizer_revision", "artifact_manifest_sha256", "prompt_version", "do_sample", "temperature", "seed", "enable_thinking", "real_model_inference"}
+        if not isinstance(provenance, Mapping) or frozenset(provenance) not in {frozenset(provenance_fields), frozenset(provenance_fields | {"strategy"})} or provenance.get("strategy", "baseline") != strategy:
+            raise SchemaValidationError("provenance F5.3 incompatible con la estrategia")
     from .f5_geographic_extraction import extraction_set_id
     if document["extraction_set_id"] != extraction_set_id(document): raise SchemaValidationError("extraction_set_id no corresponde al contenido")
 

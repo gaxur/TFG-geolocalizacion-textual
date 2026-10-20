@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "f5-textual-variant-dataset-v2",
+  "dataset_id": "f5-madrid-textual-variants-sha256-058375a1a0ecabedd348b1c6c187f412e55c7e28c96ce39cb8f585e4670da61e",
+  "dataset_version": "madrid-f53b-template-v2",
+  "source_query_dataset": {
+    "dataset_id": "f4-madrid-queries-sha256-081605e242a4df54ead19f757cbb6f490e1907cf9cd1e92926214280cbb5b4e2",
+    "sha256": "e0c710d43e848353b0116bdffacb926f321a11ed3f615cf21934fd052514562a"
+  },
+  "protocol": {
+    "version": "f5-madrid-textual-variants-v2",
+    "variant_kinds": ["es_original", "es_cartographic", "en_conventional", "en_toponym_preserved", "en_cartographic"],
+    "ground_truth_source": "f4_query_dataset_reference_only",
+    "orientation_policy": "optional_explicit_only_no_egocentric_to_cardinal_inference",
+    "toponym_policy": "manual_annotation_no_osm_lookup",
+    "osm_preselection_status": "standby_pending_tutor_decision",
+    "ranking_policy": "independent_exhaustive_rankings_no_fusion"
+  },
+  "comparison_protocol": {
+    "pairing": "paired_by_source_query_id",
+    "fixed_factors": ["checkpoint", "encoder", "gallery", "visual_embeddings", "ranking_method", "tie_break", "top_k", "ground_truth"],
+    "precision_metrics": ["recall_at_1", "recall_at_5", "recall_at_10", "top1_haversine_m", "minimum_haversine_at_k_m", "geo_recall_at_k"],
+    "stability_metrics": ["top1_agreement", "top_k_overlap", "jaccard_at_k", "top1_output_distance_m", "shared_candidate_rank_shift", "top1_margin"],
+    "spatial_dispersion": "mean_haversine_distance_to_top_k_medoid_m",
+    "cross_gallery_policy": "spatial_distance_only_no_candidate_id_equality",
+    "fusion_enabled": false
+  },
+  "observations": []
+}

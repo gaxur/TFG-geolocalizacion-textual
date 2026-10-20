@@ -56,7 +56,7 @@ def pending(kind):
 def sidecar():
     original = "Estoy cerca de Plaza Mayor, sin parques, mirando al norte y a 20 m de una calle"
     start = original.index("Plaza Mayor")
-    document = json.loads((ROOT / "config/madrid_f51_textual_variants_template.json").read_text())
+    document = json.loads((ROOT / "config/madrid_f53b_textual_variants_template.json").read_text())
     document["dataset_version"] = "f52-software-fixture-v1"
     document["observations"] = [{
         "source_query_id": "fixture-es-001", "source_input_sha256": "1" * 64, "partition": "development", "location_id": None, "derivation_group_id": "fixture-group-001",
@@ -64,7 +64,7 @@ def sidecar():
         "orientation": {"status": "verified", "cardinal": "north", "bearing_degrees": None, "bearing_convention": None, "method": "fixture", "uncertainty_degrees": 1.0, "provenance": "fixture", "verification_status": "verified", "relative_relations_present": False, "notes": None},
         "variants": [
             {"variant_id": "fixture-es-001-es-original-v1", "kind": "es_original", "status": "reviewed", "text": original, "language": "es", "generation": {"method": "original", "tool_or_model": "manual", "version": "v1", "configuration_or_prompt": "copy-from-f43", "transformation_time_ms": None}, "review_status": "reviewed", "transformations": ["preserve_original"], "preserved_elements": [], "removed_elements": [], "modified_elements": [], "protected_toponyms": []},
-            pending("es_cartographic"), pending("en_conventional"), pending("en_toponym_preserved"),
+            pending("es_cartographic"), pending("en_conventional"), pending("en_toponym_preserved"), pending("en_cartographic"),
         ], "notes": "Fixture sintética de software sin ground truth.",
     }]
     document["dataset_id"] = textual_variant_dataset_id(document)
@@ -78,6 +78,7 @@ class Phase5TextTransformTests(unittest.TestCase):
             "cartographic_rewrite_es": "Estoy cerca de Plaza Mayor, sin parques, mirando al norte y a 20 m de una calle",
             "translate_en_conventional": "I am near the Main Square, without parks, facing north and 20 m from a street",
             "translate_en_preserve_toponyms": "I am near Plaza Mayor, without parks, facing north and 20 m from a street",
+            "translate_en_cartographic": "I am near Plaza Mayor, without parks, north of a street at 20 m",
         }
 
     def test_prompt_is_task_specific_non_thinking_and_deterministic(self):
@@ -88,6 +89,8 @@ class Phase5TextTransformTests(unittest.TestCase):
         self.assertIn("Elimina solo detalles visuales", first)
         protected = build_prompt("__TOPONYM_000__", "translate_en_preserve_toponyms", ("__TOPONYM_000__",))
         self.assertIn("Placeholders obligatorios", protected)
+        cartographic = build_prompt("__TOPONYM_000__", "translate_en_cartographic", ("__TOPONYM_000__",))
+        self.assertIn("inglés cartográfico", cartographic)
         with self.assertRaises(TextTransformationError): build_prompt("x", "unknown")
         with self.assertRaises(ValueError): GenerationConfig(do_sample=True)
 
@@ -117,11 +120,12 @@ class Phase5TextTransformTests(unittest.TestCase):
         source = sidecar()
         transformer = FakeTransformer(self.outputs)
         derived, run = materialize_variants(source, transformer, self.config, source_logical_path="fixture.json", source_sha256="2" * 64)
-        self.assertEqual(len(run["records"]), 3)
+        self.assertEqual(len(run["records"]), 4)
         self.assertFalse(run["transformer"]["real_model_inference"])
         self.assertTrue(all(record["validation"]["human_review_required"] for record in run["records"]))
-        self.assertEqual([variant["status"] for variant in derived["observations"][0]["variants"]], ["reviewed", "generated", "generated", "generated"])
+        self.assertEqual([variant["status"] for variant in derived["observations"][0]["variants"]], ["reviewed", "generated", "generated", "generated", "generated"])
         self.assertEqual(derived["observations"][0]["variants"][3]["protected_toponyms"], ["Plaza Mayor"])
+        self.assertEqual(derived["observations"][0]["variants"][4]["protected_toponyms"], ["Plaza Mayor"])
         validate_document(run, "f5_transformation_run")
         self.assertEqual(run["run_id"], transformation_run_id(run))
         transformer.close()
@@ -154,13 +158,13 @@ class Phase5TextTransformTests(unittest.TestCase):
         derived, run = materialize_variants(sidecar(), FakeTransformer(self.outputs), self.config, source_logical_path="fixture.json", source_sha256="2" * 64)
         retriever = FakeRetriever()
         report = run_variant_rankings(derived, retriever, sidecar_sha256="3" * 64, gallery_ids=("madrid-50m", "madrid-25m"), top_k=5, transformation_run=run, allow_unreviewed_technical=True)
-        self.assertEqual(len(report["rankings"]), 8)
-        self.assertEqual(len(report["comparisons"]), 6)
-        self.assertEqual(len(report["cross_gallery"]), 4)
+        self.assertEqual(len(report["rankings"]), 10)
+        self.assertEqual(len(report["comparisons"]), 8)
+        self.assertEqual(len(report["cross_gallery"]), 5)
         self.assertFalse(report["geographic_accuracy_available"])
         self.assertFalse(report["retrieval"]["scores_fused"])
         self.assertFalse(report["retrieval"]["coordinates_fused"])
-        self.assertEqual(len(retriever.calls), 4)
+        self.assertEqual(len(retriever.calls), 5)
         validate_document(report, "f5_variant_ranking_report")
         self.assertEqual(report["report_id"], variant_ranking_report_id(report))
 

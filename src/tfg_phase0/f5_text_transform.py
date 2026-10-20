@@ -18,11 +18,13 @@ from .f5_textual_variants import F5ValidationError, textual_variant_dataset_id
 
 
 PROMPT_VERSION = "f52-text-transform-v1"
+PROMPT_VERSION_V2 = "f53b-text-transform-v2"
 RUN_PREFIX = "f5-transformation-run-sha256-"
 TASK_TO_KIND = {
     "cartographic_rewrite_es": "es_cartographic",
     "translate_en_conventional": "en_conventional",
     "translate_en_preserve_toponyms": "en_toponym_preserved",
+    "translate_en_cartographic": "en_cartographic",
 }
 KIND_TO_TASK = {value: key for key, value in TASK_TO_KIND.items()}
 PLACEHOLDER_RE = re.compile(r"__TOPONYM_(\d{3})__")
@@ -169,7 +171,7 @@ class QwenTransformersAdapter:
         prompt, mapping = prepare_prompt(original_text, task, protected_toponyms)
         return self.generate_prompt(prompt, config, restore_mapping=mapping)
 
-    def generate_prompt(self, prompt: str, config: GenerationConfig, *, restore_mapping: Mapping[str, str] | None = None) -> TransformResult:
+    def generate_prompt(self, prompt: str, config: GenerationConfig, *, restore_mapping: Mapping[str, str] | None = None, prefix_allowed_tokens_fn=None) -> TransformResult:
         """Genera desde un prompt versionado reutilizando modelo y tokenizer cargados."""
         if self._closed:
             raise TextTransformationError("transformador Qwen cerrado")
@@ -183,7 +185,7 @@ class QwenTransformersAdapter:
             rendered = self._tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = self._tokenizer(rendered, return_tensors="pt").to(self._model.device)
         with self._torch.inference_mode():
-            generated = self._model.generate(**inputs, max_new_tokens=config.max_new_tokens, do_sample=False, temperature=None)
+            generated = self._model.generate(**inputs, max_new_tokens=config.max_new_tokens, do_sample=False, temperature=None, prefix_allowed_tokens_fn=prefix_allowed_tokens_fn)
         output_tokens = generated[0, inputs["input_ids"].shape[1]:]
         raw = self._tokenizer.decode(output_tokens, skip_special_tokens=True).strip()
         text = restore_toponyms(raw, restore_mapping) if restore_mapping else raw
@@ -258,13 +260,14 @@ def build_prompt(text: str, task: str, protected_placeholders: Sequence[str] = (
         "cartographic_rewrite_es": "Reescribe en español conservando topónimos, calles, cruces, plazas, parques, edificios, estaciones, relaciones espaciales, negaciones y orientación explícita. Elimina solo detalles visuales sin representación cartográfica evidente.",
         "translate_en_conventional": "Traduce convencionalmente al inglés conservando significado, relaciones espaciales, negaciones, números y distancias. Los nombres propios pueden seguir la traducción convencional.",
         "translate_en_preserve_toponyms": "Traduce al inglés conservando exactamente cada placeholder protegido. No traduzcas, alteres, dupliques ni elimines placeholders.",
+        "translate_en_cartographic": "Traduce y reformula en inglés cartográfico. Conserva exactamente cada placeholder protegido, entidades y relaciones representables en OSM, relaciones espaciales, negaciones, números, distancias y orientación explícita. Elimina solo detalles visuales sin representación cartográfica evidente. No añadas ni infieras información.",
     }[task]
     protected = f"\nPlaceholders obligatorios: {', '.join(protected_placeholders)}" if protected_placeholders else ""
     return f"{common}\nTarea: {instructions}{protected}\nTexto:\n{text}"
 
 
 def prepare_prompt(original_text: str, task: str, protected_toponyms: Sequence[str]) -> tuple[str, dict[str, str]]:
-    protected_text, mapping = protect_toponyms(original_text, protected_toponyms) if task == "translate_en_preserve_toponyms" else (original_text, {})
+    protected_text, mapping = protect_toponyms(original_text, protected_toponyms) if task in {"translate_en_preserve_toponyms", "translate_en_cartographic"} else (original_text, {})
     return build_prompt(protected_text, task, tuple(mapping)), mapping
 
 
@@ -310,6 +313,7 @@ def heuristic_language(text: str) -> str:
 
 def materialize_variants(source_sidecar: Mapping[str, Any], transformer: TextTransformer, config: GenerationConfig, *, source_logical_path: str, source_sha256: str) -> tuple[dict[str, Any], dict[str, Any]]:
     derived = json.loads(json.dumps(source_sidecar, ensure_ascii=False))
+    prompt_version = PROMPT_VERSION_V2 if source_sidecar["contract_version"] == "f5-textual-variant-dataset-v2" else PROMPT_VERSION
     records = []
     for observation in derived["observations"]:
         original = next(variant for variant in observation["variants"] if variant["kind"] == "es_original")
@@ -318,7 +322,7 @@ def materialize_variants(source_sidecar: Mapping[str, Any], transformer: TextTra
             if variant["kind"] == "es_original" or variant["status"] != "pending":
                 continue
             task = KIND_TO_TASK[variant["kind"]]
-            protected = proper if task == "translate_en_preserve_toponyms" else []
+            protected = proper if task in {"translate_en_preserve_toponyms", "translate_en_cartographic"} else []
             prompt, _ = prepare_prompt(original["text"], task, protected)
             started = time.perf_counter()
             try:
@@ -334,9 +338,9 @@ def materialize_variants(source_sidecar: Mapping[str, Any], transformer: TextTra
                 preserved, removed, modified = transformation_elements(original["text"], output, variant["kind"], proper)
                 variant.update({
                     "variant_id": variant_id, "status": "generated" if status == "generated" else "rejected", "text": output,
-                    "generation": {"method": "model_assisted_cartographic_rewrite" if variant["kind"] == "es_cartographic" else "model_assisted_translation", "tool_or_model": transformer.metadata.model_id, "version": transformer.metadata.revision, "configuration_or_prompt": PROMPT_VERSION, "transformation_time_ms": None},
+                    "generation": {"method": "model_assisted_cartographic_rewrite" if variant["kind"] == "es_cartographic" else "model_assisted_translation", "tool_or_model": transformer.metadata.model_id, "version": transformer.metadata.revision, "configuration_or_prompt": prompt_version, "transformation_time_ms": None},
                     "review_status": "pending" if status == "generated" else "rejected",
-                    "transformations": ["cartographic_filter"] if variant["kind"] == "es_cartographic" else (["translation", "toponym_protection"] if variant["kind"] == "en_toponym_preserved" else ["translation"]),
+                    "transformations": ["cartographic_filter"] if variant["kind"] == "es_cartographic" else (["translation", "cartographic_filter", "toponym_protection"] if variant["kind"] == "en_cartographic" else (["translation", "toponym_protection"] if variant["kind"] == "en_toponym_preserved" else ["translation"])),
                     "preserved_elements": preserved, "removed_elements": removed, "modified_elements": modified, "protected_toponyms": list(protected),
                 })
             records.append({
@@ -353,7 +357,7 @@ def materialize_variants(source_sidecar: Mapping[str, Any], transformer: TextTra
         "source_sidecar": {"logical_path": source_logical_path, "dataset_id": source_sidecar["dataset_id"], "sha256": source_sha256},
         "derived_sidecar": {"logical_path": "derived-sidecar.json", "dataset_id": derived["dataset_id"], "sha256": hashlib.sha256(derived_raw).hexdigest()},
         "transformer": transformer.metadata.__dict__,
-        "generation": {"prompt_version": PROMPT_VERSION, "do_sample": config.do_sample, "temperature": config.temperature, "seed": config.seed, "max_new_tokens": config.max_new_tokens, "enable_thinking": config.enable_thinking},
+        "generation": {"prompt_version": prompt_version, "do_sample": config.do_sample, "temperature": config.temperature, "seed": config.seed, "max_new_tokens": config.max_new_tokens, "enable_thinking": config.enable_thinking},
         "environment": environment_metadata(transformer.metadata.real_model_inference),
         "resource_usage": json.loads(json.dumps(transformer.resource_usage)),
         "records": records,

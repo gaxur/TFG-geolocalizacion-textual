@@ -325,3 +325,106 @@ python scripts/compare_f5_geographic_extractions.py \
   tutor y evaluación independiente.
 
 Ninguna de estas integraciones se implementa en F5.3.
+
+## F5.3b: generación estructurada y evidencias literales
+
+F5.3b mantiene D064: las extracciones no se conectan a OSM, diálogo, API, VLM ni
+ranking. El objetivo fue comparar mejoras acotadas sin relajar el contrato final.
+Los artefactos históricos no se modificaron.
+
+### Diagnóstico reproducible
+
+`scripts/diagnose_f53_extraction_errors.py` clasifica los issues persistidos como
+estructurales o semánticos y conserva sus códigos originales. Sobre las tres
+campañas F5.3 (30 records) registró 16 incidencias estructurales y 42 semánticas;
+39 de estas últimas fueron `evidence_span_mismatch`. También aparecieron dos JSON
+inválidos, seis ambigüedades mal formadas, tres referencias inexistentes, dos
+negaciones inválidas, dos aridades `between`, un frame cardinal incorrecto y
+otros errores aislados. Un record puede aportar varios issues, por lo que estas
+cifras no son porcentajes de casos.
+
+```bash
+.venv-geo/bin/python scripts/diagnose_f53_extraction_errors.py \
+  --extraction-set <campaña-inicial>/extractions.json \
+  --extraction-set <campaña-retry>/extractions.json \
+  --extraction-set <campaña-indexed>/extractions.json \
+  --output results/generated/f5/f53/f53b-historical-diagnostics.json
+```
+
+El informe queda fuera de Git y es content-addressed mediante
+`diagnostic_id`. La sintaxis JSON, la validez estructural y la validez semántica
+se cuentan por separado.
+
+### Estrategias comparadas
+
+Se mantuvo un intento y `max_new_tokens=512` para las tres estrategias, con el
+mismo snapshot, seed, non-thinking y validadores:
+
+| Estrategia | Versión | Implementación |
+|---|---|---|
+| Baseline | `f53-geographic-extraction-v1` | Prompt F5.3 con spans generados por Qwen |
+| Evidencia literal | `f53b-literal-evidence-v1` | Qwen genera `evidence.text` literal sin offset; código determinista resuelve solo coincidencias únicas |
+| Schema guiado + evidencia literal | `f53b-literal-evidence-v1` y estrategia registrada | LM Format Enforcer 0.11.3 restringe nombres, tipos, enums y estructura; después se resuelven offsets únicos |
+
+`resolve_literal_evidence_spans()` no repara una evidencia incorrecta. Cero
+coincidencias produce `evidence_not_literal`; más de una produce
+`evidence_not_unique`. Solo una coincidencia añade `span`, tras lo que se ejecutan
+sin cambios `validate_extraction_structure()` y
+`validate_extraction_semantics()`. La igualdad
+`input_text[start:end] == evidence.text` continúa siendo obligatoria.
+
+LM Format Enforcer se fija en `requirements-f53b-guided.txt`. Su instalación
+aislada observada ocupó aproximadamente 30 MB sin Transformers y no requiere una
+extensión CUDA. La integración 0.11.3 necesita un shim local porque Transformers
+5.9 exporta `PreTrainedTokenizerBase` desde una ruta nueva. Además, su parser no
+acepta enums mixtos string/null; el schema de generación los expresa como
+`anyOf` equivalente. Ninguna adaptación cambia el schema persistido.
+
+### Campaña real comparativa
+
+Resultados sobre las mismas diez sondas técnicas development, sin ground truth:
+
+| Estrategia | JSON sintáctico | Estructuralmente válidas | Contrato final válido | Latencia media |
+|---|---:|---:|---:|---:|
+| Baseline histórico | 10/10 | 6/10 | 1/10 | 15.881,92 ms |
+| Evidencia literal | 10/10 | 5/10 | 4/10 | 11.575,19 ms |
+| Schema guiado + evidencia literal | 8/10 | 6/10 | 5/10 | 18.493,57 ms |
+
+Los dos JSON inválidos guiados fueron salidas truncadas al alcanzar el presupuesto
+de tokens; una restricción de prefijo no garantiza que el objeto termine dentro
+del límite. Persistieron referencias inexistentes, aridad, negación y topónimos.
+El guiado mejora cumplimiento contractual en esta muestra, pero no garantiza
+fidelidad semántica y puede forzar decisiones improbables.
+
+Telemetría real:
+
+| Estrategia | Carga | Pico CUDA asignado |
+|---|---:|---:|
+| Evidencia literal | 89.283,94 ms | 16.506.925.056 B |
+| Guiada | 89.424,47 ms | 16.523.023.360 B |
+
+Tras cada cierre quedaron 8.519.680 B asignados y 20.971.520 B reservados. La
+capa temporal de dependencias ocupó 133 MB porque incluía Transformers y sus
+dependencias directas, pero no duplicó Torch ni los 16 GB de pesos.
+
+### Cinco variantes textuales
+
+El contrato textual v2 añade `en_cartographic` sin reinterpretar v1. La campaña
+guiada sobre seis observaciones y cinco variantes produjo 15/30 records válidos,
+exactamente 3/6 por variante. En inglés persistió
+`egocentric_frame_mismatch`; en todas las variantes persistieron referencias,
+negación, aridad y casos sin contenido geográfico. No se observó superioridad de
+`en_cartographic` para extracción.
+
+No se creó una anotación de referencia independiente después de observar estas
+salidas: las sondas ya se usaron para desarrollar prompts. La validez contractual
+no se presenta como exactitud semántica. Una evaluación posterior deberá congelar
+anotaciones humanas y separar desarrollo de comprobación.
+
+### Estado de cierre
+
+F5.3b queda completada como experimento técnico, pero **no es apta para
+integración automática**. La mejor estrategia alcanzó 5/10 en sondas de
+desarrollo y sigue requiriendo revisión humana. Aumentar el límite de tokens,
+relajar referencias o corregir outputs a posteriori no se usó para mejorar
+artificialmente el resultado.

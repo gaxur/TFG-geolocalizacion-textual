@@ -38,7 +38,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
-    document = json.loads((ROOT / "config/madrid_f51_textual_variants_template.json").read_text())
+    document = json.loads((ROOT / "config/madrid_f53b_textual_variants_template.json").read_text())
     observations = []
     for index, (case, text, name, entity_type, name_kind) in enumerate(CASES, 1):
         toponyms = []
@@ -46,7 +46,7 @@ def main() -> int:
             start = text.index(name)
             toponyms.append({"mention": name, "span": {"start": start, "end": start + len(name)}, "entity_type": entity_type, "name_kind": name_kind, "aliases": [], "annotation_provenance": "manual", "review_status": "reviewed"})
         original = {"variant_id": f"f53-technical-{case}-es-original", "kind": "es_original", "status": "reviewed", "text": text, "language": "es", "generation": {"method": "original", "tool_or_model": "manual", "version": "v1", "configuration_or_prompt": "f53-technical-fixture", "transformation_time_ms": None}, "review_status": "reviewed", "transformations": ["preserve_original"], "preserved_elements": [], "removed_elements": [], "modified_elements": [], "protected_toponyms": []}
-        observations.append({"source_query_id": f"f53-technical-{case}", "source_input_sha256": hashlib.sha256(text.encode()).hexdigest(), "partition": "development", "location_id": None, "derivation_group_id": f"f53-technical-{case}", "toponyms": toponyms, "orientation": {"status": "absent", "cardinal": None, "bearing_degrees": None, "bearing_convention": None, "method": None, "uncertainty_degrees": None, "provenance": None, "verification_status": "not_applicable", "relative_relations_present": any(value in text.casefold() for value in ("izquierda", "derecha", "delante", "detrás")), "notes": "Fixture técnica F5.3 sin ground truth."}, "variants": [original, pending("es_cartographic", "es"), pending("en_conventional", "en"), pending("en_toponym_preserved", "en")], "notes": "No utilizar como evaluación."})
+        observations.append({"source_query_id": f"f53-technical-{case}", "source_input_sha256": hashlib.sha256(text.encode()).hexdigest(), "partition": "development", "location_id": None, "derivation_group_id": f"f53-technical-{case}", "toponyms": toponyms, "orientation": {"status": "absent", "cardinal": None, "bearing_degrees": None, "bearing_convention": None, "method": None, "uncertainty_degrees": None, "provenance": None, "verification_status": "not_applicable", "relative_relations_present": any(value in text.casefold() for value in ("izquierda", "derecha", "delante", "detrás")), "notes": "Fixture técnica F5.3 sin ground truth."}, "variants": [original, pending("es_cartographic", "es"), pending("en_conventional", "en"), pending("en_toponym_preserved", "en"), pending("en_cartographic", "en")], "notes": "No utilizar como evaluación."})
     document["dataset_version"] = "f53-technical-smoke-v1"
     document["observations"] = observations
     document["dataset_id"] = textual_variant_dataset_id(document)

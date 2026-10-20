@@ -33,6 +33,7 @@ def main() -> int:
     parser.add_argument("--max-new-tokens", type=int, default=768)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--max-attempts", type=int, choices=(1, 2), default=2)
+    parser.add_argument("--strategy", choices=("baseline", "literal_evidence", "guided_schema_literal_evidence"), default="baseline")
     parser.add_argument("--output-root", required=True, type=Path)
     args = parser.parse_args()
     if args.extractor == "qwen" and (args.model_path is None or not args.model_revision): parser.error("Qwen requiere --model-path local y --model-revision")
@@ -49,7 +50,7 @@ def main() -> int:
         outputs = json.loads(args.fake_outputs.read_text(encoding="utf-8")) if args.fake_outputs else {}
         extractor = FakeGeographicExtractor(outputs)
     try:
-        document = materialize_extractions(sidecar, extractor, ExtractionConfig(args.max_new_tokens, args.seed, args.max_attempts), sidecar_logical_path=args.sidecar.name, sidecar_sha256=hashlib.sha256(raw).hexdigest())
+        document = materialize_extractions(sidecar, extractor, ExtractionConfig(args.max_new_tokens, args.seed, args.max_attempts, args.strategy), sidecar_logical_path=args.sidecar.name, sidecar_sha256=hashlib.sha256(raw).hexdigest())
     finally:
         extractor.close()
     finalize_extraction_resources(document, extractor)

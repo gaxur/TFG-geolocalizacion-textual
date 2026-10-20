@@ -14,8 +14,10 @@ from .f4_validation import F4ValidationError
 
 
 DATASET_PREFIX = "f5-madrid-textual-variants-sha256-"
-VARIANT_KINDS = ("es_original", "es_cartographic", "en_conventional", "en_toponym_preserved")
-LANGUAGE_BY_KIND = {"es_original": "es", "es_cartographic": "es", "en_conventional": "en", "en_toponym_preserved": "en"}
+VARIANT_KINDS_V1 = ("es_original", "es_cartographic", "en_conventional", "en_toponym_preserved")
+VARIANT_KINDS_V2 = (*VARIANT_KINDS_V1, "en_cartographic")
+VARIANT_KINDS = VARIANT_KINDS_V2
+LANGUAGE_BY_KIND = {kind: "es" if kind.startswith("es_") else "en" for kind in VARIANT_KINDS_V2}
 
 
 class F5ValidationError(ValueError):
@@ -73,7 +75,10 @@ def validate_textual_variant_dataset(
     seen_queries = set()
     variant_ids = set()
     generated_texts: dict[str, tuple[str, str]] = {}
-    variant_counts = {kind: {"pending": 0, "generated": 0, "reviewed": 0, "rejected": 0} for kind in VARIANT_KINDS}
+    expected_kinds = variant_kinds_for_contract(document["contract_version"])
+    if tuple(document["protocol"]["variant_kinds"]) != expected_kinds:
+        raise F5ValidationError("variant_kinds no corresponde a la versión del contrato F5")
+    variant_counts = {kind: {"pending": 0, "generated": 0, "reviewed": 0, "rejected": 0} for kind in expected_kinds}
     validated_references = 0
     proper_toponyms = 0
     reference_statuses = Counter()
@@ -105,7 +110,7 @@ def validate_textual_variant_dataset(
         proper_toponyms += len(proper_names)
         _validate_orientation(observation["orientation"])
         variants = observation["variants"]
-        if tuple(variant["kind"] for variant in variants) != VARIANT_KINDS:
+        if tuple(variant["kind"] for variant in variants) != expected_kinds:
             raise F5ValidationError(f"orden o tipos de variantes F5.1 inválidos: {query_id}")
         for variant in variants:
             _validate_variant(variant, source, proper_names)
@@ -149,6 +154,14 @@ def validate_textual_variant_dataset(
         "precision_metrics_available": validated_references > 0,
         "osm_preselection_status": document["protocol"]["osm_preselection_status"],
     }
+
+
+def variant_kinds_for_contract(contract_version: str) -> tuple[str, ...]:
+    if contract_version == "f5-textual-variant-dataset-v1":
+        return VARIANT_KINDS_V1
+    if contract_version == "f5-textual-variant-dataset-v2":
+        return VARIANT_KINDS_V2
+    raise F5ValidationError(f"versión de contrato F5 no soportada: {contract_version}")
 
 
 def paired_variant_plan(document: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -236,12 +249,12 @@ def _validate_variant(variant: Mapping[str, Any], source: Mapping[str, Any], pro
             raise F5ValidationError("es_original declara transformaciones")
     elif kind == "es_cartographic" and variant["generation"]["method"] not in {"manual_cartographic_rewrite", "model_assisted_cartographic_rewrite"}:
         raise F5ValidationError("es_cartographic requiere un método de reescritura declarado")
-    elif kind in {"en_conventional", "en_toponym_preserved"} and variant["generation"]["method"] not in {"manual_translation", "automatic_translation", "model_assisted_translation"}:
+    elif kind in {"en_conventional", "en_toponym_preserved", "en_cartographic"} and variant["generation"]["method"] not in {"manual_translation", "automatic_translation", "model_assisted_translation"}:
         raise F5ValidationError("variante inglesa sin método de traducción")
-    if kind == "en_toponym_preserved":
+    if kind in {"en_toponym_preserved", "en_cartographic"}:
         if set(variant["protected_toponyms"]) != proper_names:
             raise F5ValidationError("en_toponym_preserved no protege todos los topónimos propios revisados")
         if not proper_names <= set(variant["text"].split()) and any(name not in variant["text"] for name in proper_names):
             raise F5ValidationError("topónimo protegido no aparece literalmente en la traducción")
     elif variant["protected_toponyms"]:
-        raise F5ValidationError("protected_toponyms solo se admite en en_toponym_preserved")
+        raise F5ValidationError("protected_toponyms solo se admite en variantes inglesas protegidas")
