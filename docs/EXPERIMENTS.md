@@ -608,7 +608,9 @@ No se ejecutaron modelos ni rankings. Detalles:
 
 Se verificaron inicialmente cinco PNG locales. SV-02 se confirmó fuera de D004 y
 de ambas coberturas, por lo que se retiró del dataset activo y se eliminó su PNG;
-URL, panorama y coordenadas permanecen como exclusión. Se materializó:
+URL, panorama y coordenadas permanecen como `SV-EXCLUDED-01`. Las antiguas
+SV-03/04/05 se renumeraron de forma continua a SV-02/03/04 conservando IDs
+históricos. Se materializó:
 
 ```text
 f56-streetview-documentary-sha256-7a6e1a66b7e3a0edbac6175753c3179b03ca0b89fb9e3f0f91036c3ab5eefe93

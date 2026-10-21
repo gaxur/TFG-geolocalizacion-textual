@@ -8,7 +8,7 @@ proceden del enlace suministrado y la incertidumbre posicional es desconocida.
 
 ```text
 dataset_id:
-f56-streetview-documentary-sha256-1a39ea529eba961833c7b0da892c9facd9143733780dabc63a4ccdaf05e6489c
+f56-streetview-documentary-sha256-f39d8ac6d317a5a1c244058386735d8d0ee010afabe6812585576d68f2b109c6
 ```
 
 Resultado:
@@ -30,7 +30,7 @@ precisión posicional verificable.
 Las capturas están en:
 
 ```text
-data/streetview/SV-01.png ... SV-05.png
+data/streetview/SV-01.png ... SV-04.png
 ```
 
 `/data/*` ya está ignorado por Git. El dataset almacena únicamente rutas lógicas,
@@ -42,9 +42,9 @@ Hashes:
 | Captura | SHA-256 |
 |---|---|
 | SV-01 | `f16a87c86932bece5a5155a5c117e36abcdfaeed737ad5081662adff86d069b0` |
-| SV-03 | `1d6c61ee757885f0e66aefaba93d981c7fc0afe934723277be612afde577d3c5` |
-| SV-04 | `85f7fbc2fd017a7bb8ee4b315e9815aef5acbe89ade6f48750583420c8f9d08a` |
-| SV-05 | `fad0b7fdfac37803c369c9a4f494c03828574944f57019ee87936bc633e6005b` |
+| SV-02 (antes SV-03) | `1d6c61ee757885f0e66aefaba93d981c7fc0afe934723277be612afde577d3c5` |
+| SV-03 (antes SV-04) | `85f7fbc2fd017a7bb8ee4b315e9815aef5acbe89ade6f48750583420c8f9d08a` |
+| SV-04 (antes SV-05) | `fad0b7fdfac37803c369c9a4f494c03828574944f57019ee87936bc633e6005b` |
 
 ## Referencias geográficas
 
@@ -59,14 +59,16 @@ Se distinguen:
 | Captura | D004 | 25 m por punto | 50 m por punto | Recall exacto |
 |---|---|---|---|---|
 | SV-01 | dentro | assigned | assigned | no: incertidumbre desconocida |
-| SV-03 | dentro | assigned | assigned | no: incertidumbre desconocida |
-| SV-04 | dentro | assigned | assigned | no: incertidumbre desconocida |
-| SV-05 | dentro | assigned | assigned | no: incertidumbre desconocida |
+| SV-02 (antes SV-03) | dentro | assigned | assigned | no: incertidumbre desconocida |
+| SV-03 (antes SV-04) | dentro | assigned | assigned | no: incertidumbre desconocida |
+| SV-04 (antes SV-05) | dentro | assigned | assigned | no: incertidumbre desconocida |
 
 El parámetro `650a`/similar de las URLs no se interpreta como precisión. SV-02 se
-retiró del dataset activo y su PNG local se eliminó: estaba 16,22 m al norte de
+retiró del dataset activo y su PNG local original se eliminó: estaba 16,22 m al norte de
 D004, 29,29 m al norte de la cobertura 25 m y 54,33 m al norte de la cobertura
-50 m. URL, panorama y coordenadas permanecen en `excluded_observations`.
+50 m. URL, panorama y coordenadas permanecen como `SV-EXCLUDED-01` con
+`legacy_observation_id: SV-02`. Las antiguas SV-03/04/05 se renumeraron como
+SV-02/03/04 y conservan `legacy_observation_id`.
 
 ## Orientación y descripciones
 
