@@ -216,6 +216,21 @@ def upgrade_visual_review_queue(queue: Mapping[str, Any], decisions: Mapping[str
     return output
 
 
+def upgrade_existing_visual_review_queue(queue: Mapping[str, Any], decisions: Mapping[str, Any]) -> dict[str, Any]:
+    if queue.get("contract_version") != "f55-panoramax-review-v2" or any(row.get("visual_review", {}).get("status") != "pending" for row in queue.get("records", [])):
+        raise F55EvidenceError("la cola complementaria no está pendiente en v2")
+    legacy = copy.deepcopy(queue)
+    legacy["contract_version"] = "f55-panoramax-review-v1"
+    for record in legacy["records"]: record.pop("visual_review", None)
+    legacy["review_queue_id"] = review_queue_id(legacy)
+    reviewed = upgrade_visual_review_queue(legacy, decisions)
+    reviewed["selection"] = copy.deepcopy(queue["selection"])
+    reviewed["inventory"] = copy.deepcopy(queue["inventory"])
+    reviewed["limitations"] = sorted(set([*queue["limitations"], *reviewed["limitations"]]))
+    reviewed["review_queue_id"] = review_queue_id(reviewed)
+    return reviewed
+
+
 def build_complementary_review_queue(inventory: Mapping[str, Any], primary_queue: Mapping[str, Any]) -> dict[str, Any]:
     selected = {row["item_id"] for row in primary_queue["records"]}
     remaining = sorted(item["item_id"] for item in inventory["items"] if item["item_id"] not in selected)

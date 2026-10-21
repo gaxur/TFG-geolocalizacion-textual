@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "f5_synthetic_osm_benchmark.schema.json", "title": "F5.5c synthetic OSM geographic benchmark",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "benchmark_id", "protocol", "inputs", "partitions", "observations", "limitations"],
+  "properties": {"schema_version": {"const": "1.0"}, "contract_version": {"const": "f55c-synthetic-osm-benchmark-v1"}, "benchmark_id": {"type": "string", "pattern": "^f55c-synthetic-osm-sha256-[0-9a-f]{64}$"}, "protocol": {"type": "object"}, "inputs": {"type": "object"}, "partitions": {"type": "object"}, "observations": {"type": "array", "minItems": 30, "maxItems": 50, "items": {"type": "object"}}, "limitations": {"type": "array", "minItems": 1}}
+}

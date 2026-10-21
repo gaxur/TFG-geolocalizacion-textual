@@ -135,6 +135,10 @@ F5.5b registra por separado aptitud visual y aprobación GT, y ofrece una segund
 galería offline con los cinco items Panoramax restantes:
 [PHASE5_VISUAL_REVIEW.md](docs/PHASE5_VISUAL_REVIEW.md).
 
+F5.5c cierra la revisión visual Panoramax y materializa 35 consultas
+`synthetic_osm` trazables y pendientes de revisión, separadas del GT real:
+[PHASE5_SYNTHETIC_OSM_BENCHMARK.md](docs/PHASE5_SYNTHETIC_OSM_BENCHMARK.md).
+
 Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
 
 ```bash

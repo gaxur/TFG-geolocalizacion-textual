@@ -1592,6 +1592,14 @@ def _validate_f5_field_observation(document: Mapping[str, Any]) -> None:
     except ValueError as error: raise SchemaValidationError("registro de campo F5.5 no válido") from error
 
 
+def _validate_f5_synthetic_osm_benchmark(document: Mapping[str, Any]) -> None:
+    fields={"schema_version","contract_version","benchmark_id","protocol","inputs","partitions","observations","limitations"}
+    if set(document)!=fields or document.get("schema_version")!="1.0" or document.get("contract_version")!="f55c-synthetic-osm-benchmark-v1" or not isinstance(document.get("observations"),list) or not 30<=len(document["observations"])<=50: raise SchemaValidationError("f5_synthetic_osm_benchmark incompatible")
+    from .f5_synthetic_osm_benchmark import validate_synthetic_benchmark
+    try: validate_synthetic_benchmark(document)
+    except ValueError as error: raise SchemaValidationError("benchmark synthetic_osm no válido") from error
+
+
 def _validate_crosstext2loc_retrieval_request(document: Mapping[str, Any]) -> None:
     fields = {"schema_version", "contract_version", "query", "gallery_ids", "top_k"}
     if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "crosstext2loc-retrieval-request-v1":
@@ -2112,6 +2120,7 @@ def validate_document(document: Any, schema_name: str) -> None:
         "f5_panoramax_inventory": _validate_f5_panoramax_inventory,
         "f5_panoramax_review": _validate_f5_panoramax_review,
         "f5_field_observation": _validate_f5_field_observation,
+        "f5_synthetic_osm_benchmark": _validate_f5_synthetic_osm_benchmark,
         "crosstext2loc_retrieval_request": _validate_crosstext2loc_retrieval_request,
         "crosstext2loc_retrieval_response": _validate_crosstext2loc_retrieval_response,
         "manifest": _validate_manifest,

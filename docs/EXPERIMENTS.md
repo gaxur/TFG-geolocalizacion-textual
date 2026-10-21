@@ -562,6 +562,41 @@ cobertura y dos no declaran precisión. Los artefactos permanecen fuera de Git e
 `results/generated/f5/f55b/`. Detalles:
 [PHASE5_VISUAL_REVIEW.md](PHASE5_VISUAL_REVIEW.md).
 
+## F5.5c: cierre Panoramax y benchmark `synthetic_osm`
+
+La segunda cola Panoramax quedó revisada con 1 `suitable`, 3 `limited` y 1
+`unsuitable`. El total de diez imágenes es 2/5/3 respectivamente; los diez GT
+siguen `pending` y no se importaron a F5.4.
+
+Se materializó un benchmark OSM separado:
+
+```bash
+.venv-geo/bin/python scripts/build_f55c_synthetic_osm_benchmark.py \
+  --count 40 --seed 55 --minimum-spacing-m 70 \
+  --output-root results/generated/f5/f55c-final
+```
+
+Resultado:
+
+```text
+observaciones: 35
+development: 24
+evaluation: 11
+bloques espaciales: 23
+separación mínima: 70,69 m
+media de entidades/relaciones: 3,77
+review pending: 35
+```
+
+Las 35 posiciones están `assigned` en 25 m y 50 m por construcción sintética.
+Las evidencias se revalidaron contra F3. Se solicitaron 40, pero con 80 m solo se
+obtuvieron 25; se adoptó 70 m, el mayor umbral ensayado que superó el mínimo de
+30. No se rellenó la muestra. Benchmark final:
+`f55c-synthetic-osm-sha256-bf7aea13116cda8e027343535f0a6d2de3bd6582aa09c6a65d1f14e9b24873c2`.
+
+No se ejecutaron modelos ni rankings. Detalles:
+[PHASE5_SYNTHETIC_OSM_BENCHMARK.md](PHASE5_SYNTHETIC_OSM_BENCHMARK.md).
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

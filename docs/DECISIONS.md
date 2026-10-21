@@ -87,6 +87,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D069 | Adoptar Panoramax solo como inventario y cola de revisión F5.5 | ACEPTADA | F5 / evidencia fotográfica |
 | D070 | Priorizar recogida propia para GT exacto y bloquear aprobación automática | ACEPTADA | F5 / recopilación |
 | D071 | Separar aptitud visual Panoramax de aprobación de Ground Truth | ACEPTADA | F5 / revisión humana |
+| D072 | Mantener `synthetic_osm` separado del Ground Truth real F5.4 | ACEPTADA | F5 / benchmark sintético |
 
 ## D053 — API HTTP interna del MVP
 
@@ -575,6 +576,30 @@ exacto.
 Se crea una segunda cola complementaria para los cinco items restantes sin
 reseleccionar por resultados del modelo. CrossText2Loc y Qwen permanecen sin
 ejecutarse hasta disponer de GT aprobado.
+
+## D072 — Benchmark `synthetic_osm` separado de GT real
+
+**Estado:** ACEPTADA
+**Componente:** F5 / benchmark sintético
+**Fecha:** 2026-10-21
+**Origen:** Implementación F5.5c solicitada por el responsable.
+
+### Decisión
+
+F5.5c puede usar centros de celdas F1 como puntos sintéticos conocidos y objetos
+F3 como evidencia, siempre que declare `synthetic_osm`, no GNSS ni observación
+humana. Se exige asignación inequívoca en 25 m y 50 m, evidencia revalidada contra
+F3, textos sin visibilidad/orientación y revisión humana pendiente.
+
+El benchmark usa definiciones métricas F5.4 mediante un adaptador separado y
+declara `real_ground_truth=false`. Sus métricas nunca se agregan con F5.4 real.
+
+### Consecuencias
+
+El solapamiento OSM entre consultas y candidatos se registra como contaminación.
+El conjunto no decide por sí solo prefiltrado/reranking ni sustituye observaciones
+`human_in_situ`. Qwen y CrossText2Loc se ejecutarán solo en una fase posterior,
+después de congelar revisión.
 
 ## D001 — Identidad del candidato
 
