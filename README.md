@@ -130,16 +130,24 @@ F5.5c materializa 35 consultas
 `synthetic_osm` trazables y pendientes de revisión, separadas del GT real:
 [PHASE5_SYNTHETIC_OSM_BENCHMARK.md](docs/PHASE5_SYNTHETIC_OSM_BENCHMARK.md).
 
-F5.6 sustituye Panoramax en el flujo activo por cinco capturas locales Street
-View documentales. Cuatro enlaces están dentro de D004, pero ninguna observación
-tiene precisión suficiente para Recall oficial y las descripciones siguen
-pendientes de revisión:
+F5.6 conserva el antecedente histórico de cinco referencias Street View
+documentales usado por F5.7. Sus capturas locales se retiraron tras F5.9; quedan
+metadatos, hashes y resultados para trazabilidad, no un flujo visual activo:
 [PHASE56_STREETVIEW_DOCUMENTARY.md](docs/PHASE56_STREETVIEW_DOCUMENTARY.md).
 
 F5.7 ejecuta provisionalmente 16 variantes Qwen y 40 rankings CrossText2Loc sobre
 los cuatro casos activos. Sus métricas usan coordenadas de enlace con
 incertidumbre desconocida y son exclusivamente experimentales, separadas de
 F5.4: [PHASE57_EXPERIMENTAL_EVALUATION.md](docs/PHASE57_EXPERIMENTAL_EVALUATION.md).
+
+F5.8 cambia el objetivo funcional para priorizar una ubicación próxima dentro del
+Top-10. La auditoría de F5.7 y F5.5c no permite todavía elegir definitivamente
+variante o uso de Qwen; propone una muestra humana dirigida:
+[PHASE58_GEORECALL_DECISION.md](docs/PHASE58_GEORECALL_DECISION.md).
+
+F5.9 incorpora H01–H10 como referencias Street View exploratorias, compara cinco
+variantes y conserva candidatos Top-10 individuales. Es el conjunto humano
+experimental vigente: [PHASE59_HUMAN_STREETVIEW_EXPERIMENT.md](docs/PHASE59_HUMAN_STREETVIEW_EXPERIMENT.md).
 
 Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
 

@@ -1,0 +1,86 @@
+{
+  "contract_version": "f59-oriented-streetview-input-v1",
+  "reference_policy": "panorama_coordinate_experimental_unknown_uncertainty",
+  "observations": [
+    {
+      "observation_id": "H03",
+      "panorama_coordinate": {"latitude": 40.4154371, "longitude": -3.7074567},
+      "heading_degrees": 299.4376495,
+      "pitch_degrees": -13.6071955,
+      "panorama_id": "6M6i1O8say5nG-lUYIHfLA",
+      "spanish_text": "Me encuentro en una plaza amplia y abierta, con el suelo empedrado y rodeada de edificios históricos de varias plantas con fachadas rojizas y numerosas ventanas blancas. A mi izquierda se extiende una larga fachada con balcones y soportales en la planta baja. Delante de mí hay un edificio similar con un gran arco de acceso y una farola ornamental. A mi derecha destaca una torre con reloj y un tejado puntiagudo, integrada en una fachada decorada con pinturas. Bajo los edificios hay terrazas con sombrillas y numerosas personas caminando por la plaza.",
+      "proper_toponyms": [],
+      "osm_carto_audit": {"classification": "mostly_visual", "potentially_representable": ["plaza", "edificios", "soportales o pasajes si están cartografiados"], "not_guaranteed_in_raster": ["suelo empedrado", "colores de fachadas", "balcones", "ventanas", "reloj", "tejado", "pinturas", "farola", "terrazas", "personas"], "egocentric_relations_not_encoded": ["izquierda", "delante", "derecha"]}
+    },
+    {
+      "observation_id": "H04",
+      "panorama_coordinate": {"latitude": 40.4145772, "longitude": -3.7036973},
+      "heading_degrees": 141.6454206,
+      "pitch_degrees": -4.8496322,
+      "panorama_id": "lJGoQ9GdbPnymoEneWwu7A",
+      "spanish_text": "Me encuentro en una plaza urbana amplia y pavimentada, rodeada de edificios de varias plantas. A mi izquierda hay una calle con comercios y edificios de fachadas claras con numerosos balcones. Delante de mí se encuentra un edificio grande de fachada rectangular y ventanas alineadas, con varios árboles pequeños en la plaza. A mi derecha destaca un edificio histórico de piedra clara con una torre rematada por una pequeña cúpula. Junto a él hay una parada de autobuses y un edificio amarillo con balcones. En primer plano, a mi derecha, hay una estación de bicicletas públicas, mientras que varias farolas ornamentales y zonas peatonales ocupan el espacio central.",
+      "proper_toponyms": [],
+      "osm_carto_audit": {"classification": "partially_representable", "potentially_representable": ["plaza", "calle", "edificios", "comercios", "parada de autobuses", "estación de bicicletas", "zona peatonal"], "not_guaranteed_in_raster": ["pavimento", "colores", "balcones", "ventanas", "material de piedra", "cúpula", "árboles pequeños", "farolas"], "egocentric_relations_not_encoded": ["izquierda", "delante", "derecha"]}
+    },
+    {
+      "observation_id": "H05",
+      "panorama_coordinate": {"latitude": 40.4191629, "longitude": -3.7033937},
+      "heading_degrees": 13.7394475,
+      "pitch_degrees": -14.3997571,
+      "panorama_id": "0AYEjaqgRM9WCkQk91Y5dg",
+      "spanish_text": "Me encuentro en una calle estrecha y recta, rodeada de edificios de varias plantas. A mi izquierda hay un edificio de fachada blanca con numerosos balcones pequeños de barandillas negras y varios locales comerciales en la planta baja, entre ellos restaurantes. Delante de mí, la calle continúa entre edificios altos, con aceras estrechas y pequeños bolardos metálicos que separan el paso peatonal de la calzada. A mi derecha hay una pequeña zona ajardinada con árboles de hojas oscuras y una terraza con mesas, sillas y sombrillas blancas. Detrás de esta zona destaca una gran fachada lateral con un mural publicitario antiguo y descolorido que representa un arcoíris. Ademas, en frente mio se puede observar un mural desgastado que pone Hotel Anaco.",
+      "proper_toponyms": [{"mention": "Hotel Anaco", "entity_type": "poi"}],
+      "osm_carto_audit": {"classification": "mostly_visual", "potentially_representable": ["calle", "edificios", "restaurantes", "zona ajardinada", "Hotel Anaco si está etiquetado"], "not_guaranteed_in_raster": ["colores", "balcones", "barandillas", "bolardos", "terraza", "mural del arcoíris", "texto del mural"], "egocentric_relations_not_encoded": ["izquierda", "delante", "derecha", "detrás", "en frente"]}
+    },
+    {
+      "observation_id": "H06",
+      "panorama_coordinate": {"latitude": 40.4179721, "longitude": -3.7056531},
+      "heading_degrees": 133.8842301,
+      "pitch_degrees": -22.4130233,
+      "panorama_id": "Hg22ICE7KdlogUaGKibYaw",
+      "spanish_text": "Me encuentro en una calle del centro de una ciudad, frente a un enorme edificio comercial de fachada blanca con largas franjas verticales oscuras y un gran letrero verde en la parte superior que dice «El Corte Inglés». En la fachada hay también un cartel publicitario de gran tamaño. Delante de mí se encuentra la entrada principal del establecimiento, elevada respecto a la calle y accesible mediante unas escaleras. A mi derecha destaca una estructura alta y estrecha de color negro, junto a un edificio histórico de ladrillo rojizo con numerosos balcones y barandillas metálicas. En la calle hay vehículos estacionados y varias personas caminando.",
+      "proper_toponyms": [{"mention": "El Corte Inglés", "entity_type": "poi"}],
+      "osm_carto_audit": {"classification": "mostly_visual", "potentially_representable": ["calle", "edificio comercial", "El Corte Inglés si está etiquetado", "edificio histórico"], "not_guaranteed_in_raster": ["fachada", "colores", "franjas", "letrero", "cartel publicitario", "entrada", "escaleras", "balcones", "vehículos", "personas"], "egocentric_relations_not_encoded": ["frente", "delante", "derecha"]}
+    },
+    {
+      "observation_id": "H07",
+      "panorama_coordinate": {"latitude": 40.4146943, "longitude": -3.7052449},
+      "heading_degrees": 112.2431446,
+      "pitch_degrees": -20.2903714,
+      "panorama_id": "ye3xuJRN07QETxBvNLsEeQ",
+      "spanish_text": "Me encuentro en una calle estrecha del centro de una ciudad, rodeada de edificios de varias plantas. A mi derecha destaca una gran parroquia de ladrillo rojizo y piedra clara, con una entrada monumental formada por un arco de piedra muy ornamentado, relieves religiosos y grandes puertas de madera. La fachada de la parroquia se extiende a lo largo de la calle y tiene ventanas altas y estrechas. A mi izquierda hay edificios residenciales de fachadas claras con numerosos balcones de barandillas negras y pequeños comercios en las plantas bajas. Delante de mí, la calle continúa recta entre los edificios, con vehículos circulando, aceras estrechas, árboles y una barandilla metálica que separa parte de la calzada.",
+      "proper_toponyms": [],
+      "osm_carto_audit": {"classification": "partially_representable", "potentially_representable": ["calle", "parroquia", "edificios", "comercios"], "not_guaranteed_in_raster": ["materiales", "colores", "arco ornamentado", "relieves", "puertas", "ventanas", "balcones", "vehículos", "barandilla"], "egocentric_relations_not_encoded": ["derecha", "izquierda", "delante"]}
+    },
+    {
+      "observation_id": "H08",
+      "panorama_coordinate": {"latitude": 40.4182725, "longitude": -3.7070157},
+      "heading_degrees": 89.9191392,
+      "pitch_degrees": -8.3180661,
+      "panorama_id": "q8WP7y64ok0Y8QZdMwBV4A",
+      "spanish_text": "Me encuentro junto a una pequeña plaza urbana con zonas peatonales y espacios ajardinados. A mi izquierda hay un edificio de varias plantas con fachada rojiza, balcones y ventanas alineadas, junto a una farola ornamental. Delante de mí destaca un edificio histórico de ladrillo rojizo, de aspecto religioso, con muros altos, pequeñas ventanas y varias estructuras elevadas rematadas por cruces. En el centro de la plaza hay árboles, arbustos y parterres delimitados por bordillos de ladrillo. A mi derecha se encuentra un gran edificio de ladrillo y piedra clara con una entrada monumental decorada y una gran verja metálica. La calle describe una curva hacia la derecha, bordeando los jardines, con un paso de peatones y varias motocicletas estacionadas.",
+      "proper_toponyms": [],
+      "osm_carto_audit": {"classification": "partially_representable", "potentially_representable": ["plaza", "zonas peatonales", "jardines", "edificios", "calle curva", "paso de peatones si está cartografiado"], "not_guaranteed_in_raster": ["colores", "balcones", "ventanas", "farola", "materiales", "cruces", "entrada decorada", "verja", "motocicletas"], "egocentric_relations_not_encoded": ["izquierda", "delante", "derecha"]}
+    },
+    {
+      "observation_id": "H09",
+      "panorama_coordinate": {"latitude": 40.4181525, "longitude": -3.7020088},
+      "heading_degrees": 275.187961,
+      "pitch_degrees": -2.9619871,
+      "panorama_id": "PRpaLbxiunRi4e8DB992ZA",
+      "spanish_text": "Me encuentro en una calle estrecha y adoquinada del centro de una ciudad, rodeada de edificios antiguos de varias plantas. A mi izquierda hay un edificio de fachada gris de piedra, con ventanas enrejadas y una gran puerta de madera oscura. Delante de mí, la calle continúa recta entre edificios altos de fachadas claras, con numerosos balcones de barandillas metálicas. A mi derecha hay un restaurante con un cartel que pone «Pisco Sour Cocina Peruana», acompañado de fotografías de platos de comida junto a su entrada. Un poco más adelante, también a mi derecha, destaca un letrero vertical de un hotel. La calle es estrecha, tiene pequeños bolardos metálicos a ambos lados y varias motocicletas estacionadas.",
+      "proper_toponyms": [{"mention": "Pisco Sour Cocina Peruana", "entity_type": "poi"}],
+      "osm_carto_audit": {"classification": "mostly_visual", "potentially_representable": ["calle", "edificios", "restaurante si está etiquetado", "hotel si está etiquetado"], "not_guaranteed_in_raster": ["adoquines", "materiales", "colores", "ventanas", "puerta", "balcones", "cartel", "fotografías", "letrero", "bolardos", "motocicletas"], "egocentric_relations_not_encoded": ["izquierda", "delante", "derecha"]}
+    },
+    {
+      "observation_id": "H10",
+      "panorama_coordinate": {"latitude": 40.4147528, "longitude": -3.7004122},
+      "heading_degrees": 224.8349143,
+      "pitch_degrees": -4.2358519,
+      "panorama_id": "9LhOTn2kvFD7sSpAI7F6wQ",
+      "spanish_text": "Me encuentro en una plaza amplia y peatonal, pavimentada con grandes losas de piedra clara. A mi izquierda hay varias terrazas de restaurantes con mesas, sillas y grandes sombrillas blancas en las que se puede leer «La Vinoteca». Detrás de las terrazas se extiende una hilera de árboles altos y frondosos, junto a edificios de ladrillo rojizo con balcones. Delante de mí, ligeramente a la derecha, se encuentra una estatua de bronce que representa una figura masculina de pie sobre un pedestal rectangular de piedra. Al fondo, a mi derecha, destaca un gran edificio histórico de fachada blanca muy ornamentada, con numerosas ventanas, balcones y una torre estrecha rematada por una estructura puntiaguda. La plaza también cuenta con bancos de piedra y farolas ornamentales de varios brazos.",
+      "proper_toponyms": [{"mention": "La Vinoteca", "entity_type": "poi"}],
+      "osm_carto_audit": {"classification": "mostly_visual", "potentially_representable": ["plaza peatonal", "restaurantes", "La Vinoteca si está etiquetada", "edificios", "estatua si está cartografiada"], "not_guaranteed_in_raster": ["pavimento", "terrazas", "mobiliario", "sombrillas", "árboles", "materiales", "colores", "figura de la estatua", "fachada", "ventanas", "balcones", "torre", "farolas"], "egocentric_relations_not_encoded": ["izquierda", "detrás", "delante", "derecha"]}
+    }
+  ]
+}

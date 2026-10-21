@@ -192,13 +192,82 @@ crea solapamiento de fuente y favorece conceptos cartográficos. Por tanto:
 
 No se ejecutaron Qwen, CrossText2Loc, prefiltrado ni reranking.
 
+## Evaluación exploratoria provisional posterior
+
+El 21 de octubre de 2026 se ejecutó una campaña excepcional separada sin cambiar
+los 35 estados `pending`. La auditoría automática reconstruyó cada texto desde su
+evidencia, revalidó F3 y no encontró fugas, duplicados exactos o de firma
+semántica, afirmaciones visuales ni orientaciones. Esto no constituye revisión
+humana.
+
+Qwen3-8B produjo 140/140 derivados reales. Junto con los 35 originales se
+auditaron 175 textos. Todos superaron los controles reforzados, incluida la
+prohibición de introducir nombres OSM conservados solo en evidencia. Se aceptaron
+como equivalencias controladas `atraviesa`/`cruza`,
+`se superpone`/`se solapa` y el término cartográfico inglés `way`/`vía`; no se
+regeneraron textos ni se modificaron prompts tras consultar rankings.
+
+CrossText2Loc ejecutó 350/350 rankings Top-10 exhaustivos sobre 1.115 candidatos
+de 25 m y 253 de 50 m. Las referencias sintéticas se incorporaron únicamente al
+evaluador posterior. El resultado se identifica como:
+
+```text
+f55c-exploratory-evaluation-sha256-ad492e0d6d33e1edd1db092303470aff59685de600d71fb6eb8f2bf2e22b2fe8
+```
+
+Resultados globales provisionales:
+
+| Galería | Variante | R@1 | R@5 | R@10 | Geo@10 50 m | Geo@10 100 m | Top-1 medio | Mín. Top-10 medio |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 25 m | `es_original` | 0,000 | 0,000 | 0,029 | 0,229 | 0,400 | 333,86 m | 186,20 m |
+| 25 m | `es_cartographic` | 0,000 | 0,000 | 0,029 | 0,171 | 0,343 | 353,38 m | 190,65 m |
+| 25 m | `en_conventional` | 0,000 | 0,029 | 0,029 | 0,114 | 0,143 | 412,87 m | 201,24 m |
+| 25 m | `en_toponym_preserved` | 0,000 | 0,029 | 0,029 | 0,114 | 0,171 | 456,40 m | 235,35 m |
+| 25 m | `en_cartographic` | 0,000 | 0,029 | 0,029 | 0,114 | 0,171 | 462,37 m | 245,32 m |
+| 50 m | `es_original` | 0,000 | 0,000 | 0,086 | 0,257 | 0,429 | 444,55 m | 156,09 m |
+| 50 m | `es_cartographic` | 0,000 | 0,000 | 0,057 | 0,257 | 0,486 | 435,05 m | 143,14 m |
+| 50 m | `en_conventional` | 0,029 | 0,057 | 0,086 | 0,114 | 0,286 | 456,38 m | 157,32 m |
+| 50 m | `en_toponym_preserved` | 0,029 | 0,029 | 0,086 | 0,114 | 0,257 | 420,05 m | 159,97 m |
+| 50 m | `en_cartographic` | 0,029 | 0,057 | 0,086 | 0,086 | 0,257 | 457,27 m | 179,23 m |
+
+La partición evaluation de 11 casos no se utilizó para cambiar prompts,
+parámetros o textos. En ella, `es_original` y `es_cartographic` empataron en 25 m
+con Top-1 medio de 338,14 m; `en_toponym_preserved` obtuvo 467,36 m. En 50 m,
+`es_original` obtuvo 409,21 m y `en_toponym_preserved` 415,59 m. El Recall@1/5/10
+de evaluation fue cero para todas las combinaciones.
+
+F5.7 favorecía provisionalmente `en_toponym_preserved` por Top-1 medio en cuatro
+referencias Street View aproximadas. F5.5c no reproduce esa tendencia de forma
+consistente: la variante mejora el Top-1 global de 50 m frente al original, pero
+lo empeora en 25 m y no mejora GeoRecall@10. Además, no conserva topónimos porque
+los originales sintéticos no contienen ninguno. Sigue siendo una candidata
+razonable para contrastar, no una ganadora confirmada. No se cambia el frontend,
+el backend ni la decisión multilingüe pendiente.
+
+Artefactos locales ignorados por Git:
+
+```text
+results/generated/f5/f55c-exploratory-real/
+├── inputs/benchmark-audit.json
+├── inputs/human-review-decisions-template.json
+├── inputs/query-dataset.json
+├── inputs/variant-template.json
+├── qwen/<run_id>/derived-sidecar.json
+├── qwen/<run_id>/run.json
+├── variant-audit.json
+├── rankings-complete.json
+└── final-complete/{evaluation.json,report.html,manifest.json}
+```
+
 ## Paso posterior
 
-1. Revisar las 35 descripciones mediante `review.html`.
-2. Congelar una cola de decisiones humanas sin modificar textos/evidencia.
-3. Importar solo sintéticas aprobadas al adaptador separado.
-4. Generar y revisar las cinco variantes con F5.2.
-5. Ejecutar CrossText2Loc con pesos, galerías y embeddings congelados.
-6. Publicar métricas sintéticas por separado y comparaciones pareadas.
-7. No usar estos resultados para sustituir las cinco observaciones propias
-   recomendadas por F5.5b.
+1. Abrir `review.html` y revisar las 35 fichas contra descripción, evidencia,
+   asignaciones y estado.
+2. Copiar la plantilla local de decisiones, sustituir todos los marcadores,
+   identificar al revisor y justificar cada `approve` o `reject`.
+3. Aplicar el manifiesto con `review_f55c_synthetic_benchmark.py`; nunca editar
+   `review.status` directamente.
+4. Revisar también las 140 transformaciones Qwen antes de tratarlas como
+   variantes semánticamente aprobadas.
+5. Recalcular el subconjunto validado sin mezclarlo con estas métricas
+   provisionales, F5.4 real o F5.7.

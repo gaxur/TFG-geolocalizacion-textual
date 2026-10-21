@@ -1,8 +1,10 @@
 import copy
 import json
 from pathlib import Path
+import struct
 import tempfile
 import unittest
+import zlib
 
 from src.tfg_phase0.catalog import build_catalog,write_manifest
 from src.tfg_phase0.config import load_region_config
@@ -13,19 +15,26 @@ from src.tfg_phase0.validation import validate_document
 ROOT=Path(__file__).resolve().parents[1]
 SPEC=ROOT/"config/madrid_f56_streetview_documentary.json"
 
+def _chunk(kind,data):
+ return struct.pack(">I",len(data))+kind+data+struct.pack(">I",zlib.crc32(kind+data)&0xffffffff)
+def _png(red,green,blue):
+ raw=b"\x00"+bytes((red,green,blue)); return b"\x89PNG\r\n\x1a\n"+_chunk(b"IHDR",struct.pack(">IIBBBBB",1,1,8,2,0,0,0))+_chunk(b"IDAT",zlib.compress(raw))+_chunk(b"IEND",b"")
+
 class Phase56StreetViewTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
   cls.cfg=load_region_config(ROOT/"config/madrid.yaml"); cls.temp=tempfile.TemporaryDirectory(); cls.catalogs={}
   for n in (25,50):
    path=Path(cls.temp.name)/f"manifest-{n}.json"; write_manifest(build_catalog(cls.cfg,spacing_m=n),path); cls.catalogs[f"madrid-{n}m"]=load_verified_f1_catalog(path,cls.cfg)
-  cls.spec=json.loads(SPEC.read_text()); cls.document=build_dataset(cls.spec,image_root=ROOT/"data/streetview",catalogs=cls.catalogs)
+  cls.spec=json.loads(SPEC.read_text()); cls.image_root=Path(cls.temp.name)/"streetview"; cls.image_root.mkdir()
+  for index,row in enumerate(cls.spec["observations"],1): (cls.image_root/row["image_path"]).write_bytes(_png(index,index,index))
+  cls.document=build_dataset(cls.spec,image_root=cls.image_root,catalogs=cls.catalogs)
  @classmethod
  def tearDownClass(cls): cls.temp.cleanup()
  def test_four_images_hashes_identity_and_git_policy(self):
-  self.assertEqual(len(self.document["observations"]),4); self.assertEqual(self.document["dataset_id"],dataset_id(self.document)); self.assertEqual(len({r["image"]["sha256"] for r in self.document["observations"]}),4); self.assertTrue(all(r["image"]["git_tracking_forbidden"] for r in self.document["observations"])); validate_document(self.document,"f56_streetview_documentary"); self.assertEqual(validate_dataset(self.document,catalogs=self.catalogs,image_root=ROOT/"data/streetview")["observations"],4)
+  self.assertEqual(len(self.document["observations"]),4); self.assertEqual(self.document["dataset_id"],dataset_id(self.document)); self.assertEqual(len({r["image"]["sha256"] for r in self.document["observations"]}),4); self.assertTrue(all(r["image"]["git_tracking_forbidden"] for r in self.document["observations"])); validate_document(self.document,"f56_streetview_documentary"); self.assertEqual(validate_dataset(self.document,catalogs=self.catalogs,image_root=self.image_root)["observations"],4)
  def test_active_order_is_contiguous_and_historical_sv02_is_excluded(self):
-  by={r["observation_id"]:r for r in self.document["observations"]}; self.assertEqual(list(by),["SV-01","SV-02","SV-03","SV-04"]); self.assertEqual([by[x]["legacy_observation_id"] for x in by],["SV-01","SV-03","SV-04","SV-05"]); excluded=self.document["excluded_observations"][0]; self.assertEqual(excluded["observation_id"],"SV-EXCLUDED-01"); self.assertEqual(excluded["legacy_observation_id"],"SV-02"); self.assertEqual(excluded["reason"],"outside_d004_and_both_gallery_coverages"); self.assertGreater(excluded["d004_north_excess_m"],16); self.assertEqual(by["SV-02"]["image"]["sha256"],"1d6c61ee757885f0e66aefaba93d981c7fc0afe934723277be612afde577d3c5"); self.assertTrue(all(by[x]["geography"]["inside_d004_by_link_coordinate"] for x in by)); self.assertTrue(all(v["status"]=="assigned" for x in by for v in by[x]["geography"]["link_point_assignments"].values()))
+  by={r["observation_id"]:r for r in self.document["observations"]}; self.assertEqual(list(by),["SV-01","SV-02","SV-03","SV-04"]); self.assertEqual([by[x]["legacy_observation_id"] for x in by],["SV-01","SV-03","SV-04","SV-05"]); excluded=self.document["excluded_observations"][0]; self.assertEqual(excluded["observation_id"],"SV-EXCLUDED-01"); self.assertEqual(excluded["legacy_observation_id"],"SV-02"); self.assertEqual(excluded["reason"],"outside_d004_and_both_gallery_coverages"); self.assertGreater(excluded["d004_north_excess_m"],16); self.assertTrue(all(by[x]["geography"]["inside_d004_by_link_coordinate"] for x in by)); self.assertTrue(all(v["status"]=="assigned" for x in by for v in by[x]["geography"]["link_point_assignments"].values()))
  def test_unknown_uncertainty_disables_exact_recall_and_official_accuracy(self):
   self.assertTrue(all(r["link_coordinate"]["positional_uncertainty"]=="unknown" and not r["geography"]["exact_recall_eligible"] and not r["geography"]["official_geographic_accuracy_eligible"] for r in self.document["observations"])); adapter=exploratory_reference_adapter(self.document); self.assertFalse(adapter["real_ground_truth"]); self.assertFalse(adapter["official_metrics_allowed"]); self.assertTrue(all(not r["exact_recall_eligible"] for r in adapter["observations"])); gate=execution_gate(self.document); self.assertFalse(gate["ready_for_variant_generation"]); self.assertFalse(gate["ready_for_exploratory_rankings"]); self.assertFalse(gate["ready_for_official_geographic_evaluation"]); self.assertEqual(gate["counts"]["observations"],4); self.assertEqual(gate["counts"]["inside_d004"],4); self.assertNotIn("observations_outside_d004",gate["blockers"]); self.assertEqual(gate["counts"]["rankings_generated"],0)
  def test_descriptions_have_no_coordinate_or_panorama_leak(self):
@@ -34,7 +43,7 @@ class Phase56StreetViewTests(unittest.TestCase):
   bad=copy.deepcopy(self.document); bad["observations"][0]["geography"]["exact_recall_eligible"]=True; bad["dataset_id"]=dataset_id(bad)
   with self.assertRaises(StreetViewDocumentaryError): validate_dataset(bad,catalogs=self.catalogs)
   spec=copy.deepcopy(self.spec); spec["observations"][0]["image_path"]="missing.png"
-  with self.assertRaises(StreetViewDocumentaryError): build_dataset(spec,image_root=ROOT/"data/streetview",catalogs=self.catalogs)
+  with self.assertRaises(StreetViewDocumentaryError): build_dataset(spec,image_root=self.image_root,catalogs=self.catalogs)
  def test_png_parser_rejects_non_png(self):
   with self.assertRaises(StreetViewDocumentaryError): png_dimensions(b"not-png")
  def test_offline_html_uses_explicit_local_image_prefix(self):

@@ -601,8 +601,14 @@ obtuvieron 25; se adoptó 70 m, el mayor umbral ensayado que superó el mínimo 
 30. No se rellenó la muestra. Benchmark final:
 `f55c-synthetic-osm-sha256-bf7aea13116cda8e027343535f0a6d2de3bd6582aa09c6a65d1f14e9b24873c2`.
 
-No se ejecutaron modelos ni rankings. Detalles:
-[PHASE5_SYNTHETIC_OSM_BENCHMARK.md](PHASE5_SYNTHETIC_OSM_BENCHMARK.md).
+Esta era la situación al congelar el benchmark. Posteriormente se ejecutó una
+campaña exploratoria separada, sin aprobar las 35 observaciones: Qwen3-8B generó
+140/140 derivados, la auditoría admitió 175/175 textos y CrossText2Loc produjo
+350/350 rankings exhaustivos. El resultado
+`f55c-exploratory-evaluation-sha256-ad492e0d6d33e1edd1db092303470aff59685de600d71fb6eb8f2bf2e22b2fe8`
+declara `synthetic_osm`, `real_ground_truth=false`, cero casos oficiales y no se
+agrega con F5.4 o F5.7. Detalles y métricas:
+[PHASE5_SYNTHETIC_OSM_BENCHMARK.md](PHASE5_SYNTHETIC_OSM_BENCHMARK.md#evaluación-exploratoria-provisional-posterior).
 
 ## F5.6: Street View documental local
 
@@ -634,6 +640,12 @@ SV-02 excedía D004 en 16,22 m, la cobertura 25 m en 29,29 m y la cobertura
 50 m en 54,33 m. No se ejecutaron Qwen ni CrossText2Loc. Procedimiento:
 [PHASE56_STREETVIEW_DOCUMENTARY.md](PHASE56_STREETVIEW_DOCUMENTARY.md).
 
+Tras completar F5.9 H01–H10 se retiraron las cuatro capturas PNG locales y el
+HTML de revisión que dependía de ellas. No participan en H01–H10 ni eran
+necesarias para reproducir los rankings ya congelados. Se conservan el dataset
+F5.6, hashes, URLs, panorama IDs, asignaciones y artefactos F5.7 para interpretar
+los resultados históricos sin afirmar que las imágenes continúan disponibles.
+
 ## F5.7: Qwen y evaluación aproximada Street View
 
 Se adaptó el dataset F5.6 canónico `575695ca...` a F4.3/F5 v2 sin incluir
@@ -651,6 +663,31 @@ Una segunda ejecución CrossText2Loc conservó Top-10 y scores idénticos y aña
 latencias por fila. La mediana de retrieval quedó entre 6,37 y 8,13 ms; la media
 de `es_original` incluye calentamiento inicial. El informe final con manifest v2
 está en `results/generated/f5/f57-final-v3/`.
+
+## F5.9: H01/H02 con referencias Street View
+
+Se materializaron dos descripciones humanas, sus traducciones inglesas aportadas
+por el responsable y ocho transformaciones Qwen3-8B reales. Marcador y panorama
+se conservaron por separado; el panorama se utilizó como referencia experimental
+de incertidumbre desconocida y nunca entró en Qwen o retrieval.
+
+Ambas coordenadas están dentro de D004. H01 queda fuera de la cobertura efectiva
+de las celdas completas en ambas galerías, por lo que solo admite Haversine y
+GeoRecall. H02 queda `assigned` en 25 m y 50 m. CrossText2Loc produjo 24/24
+rankings para seis controles por caso y dos galerías.
+
+El inglés humano mejoró H01, pero empeoró H02 frente al español. Qwen reprodujo
+solo parte de esas tendencias y no mostró una mejora inglesa consistente. La
+evaluación se identifica como
+`f59-exploratory-evaluation-sha256-3dabf819cfa2ba78e3b8b859683c4e70d060a462f888addf3178261d15a5e8ac`.
+Detalles: [PHASE59_HUMAN_STREETVIEW_EXPERIMENT.md](PHASE59_HUMAN_STREETVIEW_EXPERIMENT.md).
+
+La ampliación H03–H10 añadió ocho descripciones orientadas, 32 transformaciones
+Qwen y 80 rankings. Todas las relaciones y los nombres protegidos superaron la
+auditoría; la traducción convencional modificó un nombre, registrado aparte. En
+el agregado común H01–H10, `es_original` lideró o empató GeoRecall@10 a 50 m en
+ambas galerías. Las variantes inglesas alcanzaron 0,60 a 100 m solo en la galería
+de 50 m y empeoraron en 25 m. No se seleccionó variante definitiva.
 
 ## CrossText2Loc NewYork-mixed OSM en GB10
 

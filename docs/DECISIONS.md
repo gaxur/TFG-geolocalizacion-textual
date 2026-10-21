@@ -90,6 +90,9 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D072 | Mantener `synthetic_osm` separado del Ground Truth real F5.4 | ACEPTADA | F5 / benchmark sintético |
 | D073 | Sustituir Panoramax por Street View documental local con incertidumbre desconocida | ACEPTADA | F5 / evidencia documental |
 | D074 | Permitir rankings F5.7 provisionales tras controles automáticos, separados de F5.4 | ACEPTADA | F5 / evaluación experimental |
+| D075 | Priorizar una ubicación geográficamente próxima dentro del Top-10 | ACEPTADA | F5 / objetivo funcional |
+| D076 | Seleccionar variante textual e integración de Qwen para el objetivo Top-10 | PENDIENTE DE EXPERIMENTO | F5 / estrategia textual |
+| D077 | Retirar las capturas locales SV y mantener F5.6/F5.7 como trazabilidad histórica | ACEPTADA | F5 / minimización de datos |
 
 ## D053 — API HTTP interna del MVP
 
@@ -654,6 +657,101 @@ Una variante que falle se excluye sin eliminar las demás ni convertir su ausenc
 en fallo de precisión. Los rankings deben ser Top-10 exhaustivos, independientes
 y completos. La revisión humana continúa pendiente para cualquier conclusión
 semántica u oficial.
+
+## D075 — Objetivo funcional de proximidad dentro del Top-10
+
+**Estado:** ACEPTADA
+**Componente:** F5 / objetivo funcional
+**Fecha:** 2026-10-21
+**Origen:** Decisión expresa del responsable del TFG para F5.8.
+
+### Decisión
+
+La aplicación priorizará que al menos una de las diez primeras ubicaciones
+recuperadas esté geográficamente próxima a la posición descrita, por encima de
+optimizar principalmente la primera ubicación Top-1.
+
+El orden de métricas para analizar variantes será:
+
+1. GeoRecall@10 a 50 m.
+2. GeoRecall@10 a 100 m.
+3. Recall@10 exacto.
+4. Error Haversine mínimo dentro del Top-10, informando media, mediana y
+   distribución.
+
+Recall@1/5, error Top-1, latencia, coste y complejidad permanecen como métricas
+secundarias. No se define una suma ponderada ni un score compuesto. Si 50 m y
+100 m favorecen alternativas distintas, el compromiso se elevará al responsable
+en lugar de inventar pesos.
+
+### Interpretación y consecuencias
+
+GeoRecall@10 a 100 m es la proporción de consultas para las que al menos una de
+las diez candidatas queda dentro de ese radio respecto de la referencia usada.
+No significa que las diez candidatas estén dentro de 100 m, no es una
+probabilidad calibrada y no garantiza rendimiento en nuevas consultas.
+
+D075 cambia el criterio funcional con el que debe revisarse la preferencia
+provisional basada en Top-1 documentada en F5.7. No selecciona idioma, no aprueba
+Qwen y no autoriza cambiar frontend o backend. F5.7 aproximado, F5.5c sintético
+y una futura evaluación humana seguirán separados.
+
+## D076 — Variante textual y uso de Qwen para Top-10
+
+**Estado:** PENDIENTE DE EXPERIMENTO
+**Componente:** F5 / estrategia textual
+**Fecha:** 2026-10-21
+**Origen:** Auditoría F5.8 de F5.7 y F5.5c.
+
+### Decisión pendiente
+
+Elegir entre `es_original`, `es_cartographic`, `en_toponym_preserved` u otra
+variante, y decidir si la aplicación debe cargar Qwen durante la consulta.
+
+### Evidencia y límite
+
+F5.7 contiene solo cuatro referencias Street View de incertidumbre desconocida;
+F5.5c contiene 35 referencias geométricas precisas, pero textos derivados de OSM
+y no observaciones humanas. Los resultados cambian con radio y galería. En
+development sintético, `es_original` lidera GeoRecall@10 a 50 m y empata con
+`es_cartographic` a 100 m al resumir descriptivamente ambas galerías. En F5.7,
+`es_cartographic` ofrece el mejor compromiso a 100 m y en error mínimo Top-10,
+pero cada acierto cambia la tasa en 0,25.
+
+### Pendiente
+
+Congelar un protocolo humano con referencias verificables dentro de D004,
+separar selección y validación, revisar semánticamente las variantes y solicitar
+aprobación expresa del responsable. Hasta entonces no se cambia ninguna variante
+predeterminada. Véase
+[PHASE58_GEORECALL_DECISION.md](PHASE58_GEORECALL_DECISION.md).
+
+## D077 — Retirada de capturas locales SV
+
+**Estado:** ACEPTADA
+**Componente:** F5 / minimización de datos
+**Fecha:** 2026-10-21
+**Origen:** Petición expresa del responsable tras completar F5.9 H01–H10.
+
+### Decisión
+
+Se eliminan `data/streetview/SV-01.png` a `SV-04.png` y el HTML local F5.6 que
+las enlazaba. H01–H10 no usa esas imágenes y F5.7 ya consumió el dataset F5.6
+materializado, no los bytes durante Qwen, retrieval o evaluación.
+
+### Conservación histórica
+
+Se mantienen el contrato, configuración, builder, dataset JSON, hashes, URLs,
+panorama IDs y resultados F5.7 para explicar el experimento realizado. F5.6/F5.7
+no se presentan como flujo visual activo ni como GT oficial. Reconstruir F5.6
+requiere aportar de nuevo imágenes autorizadas mediante `--image-root`.
+
+### Consecuencias
+
+Los tests F5.6 usan PNG temporales sintéticos y validan software, no contenido
+visual. F5.9 H01–H10 es el conjunto humano exploratorio vigente. La eliminación
+reduce datos locales restringidos sin borrar la procedencia científica de los
+resultados históricos.
 
 ## D001 — Identidad del candidato
 

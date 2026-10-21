@@ -1,0 +1,28 @@
+{
+  "contract_version": "f59-human-streetview-input-v1",
+  "reference_policy": "panorama_coordinate_experimental_unknown_uncertainty",
+  "observations": [
+    {
+      "observation_id": "H01",
+      "spanish_text": "Estoy en una plaza y a mi derecha hay una estación de tren de Cercanías. Justo detrás de mí hay una torre con un reloj.",
+      "human_english_text": "I am in a plaza and to my right I have a commuter train station, and just behind me there is a tower with a clock.",
+      "proper_toponyms": ["Cercanías"],
+      "provided_coordinate": {"latitude": 40.419876, "longitude": -3.705696, "meaning": "coordinate_provided_by_tfg_owner"},
+      "panorama_coordinate": {"latitude": 40.4198746, "longitude": -3.7056869, "meaning": "coordinate_embedded_in_streetview_link"},
+      "panorama_id": "QQKVfbd30LTKt1VyfMiCbg",
+      "heading_degrees": 343.655774,
+      "pitch_degrees": -14.021032
+    },
+    {
+      "observation_id": "H02",
+      "spanish_text": "Estoy en una plaza y a mi derecha hay un Pans & Company. A mi izquierda hay un edificio grande con un cartel de la marca Schweppes.",
+      "human_english_text": "I'm in a square and to my right there's a Pans & Company and to my left a big building with a Schweppes brand sign.",
+      "proper_toponyms": ["Pans & Company", "Schweppes"],
+      "provided_coordinate": {"latitude": 40.4168056, "longitude": -3.7031389, "meaning": "google_maps_marker_coordinate", "dms": "40°25'00.5\"N, 3°42'11.3\"W"},
+      "panorama_coordinate": {"latitude": 40.4168246, "longitude": -3.7030911, "meaning": "coordinate_embedded_in_streetview_link"},
+      "panorama_id": "-v8WkzPEupZcUIldHpXGKg",
+      "heading_degrees": 249.05284,
+      "pitch_degrees": 0.0
+    }
+  ]
+}
