@@ -617,7 +617,8 @@ coordenada del enlace. La fuente no se considera abierta ni redistribuible.
 
 La coordenada del enlace tiene incertidumbre desconocida y no se declara posición
 de cámara verificada. Las asignaciones puntuales 25/50 m son exploratorias; no
-habilitan Recall exacto. SV-02 permanece fuera de D004.
+habilitan Recall exacto. SV-02 se excluye y su PNG se elimina por quedar fuera de
+D004 y de ambas coberturas reales.
 
 ### Consecuencias
 

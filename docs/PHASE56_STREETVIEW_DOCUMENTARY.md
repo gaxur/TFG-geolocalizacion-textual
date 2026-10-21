@@ -2,23 +2,23 @@
 
 ## Estado
 
-F5.6 registra cinco capturas manuales locales de Google Street View como
+F5.6 registra cuatro capturas manuales locales de Google Street View como
 evidencias documentales. No son observaciones `human_in_situ`, sus coordenadas
 proceden del enlace suministrado y la incertidumbre posicional es desconocida.
 
 ```text
 dataset_id:
-f56-streetview-documentary-sha256-7a6e1a66b7e3a0edbac6175753c3179b03ca0b89fb9e3f0f91036c3ab5eefe93
+f56-streetview-documentary-sha256-1a39ea529eba961833c7b0da892c9facd9143733780dabc63a4ccdaf05e6489c
 ```
 
 Resultado:
 
 | Estado | Cantidad |
 |---|---:|
-| Capturas locales presentes | 5 |
+| Capturas locales presentes | 4 |
 | Dentro de D004 por coordenada de enlace | 4 |
-| Fuera de D004 | 1 (`SV-02`) |
-| Revisión formal pendiente | 5 |
+| Excluidas antes del dataset | 1 (`SV-02`) |
+| Revisión formal pendiente | 4 |
 | Recall exacto elegible | 0 |
 | GT oficial aprobado | 0 |
 
@@ -42,7 +42,6 @@ Hashes:
 | Captura | SHA-256 |
 |---|---|
 | SV-01 | `f16a87c86932bece5a5155a5c117e36abcdfaeed737ad5081662adff86d069b0` |
-| SV-02 | `97371523b9e0d6637e992cf6ac81dfbf9cf4104c8e37bdace35f85a0f01a971c` |
 | SV-03 | `1d6c61ee757885f0e66aefaba93d981c7fc0afe934723277be612afde577d3c5` |
 | SV-04 | `85f7fbc2fd017a7bb8ee4b315e9815aef5acbe89ade6f48750583420c8f9d08a` |
 | SV-05 | `fad0b7fdfac37803c369c9a4f494c03828574944f57019ee87936bc633e6005b` |
@@ -60,13 +59,14 @@ Se distinguen:
 | Captura | D004 | 25 m por punto | 50 m por punto | Recall exacto |
 |---|---|---|---|---|
 | SV-01 | dentro | assigned | assigned | no: incertidumbre desconocida |
-| SV-02 | fuera norte | outside region | outside region | no |
 | SV-03 | dentro | assigned | assigned | no: incertidumbre desconocida |
 | SV-04 | dentro | assigned | assigned | no: incertidumbre desconocida |
 | SV-05 | dentro | assigned | assigned | no: incertidumbre desconocida |
 
-El parámetro `650a`/similar de las URLs no se interpreta como precisión. No se
-fuerza SV-02 dentro del catálogo.
+El parámetro `650a`/similar de las URLs no se interpreta como precisión. SV-02 se
+retiró del dataset activo y su PNG local se eliminó: estaba 16,22 m al norte de
+D004, 29,29 m al norte de la cobertura 25 m y 54,33 m al norte de la cobertura
+50 m. URL, panorama y coordenadas permanecen en `excluded_observations`.
 
 ## Orientación y descripciones
 
@@ -74,7 +74,7 @@ Se conservan panorama ID, URL completa, heading y pitch. Heading se interpreta
 solo como dirección declarada de la cámara en la URL; no se convierte en
 orientación corporal.
 
-Las cinco descripciones suministradas están congeladas antes de variantes y no
+Las cuatro descripciones activas están congeladas antes de variantes y no
 contienen coordenadas ni IDs. La correspondencia visual, atributos y relaciones
 egocéntricas siguen `pending` de revisión formal. El informe local es:
 
@@ -98,7 +98,6 @@ Actualmente:
 - error Haversine exploratorio: se podrá calcular frente a
   `approximate_link_coordinate` para las cuatro dentro de D004, etiquetado con
   incertidumbre desconocida;
-- SV-02: excluida incluso de ese análisis D004;
 - estabilidad de rankings: posible tras revisión, pero no equivale a precisión.
 
 `exploratory-reference.json` formaliza esta separación y declara
@@ -108,7 +107,7 @@ Actualmente:
 
 Precondiciones no cumplidas:
 
-1. las cinco descripciones siguen pendientes de revisión formal;
+1. las cuatro descripciones siguen pendientes de revisión formal;
 2. no hay celda GT validada por incertidumbre conocida;
 3. solo cuatro referencias de enlace están dentro de D004.
 
@@ -158,7 +157,7 @@ Se conserva:
 
 ## Siguiente paso
 
-1. Abrir `review.html` y completar revisión formal de las cinco descripciones.
+1. Abrir `review.html` y completar revisión formal de las cuatro descripciones.
 2. Confirmar qué relaciones egocéntricas son coherentes con heading.
 3. Obtener, si es posible por una vía autorizada, incertidumbre/posición de cámara
    trazable; si no, mantener análisis aproximado.

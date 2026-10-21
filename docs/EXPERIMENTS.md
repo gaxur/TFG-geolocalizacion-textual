@@ -606,7 +606,9 @@ No se ejecutaron modelos ni rankings. Detalles:
 
 ## F5.6: Street View documental local
 
-Se verificaron cinco PNG locales ignorados por Git y se materializó:
+Se verificaron inicialmente cinco PNG locales. SV-02 se confirmó fuera de D004 y
+de ambas coberturas, por lo que se retiró del dataset activo y se eliminó su PNG;
+URL, panorama y coordenadas permanecen como exclusión. Se materializó:
 
 ```text
 f56-streetview-documentary-sha256-7a6e1a66b7e3a0edbac6175753c3179b03ca0b89fb9e3f0f91036c3ab5eefe93
@@ -615,9 +617,9 @@ f56-streetview-documentary-sha256-7a6e1a66b7e3a0edbac6175753c3179b03ca0b89fb9e3f
 Resultado:
 
 ```text
-observaciones: 5
+observaciones: 4
 dentro de D004 por coordenada de enlace: 4
-fuera de D004: 1 (SV-02)
+excluidas antes del dataset: 1 (SV-02)
 descripciones formalmente revisadas: 0
 Recall exacto elegible: 0
 variantes generadas: 0
@@ -626,7 +628,8 @@ rankings: 0
 
 SV-01/03/04/05 tienen asignación puntual `assigned` en ambas galerías, pero la
 incertidumbre posicional es desconocida; no se presenta como celda GT validada.
-SV-02 es `outside_region`. No se ejecutaron Qwen ni CrossText2Loc. Procedimiento:
+SV-02 excedía D004 en 16,22 m, la cobertura 25 m en 29,29 m y la cobertura
+50 m en 54,33 m. No se ejecutaron Qwen ni CrossText2Loc. Procedimiento:
 [PHASE56_STREETVIEW_DOCUMENTARY.md](PHASE56_STREETVIEW_DOCUMENTARY.md).
 
 ## CrossText2Loc NewYork-mixed OSM en GB10

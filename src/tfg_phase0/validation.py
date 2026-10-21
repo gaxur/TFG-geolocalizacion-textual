@@ -1584,8 +1584,8 @@ def _validate_f5_synthetic_osm_benchmark(document: Mapping[str, Any]) -> None:
 
 
 def _validate_f56_streetview_documentary(document: Mapping[str, Any]) -> None:
-    fields={"schema_version","contract_version","dataset_id","protocol","inputs","observations","limitations"}
-    if set(document)!=fields or document.get("schema_version")!="1.0" or document.get("contract_version")!="f56-streetview-documentary-v1" or not isinstance(document.get("observations"),list) or len(document["observations"])!=5: raise SchemaValidationError("f56_streetview_documentary incompatible")
+    fields={"schema_version","contract_version","dataset_id","protocol","inputs","observations","excluded_observations","limitations"}
+    if set(document)!=fields or document.get("schema_version")!="1.0" or document.get("contract_version")!="f56-streetview-documentary-v1" or not isinstance(document.get("observations"),list) or len(document["observations"])!=4 or not isinstance(document.get("excluded_observations"),list): raise SchemaValidationError("f56_streetview_documentary incompatible")
     from .f56_streetview_documentary import dataset_id
     if document["dataset_id"]!=dataset_id(document): raise SchemaValidationError("dataset_id F5.6 no corresponde al contenido")
     if document["protocol"].get("real_ground_truth") is not False or document["protocol"].get("unknown_accuracy_disables_exact_recall") is not True: raise SchemaValidationError("F5.6 habilita métricas oficiales sin GT")
