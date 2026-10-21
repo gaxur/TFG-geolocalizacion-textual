@@ -72,6 +72,76 @@ La mediana de retrieval por variante estuvo entre 6,37 y 8,13 ms. La media de
 para las demás variantes las medias estuvieron entre 6,39 y 7,91 ms. Los Top-10
 de dos ejecuciones CrossText2Loc fueron idénticos; solo cambió telemetría.
 
+## Decisión provisional de variante para el MVP
+
+Se selecciona **provisionalmente** `en_toponym_preserved` como variante textual
+preferente para el MVP cuando el criterio principal del producto sea minimizar
+el error geográfico medio de la primera ubicación propuesta, es decir, el error
+Top-1. Esta es una decisión documentada para una configuración futura: el
+frontend y el backend del MVP **no se han modificado todavía** para aplicar esta
+variante por defecto.
+
+La comparación que sustenta la decisión es:
+
+| Variante | Error Top-1 medio, 25 m | Error Top-1 medio, 50 m | Media descriptiva entre galerías |
+|---|---:|---:|---:|
+| `es_original` | 412,84 m | 365,69 m | 389,26 m |
+| `es_cartographic` | 416,35 m | 365,69 m | 391,02 m |
+| `en_conventional` | 420,02 m | 276,43 m | 348,22 m |
+| `en_toponym_preserved` | **305,47 m** | **276,43 m** | **290,95 m** |
+| `en_cartographic` | 401,40 m | 385,90 m | 393,65 m |
+
+`en_toponym_preserved` obtuvo el menor error Top-1 medio en la galería de 25 m
+y empató con `en_conventional` en la de 50 m. El valor 290,95 m es únicamente la
+media aritmética descriptiva de esos dos errores agregados; no constituye una
+métrica oficial adicional, una combinación de galerías ni una evaluación
+estadística independiente.
+
+La elección no convierte a `en_toponym_preserved` en ganadora absoluta. Todas
+las variantes obtuvieron Recall@1, Recall@5 y Recall@10 exacto aproximado de
+0,00. Además, `en_toponym_preserved` alcanzó GeoRecall@10 a 100 m de 0,50 en
+ambas galerías, por debajo del 0,75 de `es_cartographic`. En 50 m,
+`es_cartographic`, `en_conventional` y `en_cartographic` alcanzaron
+GeoRecall@10 a 50 m de 0,50, frente al 0,25 de `en_toponym_preserved`.
+Por tanto, si el objetivo del producto pasa a priorizar que alguna ubicación
+cercana aparezca dentro del Top-10, en lugar de minimizar el error de la primera
+propuesta, deberá reconsiderarse esta preferencia.
+
+La referencia contractual real de F5.7 es
+`experimental_approximate_reference`. Las cuatro coordenadas proceden de enlaces
+Street View, tienen incertidumbre desconocida y no son posiciones de cámara
+verificadas de forma independiente. No constituyen Ground Truth validado F5.4;
+de hecho, `officially_evaluable=0` y el informe declara
+`official_f54_evaluation=false`. Las 16 transformaciones generadas por Qwen
+siguen pendientes de revisión semántica humana, aunque superaron los controles
+automáticos empleados para permitir esta ejecución provisional.
+
+La muestra de cuatro observaciones es demasiado pequeña para establecer
+superioridad estadística o generalizar el resultado a Madrid. Al utilizarse para
+seleccionar provisionalmente una variante, estas cuatro observaciones pasan a
+desempeñar una función de desarrollo y selección experimental. No deben
+reutilizarse después como evaluación independiente final de la misma decisión.
+
+## Reevaluación pendiente con F5.5c
+
+La preferencia deberá revisarse tras completar la revisión humana y ejecutar el
+benchmark `synthetic_osm` F5.5c. Ese benchmark contiene 35 observaciones
+sintéticas: 24 de desarrollo y 11 de evaluación, inicialmente todas pendientes
+de revisión humana.
+
+Sus métricas deberán publicarse separadas de las cuatro referencias Street View.
+Las observaciones `synthetic_osm` proceden de OSM y no son equivalentes a Ground
+Truth humano independiente ni demuestran por sí solas qué variante funciona
+mejor con descripciones visuales humanas. También debe preservarse la partición
+de evaluación: no se puede usar iterativamente para ajustar prompts o seleccionar
+variantes y presentarla después como evaluación intacta.
+
+F5.5c podrá aportar evidencia complementaria sobre recuperación cartográfica. La
+decisión provisional solo debería confirmarse si `en_toponym_preserved` mantiene
+un compromiso favorable después de: revisar manualmente las transformaciones
+Qwen, congelar los criterios de comparación y evaluar sin reutilizar como test
+independiente los datos empleados para seleccionar la variante.
+
 ## Artefactos y comandos
 
 Los artefactos base están bajo `results/generated/f5/f57-final/` y el informe
