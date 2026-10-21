@@ -89,6 +89,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D071 | Separar aptitud visual Panoramax de aprobación de Ground Truth | SUSTITUIDA POR D073 | F5 / revisión humana |
 | D072 | Mantener `synthetic_osm` separado del Ground Truth real F5.4 | ACEPTADA | F5 / benchmark sintético |
 | D073 | Sustituir Panoramax por Street View documental local con incertidumbre desconocida | ACEPTADA | F5 / evidencia documental |
+| D074 | Permitir rankings F5.7 provisionales tras controles automáticos, separados de F5.4 | ACEPTADA | F5 / evaluación experimental |
 
 ## D053 — API HTTP interna del MVP
 
@@ -627,6 +628,32 @@ F5.2/CrossText2Loc no se ejecutan hasta revisar formalmente descripciones. Si se
 ejecutan después, los errores a coordenada de enlace se etiquetarán aproximados y
 separados de F5.4 real y `synthetic_osm`. El código Panoramax exclusivo se elimina,
 pero el historial y los artefactos locales no se borran.
+
+## D074 — Excepción provisional F5.7 separada de F5.4
+
+**Estado:** ACEPTADA
+**Componente:** F5 / evaluación experimental
+**Fecha:** 2026-10-21
+**Origen:** Petición expresa de completar F5.7 antes de la revisión humana.
+
+### Decisión
+
+F5.7 puede ejecutar variantes Qwen pendientes de revisión y rankings
+CrossText2Loc solo cuando cada salida supera controles automáticos de estructura,
+fugas, hashes, negaciones y relaciones. Esta excepción no cambia el estado de la
+revisión en F5.6 ni la regla general D061.
+
+Las coordenadas de enlace se reservan para evaluación posterior al retrieval.
+Los resultados se etiquetan como referencias aproximadas de incertidumbre
+desconocida, con `official_f54_evaluation=false`; no se agregan a F5.4, no se
+presentan como GT real y no autorizan conclusiones de superioridad.
+
+### Consecuencias
+
+Una variante que falle se excluye sin eliminar las demás ni convertir su ausencia
+en fallo de precisión. Los rankings deben ser Top-10 exhaustivos, independientes
+y completos. La revisión humana continúa pendiente para cualquier conclusión
+semántica u oficial.
 
 ## D001 — Identidad del candidato
 

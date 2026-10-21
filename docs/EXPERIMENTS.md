@@ -634,6 +634,24 @@ SV-02 excedía D004 en 16,22 m, la cobertura 25 m en 29,29 m y la cobertura
 50 m en 54,33 m. No se ejecutaron Qwen ni CrossText2Loc. Procedimiento:
 [PHASE56_STREETVIEW_DOCUMENTARY.md](PHASE56_STREETVIEW_DOCUMENTARY.md).
 
+## F5.7: Qwen y evaluación aproximada Street View
+
+Se adaptó el dataset F5.6 canónico `575695ca...` a F4.3/F5 v2 sin incluir
+coordenadas en las entradas. Qwen3-8B real, revisión `b968826d...`, produjo 16/16
+derivados; los controles automáticos admitieron las 20 variantes. CrossText2Loc
+con pesos congelados generó 40/40 Top-10 sobre las galerías 25 m y 50 m.
+
+El Recall@1/5/10 de celda aproximada fue 0 en todas las combinaciones. El
+GeoRecall@10 a 100 m estuvo entre 0,50 y 0,75, y el error Top-1 medio entre
+276,43 m y 420,02 m. Son cuatro coordenadas de enlace con incertidumbre
+desconocida, no métricas oficiales F5.4 ni evidencia de superioridad. Detalles:
+[PHASE57_EXPERIMENTAL_EVALUATION.md](PHASE57_EXPERIMENTAL_EVALUATION.md).
+
+Una segunda ejecución CrossText2Loc conservó Top-10 y scores idénticos y añadió
+latencias por fila. La mediana de retrieval quedó entre 6,37 y 8,13 ms; la media
+de `es_original` incluye calentamiento inicial. El informe final con manifest v2
+está en `results/generated/f5/f57-final-v3/`.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

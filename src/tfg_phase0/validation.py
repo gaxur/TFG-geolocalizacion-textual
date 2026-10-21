@@ -1591,6 +1591,16 @@ def _validate_f56_streetview_documentary(document: Mapping[str, Any]) -> None:
     if document["protocol"].get("real_ground_truth") is not False or document["protocol"].get("unknown_accuracy_disables_exact_recall") is not True: raise SchemaValidationError("F5.6 habilita métricas oficiales sin GT")
 
 
+def _validate_f57_experimental_evaluation(document: Mapping[str, Any]) -> None:
+    fields={"schema_version","contract_version","evaluation_id","protocol","inputs","coverage","metrics","paired_comparisons","per_observation","limitations"}
+    if set(document)!=fields or document.get("schema_version")!="1.0" or document.get("contract_version")!="f57-experimental-approximate-evaluation-v1": raise SchemaValidationError("f57_experimental_evaluation incompatible")
+    from .f57_experimental_evaluation import evaluation_id
+    if document.get("evaluation_id")!=evaluation_id(document): raise SchemaValidationError("evaluation_id F5.7 no corresponde al contenido")
+    protocol=document.get("protocol",{})
+    if protocol.get("official_f54_evaluation") is not False or protocol.get("coordinates_used_for_retrieval") is not False or protocol.get("reference_kind")!="experimental_approximate_reference": raise SchemaValidationError("F5.7 se presenta como evaluación oficial o usa coordenadas en retrieval")
+    if document.get("coverage",{}).get("officially_evaluable")!=0 or "not_f54_metrics" not in document.get("limitations",[]): raise SchemaValidationError("F5.7 no está separado de F5.4")
+
+
 def _validate_crosstext2loc_retrieval_request(document: Mapping[str, Any]) -> None:
     fields = {"schema_version", "contract_version", "query", "gallery_ids", "top_k"}
     if set(document) != fields or document["schema_version"] != "1.0" or document["contract_version"] != "crosstext2loc-retrieval-request-v1":
@@ -2111,6 +2121,7 @@ def validate_document(document: Any, schema_name: str) -> None:
         "f5_field_observation": _validate_f5_field_observation,
         "f5_synthetic_osm_benchmark": _validate_f5_synthetic_osm_benchmark,
         "f56_streetview_documentary": _validate_f56_streetview_documentary,
+        "f57_experimental_evaluation": _validate_f57_experimental_evaluation,
         "crosstext2loc_retrieval_request": _validate_crosstext2loc_retrieval_request,
         "crosstext2loc_retrieval_response": _validate_crosstext2loc_retrieval_response,
         "manifest": _validate_manifest,

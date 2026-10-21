@@ -136,6 +136,11 @@ tiene precisión suficiente para Recall oficial y las descripciones siguen
 pendientes de revisión:
 [PHASE56_STREETVIEW_DOCUMENTARY.md](docs/PHASE56_STREETVIEW_DOCUMENTARY.md).
 
+F5.7 ejecuta provisionalmente 16 variantes Qwen y 40 rankings CrossText2Loc sobre
+los cuatro casos activos. Sus métricas usan coordenadas de enlace con
+incertidumbre desconocida y son exclusivamente experimentales, separadas de
+F5.4: [PHASE57_EXPERIMENTAL_EVALUATION.md](docs/PHASE57_EXPERIMENTAL_EVALUATION.md).
+
 Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
 
 ```bash

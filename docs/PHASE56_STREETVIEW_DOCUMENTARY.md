@@ -173,3 +173,9 @@ Se conserva:
 6. Ejecutar 40 rankings exploratorios con pesos/galerías congelados.
 7. Reportar errores a coordenada de enlace como aproximados y separados de F5.4
    real y `synthetic_osm`.
+
+> Actualización posterior: F5.7 ejecutó esta vía como excepción provisional
+> expresa D074, tras controles automáticos y antes de revisión humana. F5.6
+> conserva sus estados `pending`; los resultados aproximados se documentan en
+> [PHASE57_EXPERIMENTAL_EVALUATION.md](PHASE57_EXPERIMENTAL_EVALUATION.md) y no
+> son métricas oficiales F5.4.
