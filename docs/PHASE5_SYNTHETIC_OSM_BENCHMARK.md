@@ -1,28 +1,9 @@
-# F5.5c: revisión Panoramax y benchmark sintético OSM
+# F5.5c: benchmark sintético OSM
 
-## Cierre de revisión Panoramax
-
-La segunda cola fue revisada visualmente sin aprobar GT:
-
-| Aptitud | Segunda cola | Total diez imágenes |
-|---|---:|---:|
-| `suitable` | 1 | 2 |
-| `limited` | 3 | 5 |
-| `unsuitable` | 1 | 3 |
-| GT `approved` | 0 | 0 |
-
-Artefacto final:
-
-```text
-results/generated/f5/f55c/panoramax-review/
-  f55c-complementary-review-905cd76a33dab3f27f970ef20beaca37dba2bbb5561f9aabcb794253d21ce87c/
-    complementary-visual-review.json
-    complementary-visual-review.html
-```
-
-La imagen `608dca83-929b-49d6-be52-537ee91a2aaa` es visualmente apta y
-conserva una descripción propuesta pendiente de revisión final. Sus asignaciones
-25/50 m son `accuracy_insufficient`; no se convierte en GT exacto.
+F5.5c se conserva como benchmark cartográfico independiente. La vía Panoramax
+que coexistía durante su creación fue sustituida y retirada del flujo activo en
+F5.6; su provenance histórica permanece en Git y en el registro de experimentos,
+pero no forma parte de este benchmark ni de sus comandos actuales.
 
 ## Propósito del benchmark
 

@@ -1567,27 +1567,10 @@ def _validate_f5_geographic_evaluation(document: Mapping[str, Any]) -> None:
         raise SchemaValidationError("evaluation_id F5.4 no corresponde al contenido")
 
 
-def _validate_f5_panoramax_inventory(document: Mapping[str, Any]) -> None:
-    fields = {"schema_version", "contract_version", "inventory_id", "source", "bbox_wgs84", "raw_response", "catalogs", "items", "limitations"}
-    if set(document) != fields or document.get("schema_version") != "1.0" or document.get("contract_version") != "f55-panoramax-inventory-v1" or not isinstance(document["items"], list) or not isinstance(document["limitations"], list) or not document["limitations"]:
-        raise SchemaValidationError("f5_panoramax_inventory incompatible")
-    from .f5_evidence_acquisition import inventory_id
-    if document["inventory_id"] != inventory_id(document): raise SchemaValidationError("inventory_id F5.5 no corresponde al contenido")
-
-
-def _validate_f5_panoramax_review(document: Mapping[str, Any]) -> None:
-    fields = {"schema_version", "contract_version", "review_queue_id", "inventory", "selection", "records", "limitations"}
-    if set(document) != fields or document.get("schema_version") != "1.0" or document.get("contract_version") not in {"f55-panoramax-review-v1", "f55-panoramax-review-v2"} or not isinstance(document["records"], list) or len(document["records"]) > 5:
-        raise SchemaValidationError("f5_panoramax_review incompatible")
-    from .f5_evidence_acquisition import validate_review_queue
-    try: validate_review_queue(document)
-    except ValueError as error: raise SchemaValidationError("cola Panoramax F5.5 no válida") from error
-
-
 def _validate_f5_field_observation(document: Mapping[str, Any]) -> None:
     fields = {"schema_version", "contract_version", "record_id", "location_id", "derivation_group_id", "partition", "captured_at_utc", "device", "observer_position", "gnss_readings", "orientation", "original_spanish_description", "evidence", "consent_or_data_policy", "limitations", "review"}
     if set(document) != fields or document.get("schema_version") != "1.0" or document.get("contract_version") != "f55-field-observation-v1": raise SchemaValidationError("f5_field_observation incompatible")
-    from .f5_evidence_acquisition import validate_field_record
+    from .f56_evidence_common import validate_field_record
     try: validate_field_record(document)
     except ValueError as error: raise SchemaValidationError("registro de campo F5.5 no válido") from error
 
@@ -1598,6 +1581,14 @@ def _validate_f5_synthetic_osm_benchmark(document: Mapping[str, Any]) -> None:
     from .f5_synthetic_osm_benchmark import validate_synthetic_benchmark
     try: validate_synthetic_benchmark(document)
     except ValueError as error: raise SchemaValidationError("benchmark synthetic_osm no válido") from error
+
+
+def _validate_f56_streetview_documentary(document: Mapping[str, Any]) -> None:
+    fields={"schema_version","contract_version","dataset_id","protocol","inputs","observations","limitations"}
+    if set(document)!=fields or document.get("schema_version")!="1.0" or document.get("contract_version")!="f56-streetview-documentary-v1" or not isinstance(document.get("observations"),list) or len(document["observations"])!=5: raise SchemaValidationError("f56_streetview_documentary incompatible")
+    from .f56_streetview_documentary import dataset_id
+    if document["dataset_id"]!=dataset_id(document): raise SchemaValidationError("dataset_id F5.6 no corresponde al contenido")
+    if document["protocol"].get("real_ground_truth") is not False or document["protocol"].get("unknown_accuracy_disables_exact_recall") is not True: raise SchemaValidationError("F5.6 habilita métricas oficiales sin GT")
 
 
 def _validate_crosstext2loc_retrieval_request(document: Mapping[str, Any]) -> None:
@@ -2117,10 +2108,9 @@ def validate_document(document: Any, schema_name: str) -> None:
         "f5_geographic_extraction_comparison": _validate_f5_geographic_extraction_comparison,
         "f5_ground_truth_dataset": _validate_f5_ground_truth_dataset,
         "f5_geographic_evaluation": _validate_f5_geographic_evaluation,
-        "f5_panoramax_inventory": _validate_f5_panoramax_inventory,
-        "f5_panoramax_review": _validate_f5_panoramax_review,
         "f5_field_observation": _validate_f5_field_observation,
         "f5_synthetic_osm_benchmark": _validate_f5_synthetic_osm_benchmark,
+        "f56_streetview_documentary": _validate_f56_streetview_documentary,
         "crosstext2loc_retrieval_request": _validate_crosstext2loc_retrieval_request,
         "crosstext2loc_retrieval_response": _validate_crosstext2loc_retrieval_response,
         "manifest": _validate_manifest,

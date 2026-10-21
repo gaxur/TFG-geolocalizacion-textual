@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Importa únicamente registros F5.5 aprobados a contratos F4.3/F5.4."""
+"""Importa registros propios aprobados a contratos F4.3/F5.4."""
 
 from __future__ import annotations
 
@@ -16,15 +16,13 @@ sys.path.insert(0, str(ROOT))
 from src.tfg_phase0.config import load_region_config
 from src.tfg_phase0.f4_evaluation import validate_query_dataset
 from src.tfg_phase0.f4_validation import load_verified_f1_catalog
-from src.tfg_phase0.f5_evidence_acquisition import import_approved_field_records, import_approved_panoramax_reviews
+from src.tfg_phase0.f56_evidence_common import import_approved_field_records
 from src.tfg_phase0.f5_ground_truth_evaluation import validate_ground_truth_dataset
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--field-record", action="append", type=Path)
-    source.add_argument("--panoramax-review", type=Path)
+    parser.add_argument("--field-record", action="append", required=True, type=Path)
     parser.add_argument("--evidence-root", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--catalog-25m", type=Path, default=ROOT / "data/processed/catalog/manifest-25m.json")
@@ -32,12 +30,8 @@ def main() -> int:
     args = parser.parse_args()
     config = load_region_config(ROOT / "config/madrid.yaml")
     catalogs = {"madrid-25m": load_verified_f1_catalog(args.catalog_25m, config), "madrid-50m": load_verified_f1_catalog(args.catalog_50m, config)}
-    if args.field_record:
-        records = [json.loads(path.read_text(encoding="utf-8")) for path in args.field_record]
-        source_dataset, gt_dataset, counts = import_approved_field_records(records, evidence_root=args.evidence_root, catalogs=catalogs)
-    else:
-        queue = json.loads(args.panoramax_review.read_text(encoding="utf-8"))
-        source_dataset, gt_dataset, counts = import_approved_panoramax_reviews(queue, evidence_root=args.evidence_root, catalogs=catalogs)
+    records = [json.loads(path.read_text(encoding="utf-8")) for path in args.field_record]
+    source_dataset, gt_dataset, counts = import_approved_field_records(records, evidence_root=args.evidence_root, catalogs=catalogs)
     validate_query_dataset(source_dataset, catalogs["madrid-50m"])
     source_raw = (json.dumps(source_dataset, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()
     if gt_dataset["source_query_dataset"]["sha256"] != hashlib.sha256(source_raw).hexdigest():

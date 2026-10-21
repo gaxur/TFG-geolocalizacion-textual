@@ -500,17 +500,16 @@ candidatos de 25 m y 253 de 50 m. La infraestructura y métricas se verificaron
 con fixtures sintéticos identificados exclusivamente como tests de software.
 Procedimiento: [PHASE5_GEOGRAPHIC_EVALUATION.md](PHASE5_GEOGRAPHIC_EVALUATION.md).
 
-## F5.5: snapshot Panoramax y cola piloto
+## F5.5: snapshot Panoramax y cola piloto — vía sustituida
 
 Se consultó el catálogo federado Panoramax sobre D004 y se congelaron los bytes
 reales de la respuesta:
 
-```bash
-.venv-geo/bin/python scripts/acquire_f55_panoramax.py \
-  --output-root results/generated/f5/f55/panoramax \
-  --review-limit 5 \
-  --asset-role thumb
-```
+> Registro histórico: F5.6 eliminó el script de adquisición y esta orden ya no
+> forma parte del flujo activo reproducible desde `main`.
+
+El procedimiento quedó fijado en el commit histórico `ec1f4ae`; F5.6 retiró el
+script de adquisición del flujo activo.
 
 Resultado:
 
@@ -534,12 +533,16 @@ con raw SHA-256
 `67882b891ac6a6523ea93ba1d8a3e99a047b4cbf7a4c6354a87483b7187b2d1a`.
 Un intento anterior quedó invalidado por identidad tras detectar aliasing y no se
 usa como resultado.
-Detalles: [PHASE5_EVIDENCE_ACQUISITION.md](PHASE5_EVIDENCE_ACQUISITION.md).
+La migración y las limitaciones vigentes se documentan en
+[PHASE56_STREETVIEW_DOCUMENTARY.md](PHASE56_STREETVIEW_DOCUMENTARY.md).
 
-## F5.5b: revisión visual y cola complementaria
+## F5.5b: revisión visual y cola complementaria — vía sustituida
 
 La revisión manual comunicada por el responsable se materializó en un contrato
 Panoramax v2 sin modificar la aprobación GT:
+
+> Registro histórico: los contratos y scripts Panoramax fueron retirados del
+> flujo activo por D073; no ejecutar esta vía en nuevas campañas.
 
 ```text
 suitable: 1
@@ -559,14 +562,18 @@ Los cinco items restantes se publicaron como segunda cola, con cinco thumbnails
 y estado visual/GT `pending`. Ninguno mejora automáticamente la cobertura exacta:
 tres tienen precisión declarada pero asignaciones insuficientes o fuera de
 cobertura y dos no declaran precisión. Los artefactos permanecen fuera de Git en
-`results/generated/f5/f55b/`. Detalles:
-[PHASE5_VISUAL_REVIEW.md](PHASE5_VISUAL_REVIEW.md).
+`results/generated/f5/f55b/`. El procedimiento histórico está en `85fd35b`; la
+vía vigente se documenta en
+[PHASE56_STREETVIEW_DOCUMENTARY.md](PHASE56_STREETVIEW_DOCUMENTARY.md).
 
-## F5.5c: cierre Panoramax y benchmark `synthetic_osm`
+## F5.5c: benchmark `synthetic_osm`
 
 La segunda cola Panoramax quedó revisada con 1 `suitable`, 3 `limited` y 1
 `unsuitable`. El total de diez imágenes es 2/5/3 respectivamente; los diez GT
 siguen `pending` y no se importaron a F5.4.
+
+F5.6 retiró posteriormente Panoramax del flujo activo; estos resultados se
+conservan solo como historial experimental.
 
 Se materializó un benchmark OSM separado:
 
@@ -596,6 +603,31 @@ obtuvieron 25; se adoptó 70 m, el mayor umbral ensayado que superó el mínimo 
 
 No se ejecutaron modelos ni rankings. Detalles:
 [PHASE5_SYNTHETIC_OSM_BENCHMARK.md](PHASE5_SYNTHETIC_OSM_BENCHMARK.md).
+
+## F5.6: Street View documental local
+
+Se verificaron cinco PNG locales ignorados por Git y se materializó:
+
+```text
+f56-streetview-documentary-sha256-7a6e1a66b7e3a0edbac6175753c3179b03ca0b89fb9e3f0f91036c3ab5eefe93
+```
+
+Resultado:
+
+```text
+observaciones: 5
+dentro de D004 por coordenada de enlace: 4
+fuera de D004: 1 (SV-02)
+descripciones formalmente revisadas: 0
+Recall exacto elegible: 0
+variantes generadas: 0
+rankings: 0
+```
+
+SV-01/03/04/05 tienen asignación puntual `assigned` en ambas galerías, pero la
+incertidumbre posicional es desconocida; no se presenta como celda GT validada.
+SV-02 es `outside_region`. No se ejecutaron Qwen ni CrossText2Loc. Procedimiento:
+[PHASE56_STREETVIEW_DOCUMENTARY.md](PHASE56_STREETVIEW_DOCUMENTARY.md).
 
 ## CrossText2Loc NewYork-mixed OSM en GB10
 

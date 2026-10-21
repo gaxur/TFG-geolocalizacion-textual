@@ -84,10 +84,11 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D066 | Versionar el contrato textual para añadir `en_cartographic` sin reinterpretar v1 | ACEPTADA | F5 / variantes textuales |
 | D067 | Reutilizar F4.3 y añadir un sidecar F5.4 de evidencia/asignación multigalería | ACEPTADA | F5 / evaluación geográfica |
 | D068 | No publicar precisión de Madrid hasta disponer de GT real verificado | ACEPTADA | F5 / integridad experimental |
-| D069 | Adoptar Panoramax solo como inventario y cola de revisión F5.5 | ACEPTADA | F5 / evidencia fotográfica |
+| D069 | Adoptar Panoramax solo como inventario y cola de revisión F5.5 | SUSTITUIDA POR D073 | F5 / evidencia fotográfica |
 | D070 | Priorizar recogida propia para GT exacto y bloquear aprobación automática | ACEPTADA | F5 / recopilación |
-| D071 | Separar aptitud visual Panoramax de aprobación de Ground Truth | ACEPTADA | F5 / revisión humana |
+| D071 | Separar aptitud visual Panoramax de aprobación de Ground Truth | SUSTITUIDA POR D073 | F5 / revisión humana |
 | D072 | Mantener `synthetic_osm` separado del Ground Truth real F5.4 | ACEPTADA | F5 / benchmark sintético |
+| D073 | Sustituir Panoramax por Street View documental local con incertidumbre desconocida | ACEPTADA | F5 / evidencia documental |
 
 ## D053 — API HTTP interna del MVP
 
@@ -600,6 +601,30 @@ El solapamiento OSM entre consultas y candidatos se registra como contaminación
 El conjunto no decide por sí solo prefiltrado/reranking ni sustituye observaciones
 `human_in_situ`. Qwen y CrossText2Loc se ejecutarán solo en una fase posterior,
 después de congelar revisión.
+
+## D073 — Street View documental sustituye Panoramax
+
+**Estado:** ACEPTADA
+**Componente:** F5 / evidencia documental
+**Fecha:** 2026-10-21
+**Origen:** Decisión expresa del responsable para F5.6.
+
+### Decisión
+
+Panoramax se retira del flujo activo. Cinco capturas manuales Street View se
+mantienen fuera de Git y se registran con SHA-256, panorama, URL, heading, pitch y
+coordenada del enlace. La fuente no se considera abierta ni redistribuible.
+
+La coordenada del enlace tiene incertidumbre desconocida y no se declara posición
+de cámara verificada. Las asignaciones puntuales 25/50 m son exploratorias; no
+habilitan Recall exacto. SV-02 permanece fuera de D004.
+
+### Consecuencias
+
+F5.2/CrossText2Loc no se ejecutan hasta revisar formalmente descripciones. Si se
+ejecutan después, los errores a coordenada de enlace se etiquetarán aproximados y
+separados de F5.4 real y `synthetic_osm`. El código Panoramax exclusivo se elimina,
+pero el historial y los artefactos locales no se borran.
 
 ## D001 — Identidad del candidato
 

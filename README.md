@@ -126,18 +126,15 @@ variantes sobre galerías 25 m/50 m. La auditoría actual encontró cero
 observaciones humanas con GT validado, por lo que no publica precisión todavía:
 [PHASE5_GEOGRAPHIC_EVALUATION.md](docs/PHASE5_GEOGRAPHIC_EVALUATION.md).
 
-F5.5 congela un inventario Panoramax de D004, descarga una evidencia visual
-ligera para cinco candidatos y prepara revisión humana y recogida propia, sin
-aprobar automáticamente ningún GT:
-[PHASE5_EVIDENCE_ACQUISITION.md](docs/PHASE5_EVIDENCE_ACQUISITION.md).
-
-F5.5b registra por separado aptitud visual y aprobación GT, y ofrece una segunda
-galería offline con los cinco items Panoramax restantes:
-[PHASE5_VISUAL_REVIEW.md](docs/PHASE5_VISUAL_REVIEW.md).
-
-F5.5c cierra la revisión visual Panoramax y materializa 35 consultas
+F5.5c materializa 35 consultas
 `synthetic_osm` trazables y pendientes de revisión, separadas del GT real:
 [PHASE5_SYNTHETIC_OSM_BENCHMARK.md](docs/PHASE5_SYNTHETIC_OSM_BENCHMARK.md).
+
+F5.6 sustituye Panoramax en el flujo activo por cinco capturas locales Street
+View documentales. Cuatro enlaces están dentro de D004, pero ninguna observación
+tiene precisión suficiente para Recall oficial y las descripciones siguen
+pendientes de revisión:
+[PHASE56_STREETVIEW_DOCUMENTARY.md](docs/PHASE56_STREETVIEW_DOCUMENTARY.md).
 
 Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
 
