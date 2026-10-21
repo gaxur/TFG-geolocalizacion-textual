@@ -613,7 +613,7 @@ SV-03/04/05 se renumeraron de forma continua a SV-02/03/04 conservando IDs
 históricos. Se materializó:
 
 ```text
-f56-streetview-documentary-sha256-7a6e1a66b7e3a0edbac6175753c3179b03ca0b89fb9e3f0f91036c3ab5eefe93
+f56-streetview-documentary-sha256-575695ca55793d6077f9a464cfb53b61366871c7e721d9b0a3fe60e3d253be9a
 ```
 
 Resultado:

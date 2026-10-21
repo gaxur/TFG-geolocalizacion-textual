@@ -8,7 +8,7 @@ proceden del enlace suministrado y la incertidumbre posicional es desconocida.
 
 ```text
 dataset_id:
-f56-streetview-documentary-sha256-f39d8ac6d317a5a1c244058386735d8d0ee010afabe6812585576d68f2b109c6
+f56-streetview-documentary-sha256-575695ca55793d6077f9a464cfb53b61366871c7e721d9b0a3fe60e3d253be9a
 ```
 
 Resultado:
@@ -86,6 +86,11 @@ results/generated/f5/f56/<dataset_id>/review.html
 
 Las imágenes se enlazan por rutas locales relativas y el HTML funciona sin red,
 salvo los enlaces externos de procedencia.
+
+El responsable actualizó los detalles de las cuatro descripciones y se alinearon
+las listas `visible_evidence` con esos textos. Los hashes, panorama IDs,
+coordenadas y enlaces no cambiaron; esta comprobación garantiza correspondencia
+documental tras la renumeración, no aprobación visual automática.
 
 El entorno automatizado valida forma, fugas, hashes y orientación declarada, pero
 no sustituye la inspección humana del contenido PNG. No se registra
