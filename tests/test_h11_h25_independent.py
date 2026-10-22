@@ -1,10 +1,10 @@
-import copy,json
+import copy,json,tempfile
 from pathlib import Path
 import unittest
 from src.tfg_phase0.config import load_region_config
 from src.tfg_phase0.f4_validation import load_verified_f1_catalog
 from src.tfg_phase0.f5_text_transform import GenerationConfig,TransformResult,TransformerMetadata
-from src.tfg_phase0.h11_h25_independent import H11H25Error,build_dataset,build_plan,evaluate,historical_rows,run_rankings,transform_dataset
+from src.tfg_phase0.h11_h25_independent import H11H25Error,build_dataset,build_plan,evaluate,historical_rows,render_html,run_rankings,transform_dataset
 ROOT=Path(__file__).resolve().parents[1]
 class Transformer:
  metadata=TransformerMetadata("fake","Qwen/Qwen3-8B","b968826d9c46dd6066d109eabc6255188de91218","Qwen/Qwen3-8B","r","a"*64,True)
@@ -38,4 +38,6 @@ class H11H25Tests(unittest.TestCase):
   broken=copy.deepcopy(run); broken["records"][0]["status"]="rejected"; plan=build_plan(self.dataset,broken); self.assertEqual(len(plan["controls"]),29); self.assertEqual(plan["excluded"][0]["reason"],"qwen_failed_no_fallback")
  def test_thirty_retrieval_calls_sixty_rows_and_metrics(self):
   run=transform_dataset(self.dataset,Transformer()); plan=build_plan(self.dataset,run); retriever=Retriever(); rankings=run_rankings(plan,retriever); self.assertEqual(len(retriever.calls),30); self.assertTrue(all(x[0]==("madrid-25m","madrid-50m") for x in retriever.calls)); self.assertEqual(len(rankings["rows"]),60); report=evaluate(self.dataset,rankings,run); self.assertEqual(report["coverage"],{"observations":15,"qwen_generated":15,"rankings":60,"exterior":14,"interior":1}); self.assertTrue(any(x["group"]=="interior_h16" and x["count"]==1 for x in report["metrics"])); self.assertEqual(len(report["paired"]),2)
+  with tempfile.TemporaryDirectory() as tmp:
+   path=Path(tmp)/"report.html"; render_html(self.dataset,run,report,path); html=path.read_text(); self.assertIn("Conclusión experimental: variante ganadora y justificación",html); self.assertIn("Qwen en_cartographic + galería 50 m",html)
 if __name__=="__main__": unittest.main()

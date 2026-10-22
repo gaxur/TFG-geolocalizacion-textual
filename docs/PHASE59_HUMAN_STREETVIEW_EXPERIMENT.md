@@ -1,5 +1,20 @@
 # F5.9: H01 y H02 con referencias Street View
 
+## Relación entre H01–H10 y H11–H25
+
+H01–H10 constituye la muestra humana exploratoria de desarrollo de F5.9. Se
+construyó en dos incrementos: H01–H02, que además incluyó traducciones inglesas
+humanas, y H03–H10, orientado a relaciones egocéntricas. Sus resultados se
+inspeccionaron para consolidar métricas y proponer la candidata Qwen de F5.10;
+por tanto, no debe reutilizarse como validación independiente de esa propuesta.
+
+H11–H25 es una campaña posterior y separada que compara únicamente
+`es_original` frente a `en_cartographic`. No comparte panoramas ni referencias a
+menos de 25 m con F5.7/H01–H10 según la auditoría previa. Aporta evidencia nueva,
+pero sus coordenadas de enlace, revisión visual pendiente y el caso interior H16
+impiden tratarla como Ground Truth oficial. Su protocolo y resultados están en
+[PHASE_H11_H25_EVALUATION.md](PHASE_H11_H25_EVALUATION.md).
+
 ## Alcance y referencia
 
 F5.9 incorpora dos descripciones humanas y sus traducciones inglesas aportadas

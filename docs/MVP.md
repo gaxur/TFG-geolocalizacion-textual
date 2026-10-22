@@ -454,24 +454,13 @@ npm --prefix frontend test
 npm --prefix frontend run build
 ```
 
-### Check bilingüe inglés-español
+### Check bilingüe histórico
 
-Con el stack levantado:
-
-```bash
-python scripts/check_mvp_bilingual.py \
-  --base-url http://127.0.0.1:8080 \
-  --output results/generated/mvp3/bilingual-check.json
-```
-
-El check usa los tres pares de traducción controlados de F4.5 y consulta ambas
-galerías a través de Nginx y FastAPI. Reporta estabilidad del Top-K, no precisión
-geográfica. Las descripciones y el procedimiento de revisión visual están en
-[PRUEBAS_BILINGUES_MVP.md](PRUEBAS_BILINGUES_MVP.md).
-
-La ejecución validada completó 12 peticiones y seis comparaciones. Ninguna
-traducción conservó Top-1; este dato describe sensibilidad lingüística sin
-ground truth y no permite comparar la precisión de inglés y español.
+El antiguo contrato HTTP permitió ejecutar pares ingles-español de F4.5. F5.11
+acepta una descripción original española y compara Sin LLM frente a Qwen
+`en_cartographic`, por lo que aquel script ya no es una prueba operativa del MVP.
+Resultados y límites históricos:
+[PHASE4_LINGUISTIC_ROBUSTNESS.md](PHASE4_LINGUISTIC_ROBUSTNESS.md#check-http-histórico-del-mvp).
 
 ## Estado de evaluación y métricas
 
@@ -507,8 +496,10 @@ El borrador actual contiene tres sondas técnicas de desarrollo, pero:
 - sus coordenadas de referencia están pendientes;
 - `ground_truth_candidate_id` no está validado;
 - la partición final de evaluación no está congelada;
-- las consultas manuales de `PRUEBAS_BILINGUES_MVP.md` se redactaron conociendo
-  el lugar y sirven para inspección, no para una prueba reservada.
+- las consultas humanas H01–H10 se usaron durante desarrollo y consolidación, no
+  constituyen una prueba reservada independiente;
+- H11–H25 forma una campaña posterior separada, aunque conserva limitaciones de
+  referencia y revisión visual documentadas.
 
 Por tanto:
 

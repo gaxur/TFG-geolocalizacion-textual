@@ -113,6 +113,45 @@ Esto no demuestra que el español tenga menor precisión. Solo compara tres
 traducciones técnicas con anchors ingleses y el checkpoint procede de Nueva
 York. El efecto del idioma está confundido con redacción, tokenización y muestra.
 
+### Check HTTP histórico del MVP
+
+Antes del contrato experimental F5.11 se ejecutó también
+`scripts/check_mvp_bilingual.py` contra la API desplegada. Reutilizó los tres
+pares inglés-español de F4.5 sobre ambas galerías y comprobó el transporte HTTP,
+no precisión geográfica.
+
+| Grupo | Galería | Top-1 igual | Compartidos Top-10 | Jaccard@10 | Distancia entre Top-1 |
+|---|---|---:|---:|---:|---:|
+| Plaza | 50 m | No | 0 | 0,000 | 111,9 m |
+| Plaza | 25 m | No | 0 | 0,000 | 160,0 m |
+| Parque | 50 m | No | 1 | 0,053 | 461,0 m |
+| Parque | 25 m | No | 0 | 0,000 | 727,7 m |
+| Intersección | 50 m | No | 2 | 0,111 | 50,1 m |
+| Intersección | 25 m | No | 0 | 0,000 | 56,0 m |
+
+Las 12 peticiones terminaron correctamente. El informe local histórico se guardó
+en `results/generated/mvp3/bilingual-check.json`, fuera de Git. Estos valores
+describen inestabilidad del ranking: no determinan qué idioma localiza mejor.
+
+F5.11 sustituyó aquel contrato HTTP por una entrada original exclusivamente
+española y dos modos: texto original o Qwen `en_cartographic`. Por ello el check
+bilingüe ya no es una prueba operativa del MVP actual y se conserva solo como
+antecedente F4.5.
+
+## Redacción de consultas cartográficas
+
+Para una galería de imágenes OSM conviene priorizar elementos con posible
+representación cartográfica: forma de plazas y parques, calles que desembocan en
+un espacio, cruces, zonas peatonales, anchura relativa de vías y densidad de
+edificios. Colores, materiales, escaparates, logotipos, carteles, relojes y
+detalles de fachada pueden carecer de equivalente en el raster y actuar como
+ruido.
+
+Esta observación motivó posteriormente las variantes cartográficas F5, pero no
+autoriza eliminar pistas visuales sin conservar el original ni demuestra que una
+transformación mejore la precisión. Las variantes se evalúan como rankings
+separados; el MVP F5.11 no fusiona resultados ni promedia coordenadas.
+
 ### Casos de mayor desplazamiento
 
 - En 50 m, la variante de sinónimos de la intersección desplazó el Top-1 unos
