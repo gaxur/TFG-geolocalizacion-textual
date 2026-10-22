@@ -73,6 +73,14 @@ el wrapper y Docker Compose leen desde la raíz cuando se copia como `.env`.
 scripts/run_mvp3_stack.sh
 ```
 
+La interfaz experimental permite elegir galería 25/50 m y procesamiento Sin
+LLM/Con LLM. Sin LLM usa el texto original; Con LLM aplica provisionalmente Qwen
+`en_cartographic`. Cada consulta ejecuta una sola combinación y devuelve Top-10,
+sin fusión ni fallback. El modo Qwen requiere definir `MVP_QWEN_MODEL_DIR` y una
+imagen API reconstruida con las dependencias F5.11; véase [MVP.md](docs/MVP.md).
+La imagen validada es `crosstext2loc-gb10:f511`; el smoke integrado real completó
+las cuatro combinaciones en la GB10.
+
 Este wrapper comprueba los artefactos externos y ejecuta el equivalente a
 `docker compose -f compose.mvp.yaml up --build`. Abrir
 `http://127.0.0.1:8080/` desde la PGX o `http://IP_LOCAL:8080/` desde un
@@ -149,14 +157,17 @@ F5.9 incorpora H01–H10 como referencias Street View exploratorias, compara cin
 variantes y conserva candidatos Top-10 individuales. Es el conjunto humano
 experimental vigente: [PHASE59_HUMAN_STREETVIEW_EXPERIMENT.md](docs/PHASE59_HUMAN_STREETVIEW_EXPERIMENT.md).
 
-Para comprobar pares equivalentes en inglés y español sobre ambas galerías:
+F5.10 consolida numeradores, denominadores, métricas Top-1/Top-10 y comparaciones
+pareadas, detecta solapamientos con F5.7 y prepara una validación independiente
+para D076: [PHASE510_METRIC_CONSOLIDATION.md](docs/PHASE510_METRIC_CONSOLIDATION.md).
 
-```bash
-python scripts/check_mvp_bilingual.py --base-url http://127.0.0.1:8080
-```
+H11–H25 añade una evaluación humana independiente de `es_original` frente a
+`en_cartographic`, con H16 interior separado y 60 rankings reales:
+[PHASE_H11_H25_EVALUATION.md](docs/PHASE_H11_H25_EVALUATION.md).
 
-La interpretación y las consultas manuales se documentan en
-[PRUEBAS_BILINGUES_MVP.md](docs/PRUEBAS_BILINGUES_MVP.md).
+El check bilingüe F4.5/F5.2 pertenece al contrato HTTP histórico anterior. La API
+experimental F5.11 acepta descripciones originales españolas y compara Sin LLM
+frente a Qwen; no reutiliza ese script como prueba operativa.
 
 El primer experimento, completado **sin entrenamiento ni fine-tuning**, fue:
 

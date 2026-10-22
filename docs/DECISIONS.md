@@ -93,6 +93,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D075 | Priorizar una ubicación geográficamente próxima dentro del Top-10 | ACEPTADA | F5 / objetivo funcional |
 | D076 | Seleccionar variante textual e integración de Qwen para el objetivo Top-10 | PENDIENTE DE EXPERIMENTO | F5 / estrategia textual |
 | D077 | Retirar las capturas locales SV y mantener F5.6/F5.7 como trazabilidad histórica | ACEPTADA | F5 / minimización de datos |
+| D078 | Ofrecer dos galerías y dos modos exclusivos en el MVP experimental | ACEPTADA | MVP / experimentación interactiva |
 
 ## D053 — API HTTP interna del MVP
 
@@ -726,6 +727,24 @@ aprobación expresa del responsable. Hasta entonces no se cambia ninguna variant
 predeterminada. Véase
 [PHASE58_GEORECALL_DECISION.md](PHASE58_GEORECALL_DECISION.md).
 
+### Actualización F5.10
+
+La consolidación humana H01–H10 mantiene D076 pendiente. `es_original` lidera o
+empata GeoRecall@10 a 50 m en ambas galerías. `en_cartographic` es la candidata
+Qwen propuesta para una validación independiente porque empata a 50 m en la
+galería de 50 m y mejora métricas a 100 m, pero pierde aciertos en 25 m. No se
+aprueba ni se integra. Criterios y protocolo:
+[PHASE510_METRIC_CONSOLIDATION.md](PHASE510_METRIC_CONSOLIDATION.md).
+
+### Evidencia H11–H25
+
+La muestra independiente H11–H25 mejora GeoRecall@10 a 50 m con
+`en_cartographic`, especialmente en la galería de 50 m, pero contiene regresiones
+claras y un caso interior desfavorable. Las coordenadas de enlace y la orientación
+siguen sin validación visual independiente. D076 permanece pendiente hasta revisión
+metodológica expresa. Véase
+[PHASE_H11_H25_EVALUATION.md](PHASE_H11_H25_EVALUATION.md).
+
 ## D077 — Retirada de capturas locales SV
 
 **Estado:** ACEPTADA
@@ -752,6 +771,46 @@ Los tests F5.6 usan PNG temporales sintéticos y validan software, no contenido
 visual. F5.9 H01–H10 es el conjunto humano exploratorio vigente. La eliminación
 reduce datos locales restringidos sin borrar la procedencia científica de los
 resultados históricos.
+
+## D078 — Dos galerías y dos modos en el MVP experimental
+
+**Estado:** ACEPTADA
+**Componente:** MVP / experimentación interactiva
+**Fecha:** 2026-10-22
+**Origen:** Petición expresa F5.11 del responsable.
+
+### Decisión
+
+El MVP ofrece una selección independiente y exclusiva de galería 25/50 m y modo
+Sin LLM/Con LLM. Cada petición ejecuta exactamente una combinación y devuelve un
+único Top-10, sin fusión, fallback, segunda galería o variante adicional.
+
+- Sin LLM usa `es_original` directamente con CrossText2Loc.
+- Con LLM usa provisionalmente Qwen3-8B `en_cartographic` y después una sola
+  recuperación CrossText2Loc.
+
+La transformación se valida automáticamente; un fallo produce error y nunca
+activa Sin LLM de forma silenciosa. Texto original y efectivo se devuelven como
+metadatos separados.
+
+### Relación con D076
+
+D078 habilita una herramienta experimental, no aprueba superioridad científica
+ni resuelve D076. `en_cartographic` continúa siendo candidata provisional para
+estudio. La selección definitiva del producto requiere validación independiente
+y aprobación posterior.
+
+### Condición operativa
+
+Qwen y CrossText2Loc deben cargarse una vez en el lifespan de un solo worker y
+ejecutarse secuencialmente bajo el mismo lock. El modo Con LLM solo se anuncia
+disponible si Qwen cargó. La coexistencia GPU en la imagen unificada debe superar
+`scripts/smoke_f511_joint_runtime.py`; no se recargan modelos por petición.
+
+La condición se verificó en la GB10 con la imagen `crosstext2loc-gb10:f511`: el
+smoke conjunto completó transformación y Top-10 con ambos modelos residentes, y
+el smoke integrado completó las cuatro combinaciones mediante Chromium. Esta
+validación cierra la viabilidad técnica F5.11, no D076.
 
 ## D001 — Identidad del candidato
 

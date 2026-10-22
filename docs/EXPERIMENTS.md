@@ -689,6 +689,49 @@ el agregado común H01–H10, `es_original` lideró o empató GeoRecall@10 a 50 
 ambas galerías. Las variantes inglesas alcanzaron 0,60 a 100 m solo en la galería
 de 50 m y empeoraron en 25 m. No se seleccionó variante definitiva.
 
+## F5.10: consolidación post hoc
+
+Sin ejecutar modelos se recalcularon métricas H03–H10 y H01–H10 desde candidatas
+individuales, incluyendo numeradores, denominadores, GeoRecall@1, Recall@1,
+rangos y transiciones pareadas. La auditoría detectó que SV-02/H10 reutilizan el
+mismo panorama y que SV-03/H03 pertenecen al mismo entorno inmediato; F5.7 no se
+trata como muestra independiente.
+
+`es_original` lideró o empató GeoRecall@10 a 50 m. `en_cartographic` quedó como
+candidata Qwen para una futura validación, no como default aprobado. Resultado:
+`f510-consolidation-sha256-c4be6f6577be7403f419396a8f1953d25315a6afb3945a049c2d2ff9c4e81a22`.
+Detalles: [PHASE510_METRIC_CONSOLIDATION.md](PHASE510_METRIC_CONSOLIDATION.md).
+
+## Evaluación independiente H11–H25
+
+Se congelaron 15 descripciones humanas nuevas con reparto aleatorio 5/5/5 en
+sencilla, intermedia y compleja. H16 se identificó como fotografía interior. Las
+15 referencias están dentro de D004 y asignadas en ambas galerías, sin
+solapamientos ≤25 m ni panoramas repetidos respecto de F5.7/H01–H10.
+
+Qwen produjo 15/15 `en_cartographic` y CrossText2Loc generó 60/60 rankings. En
+exteriores, GeoRecall@10 a 50 m pasó de 3/14 a 5/14 en 25 m y de 3/14 a 8/14 en
+50 m. H16 empeoró con Qwen en ambas galerías. El resultado
+`h11-h25-evaluation-sha256-952d33d7312f5e418bf43ccbdba4277800653b36a77f5bd026e22b85473502bf`
+aporta evidencia favorable pero no resuelve D076 por incertidumbre de referencia,
+revisión visual pendiente y regresiones individuales. Detalles:
+[PHASE_H11_H25_EVALUATION.md](PHASE_H11_H25_EVALUATION.md).
+
+## F5.11: MVP experimental 2 × 2
+
+Se implementó un contrato Atlas v2 que exige exactamente una galería 25/50 m y
+un modo Sin LLM/Con LLM. Sin LLM no invoca Qwen; Con LLM ejecuta una única
+transformación `en_cartographic`, valida su salida y realiza un único ranking
+Top-10. No existe fallback, fusión ni ejecución multigalería.
+
+Los cuatro caminos pasan tests con dobles y el frontend Vite compila. El smoke
+host inicial no pudo arrancar por entornos separados, por lo que se construyó la
+imagen unificada `crosstext2loc-gb10:f511` con Transformers 5.9.0. El smoke
+conjunto cargó ambos modelos y alcanzó un pico CUDA asignado de 18.141.917.696 B.
+Después, el smoke integrado real validó las cuatro combinaciones mediante
+Nginx/FastAPI/GPU/Leaflet y Chromium ARM64. D076 permanece pendiente porque esta
+validación es funcional, no evidencia de superioridad científica.
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado
