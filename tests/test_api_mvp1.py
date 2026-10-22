@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from backend.atlas_api.main import create_app
 from backend.atlas_api.settings import Settings
 from src.tfg_phase0.crosstext2loc_runtime import GalleryNotLoadedError, InferenceError, RetrievalInputError
-from src.tfg_phase0.validation import validate_document
+from src.tfg_phase0.f5_text_transform import TransformResult, TransformerMetadata
 
 
 class FakeRetriever:
@@ -48,11 +48,21 @@ class FakeRetriever:
         self.close_calls += 1
 
 
+class FakeTransformer:
+    metadata = TransformerMetadata("fake", "Qwen/Qwen3-8B", "b968826d9c46dd6066d109eabc6255188de91218", "Qwen/Qwen3-8B", "b968826d9c46dd6066d109eabc6255188de91218", "a"*64, True)
+    def __init__(self, error=None): self.calls=[]; self.close_calls=0; self.error=error
+    def transform(self, text, task, protected, config):
+        self.calls.append((text,task,protected,config))
+        if self.error: raise self.error
+        return TransformResult("A mapped square.","A mapped square.",4.5)
+    def close(self): self.close_calls+=1
+
+
 SETTINGS = Settings(Path("runtime.json"), Path("config/madrid.yaml"), "a" * 64, Path("clip.pt"), (), True)
 
 
-def request(galleries=None, k=2):
-    return {"schema_version": "1.0", "contract_version": "crosstext2loc-retrieval-request-v1", "query": {"query_id": "q1", "text": "Una plaza", "language": "es"}, "gallery_ids": galleries or ["madrid-50m"], "top_k": k}
+def request(gallery="madrid-50m", mode="no_llm", k=10):
+    return {"schema_version":"1.0","contract_version":"atlas-experimental-retrieval-request-v2","query":{"query_id":"q1","text":"Una plaza","language":"es"},"gallery_id":gallery,"processing_mode":mode,"top_k":k}
 
 
 class MvpApiTests(unittest.TestCase):
@@ -66,7 +76,7 @@ class MvpApiTests(unittest.TestCase):
     def test_lifespan_loads_and_closes_once(self):
         fake = FakeRetriever()
         factory_calls = []
-        app = create_app(settings=SETTINGS, retriever_factory=lambda settings: factory_calls.append(settings) or fake)
+        transformer=FakeTransformer(); app = create_app(settings=SETTINGS, retriever_factory=lambda settings: factory_calls.append(settings) or fake, transformer_factory=lambda settings: transformer)
         with TestClient(app) as client:
             self.assertEqual(client.get("/api/v1/health/live").status_code, 200)
             self.assertEqual(client.get("/api/v1/health/ready").json()["status"], "ready")
@@ -75,48 +85,66 @@ class MvpApiTests(unittest.TestCase):
             self.assertEqual(fake.calls, 2)
             self.assertEqual(len(factory_calls), 1)
         self.assertEqual(fake.close_calls, 1)
+        self.assertEqual(transformer.close_calls,1)
 
     def test_capabilities_and_valid_multigallery_response(self):
         fake = FakeRetriever()
-        app = create_app(settings=SETTINGS, retriever_factory=lambda settings: fake)
+        transformer=FakeTransformer(); app = create_app(settings=SETTINGS, retriever_factory=lambda settings: fake, transformer_factory=lambda settings: transformer)
         with TestClient(app) as client:
             capabilities = client.get("/api/v1/capabilities").json()
             self.assertEqual(capabilities["galleries"], [{"gallery_id": "madrid-50m", "candidate_count": 253}, {"gallery_id": "madrid-25m", "candidate_count": 1115}])
             self.assertEqual(capabilities["search_area"], {"region_id": "madrid_pilot", "crs": "EPSG:4326", "bbox": {"north": 40.42, "south": 40.412, "east": -3.699, "west": -3.709}})
-            response = client.post("/api/v1/retrievals", json=request(["madrid-25m", "madrid-50m"], 3))
+            self.assertTrue(next(x for x in capabilities["processing_modes"] if x["id"]=="with_llm")["available"])
+            response = client.post("/api/v1/retrievals", json=request("madrid-25m","no_llm"))
             self.assertEqual(response.status_code, 200)
             document = response.json()
-            validate_document(document, "crosstext2loc_retrieval_response")
-            self.assertEqual([row["gallery_id"] for row in document["retrievals"]], ["madrid-25m", "madrid-50m"])
+            self.assertEqual([row["gallery_id"] for row in document["retrievals"]], ["madrid-25m"])
+            self.assertEqual(document["processing"]["variant"],"es_original"); self.assertIsNone(document["processing"]["transformer"]); self.assertEqual(transformer.calls,[])
             self.assertNotIn("ground_truth", document)
             self.assertIn("X-Request-ID", response.headers)
 
     def test_invalid_body_unknown_gallery_and_oversized_k(self):
         fake = FakeRetriever()
-        app = create_app(settings=SETTINGS, retriever_factory=lambda settings: fake)
+        app = create_app(settings=SETTINGS, retriever_factory=lambda settings: fake, transformer_factory=lambda settings: FakeTransformer())
         with TestClient(app, raise_server_exceptions=False) as client:
             invalid = request(); invalid["ground_truth"] = {}
             response = client.post("/api/v1/retrievals", json=invalid)
             self.assertEqual(response.status_code, 422)
             self.assertEqual(response.json()["error"]["code"], "INVALID_REQUEST")
-            unknown = client.post("/api/v1/retrievals", json=request(["missing"]))
-            self.assertEqual(unknown.status_code, 404)
-            too_large = client.post("/api/v1/retrievals", json=request(["madrid-50m"], 300))
-            self.assertEqual(too_large.status_code, 422)
+            unknown=request(); unknown["gallery_id"]="missing"; self.assertEqual(client.post("/api/v1/retrievals",json=unknown).status_code,422)
+            bad_mode=request(); bad_mode["processing_mode"]="auto"; self.assertEqual(client.post("/api/v1/retrievals",json=bad_mode).status_code,422)
+            self.assertEqual(client.post("/api/v1/retrievals",json=request(k=5)).status_code,422)
+
+    def test_four_combinations_and_single_qwen_call(self):
+        fake=FakeRetriever(); transformer=FakeTransformer(); app=create_app(settings=SETTINGS,retriever_factory=lambda s:fake,transformer_factory=lambda s:transformer)
+        with TestClient(app) as client:
+            for gallery in ("madrid-25m","madrid-50m"):
+                direct=client.post("/api/v1/retrievals",json=request(gallery,"no_llm")).json(); self.assertEqual(direct["processing"]["effective_query"]["text"],"Una plaza"); self.assertEqual(len(direct["retrievals"]),1)
+                transformed=client.post("/api/v1/retrievals",json=request(gallery,"with_llm")).json(); self.assertEqual(transformed["processing"]["effective_query"]["text"],"A mapped square."); self.assertEqual(transformed["retrievals"][0]["gallery_id"],gallery)
+        self.assertEqual(len(transformer.calls),2); self.assertTrue(all(call[1]=="translate_en_cartographic" for call in transformer.calls)); self.assertEqual(fake.calls,4)
+
+    def test_qwen_unavailable_or_failed_never_falls_back(self):
+        fake=FakeRetriever(); app=create_app(settings=SETTINGS,retriever_factory=lambda s:fake,transformer_factory=lambda s:None)
+        with TestClient(app) as client:
+            response=client.post("/api/v1/retrievals",json=request(mode="with_llm")); self.assertEqual(response.status_code,503); self.assertEqual(response.json()["error"]["code"],"LLM_NOT_READY"); self.assertEqual(fake.calls,0)
+        from src.tfg_phase0.f5_text_transform import TextTransformationError
+        fake=FakeRetriever(); app=create_app(settings=SETTINGS,retriever_factory=lambda s:fake,transformer_factory=lambda s:FakeTransformer(TextTransformationError("boom")))
+        with TestClient(app) as client:
+            response=client.post("/api/v1/retrievals",json=request(mode="with_llm")); self.assertEqual(response.status_code,503); self.assertEqual(response.json()["error"]["code"],"TRANSFORMATION_FAILED"); self.assertEqual(fake.calls,0)
 
     def test_runtime_unavailable_inference_and_unexpected_errors_are_sanitized(self):
-        app = create_app(settings=SETTINGS, retriever_factory=lambda settings: (_ for _ in ()).throw(RuntimeError("secret /path")))
+        app = create_app(settings=SETTINGS, retriever_factory=lambda settings: (_ for _ in ()).throw(RuntimeError("secret /path")), transformer_factory=lambda s:None)
         with self.assertRaises(RuntimeError):
             with TestClient(app, raise_server_exceptions=False):
                 pass
-        app = create_app(settings=SETTINGS, retriever_factory=lambda settings: FakeRetriever())
+        app = create_app(settings=SETTINGS, retriever_factory=lambda settings: FakeRetriever(), transformer_factory=lambda s:None)
         with TestClient(app, raise_server_exceptions=False) as client:
             app.state.retriever = None
             readiness = client.get("/api/v1/health/ready")
             self.assertEqual(readiness.status_code, 503)
             self.assertEqual(readiness.json()["error"]["code"], "RUNTIME_NOT_READY")
         for error, status, code in ((InferenceError("cuda details"), 503, "INFERENCE_FAILED"), (RuntimeError("secret traceback"), 500, "INTERNAL_ERROR")):
-            app = create_app(settings=SETTINGS, retriever_factory=lambda settings, error=error: FakeRetriever(error=error))
+            app = create_app(settings=SETTINGS, retriever_factory=lambda settings, error=error: FakeRetriever(error=error), transformer_factory=lambda s:None)
             with TestClient(app, raise_server_exceptions=False) as client:
                 response = client.post("/api/v1/retrievals", json=request())
                 self.assertEqual(response.status_code, status)
@@ -125,7 +153,7 @@ class MvpApiTests(unittest.TestCase):
 
     def test_openapi_error_contract_and_cors_request_id_on_500(self):
         settings = Settings(SETTINGS.runtime_config, SETTINGS.region_config, SETTINGS.cvg_utils_sha256, SETTINGS.clip_weights_path, ("http://frontend.test",), True)
-        app = create_app(settings=settings, retriever_factory=lambda value: FakeRetriever(error=RuntimeError("hidden")))
+        app = create_app(settings=settings, retriever_factory=lambda value: FakeRetriever(error=RuntimeError("hidden")), transformer_factory=lambda s:None)
         with TestClient(app, raise_server_exceptions=False) as client:
             openapi = client.get("/openapi.json").json()
             responses = openapi["paths"]["/api/v1/retrievals"]["post"]["responses"]
@@ -138,7 +166,7 @@ class MvpApiTests(unittest.TestCase):
 
     def test_busy_request_is_rejected_and_liveness_remains_available(self):
         fake = FakeRetriever(block=True)
-        app = create_app(settings=SETTINGS, retriever_factory=lambda settings: fake)
+        app = create_app(settings=SETTINGS, retriever_factory=lambda settings: fake, transformer_factory=lambda s:None)
         with TestClient(app, raise_server_exceptions=False) as client:
             responses = []
             thread = threading.Thread(target=lambda: responses.append(client.post("/api/v1/retrievals", json=request())))

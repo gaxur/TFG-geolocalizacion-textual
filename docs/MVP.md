@@ -16,20 +16,27 @@ flowchart LR
     B[Navegador local o LAN] -->|IP_PGX:8080| N[Nginx]
     N -->|HTML, JS, CSS| B
     N -->|/api/*, red Compose| A[FastAPI]
-    A --> R[CrossText2Loc residente]
+    A --> M{Modo seleccionado}
+    M -->|Sin LLM| R[CrossText2Loc residente]
+    M -->|Con LLM| Q[Qwen3-8B en_cartographic]
+    Q --> R
     R --> G25[Galería Madrid 25 m]
     R --> G50[Galería Madrid 50 m]
 ```
 
 La API no publica ningún puerto en el host. Nginx es el único punto de entrada y
 redirige `/api/` a `api:8000`. Uvicorn ejecuta un worker y carga una sola
-instancia de `CrossText2LocRetriever` durante el lifespan.
+instancia de `CrossText2LocRetriever` durante el lifespan. F5.11 carga además una
+instancia Qwen opcional; el modo Con LLM solo está disponible si ambos runtimes
+superan el arranque.
 
 ## Funcionalidad implementada
 
 - descripción textual en español;
 - selección de las galerías Madrid 25 m y 50 m;
-- selección Top-3, Top-5 o Top-10;
+- selección exclusiva de galería 25 m o 50 m;
+- selección exclusiva Sin LLM o Con LLM experimental;
+- Top-10 fijo para la combinación seleccionada;
 - ranking exhaustivo CrossText2Loc con pesos congelados;
 - API FastAPI con una instancia residente y un worker;
 - frontend estático Nginx con mapa Leaflet y bbox del piloto;
@@ -38,8 +45,10 @@ instancia de `CrossText2LocRetriever` durante el lifespan.
 - proxy `/api` del mismo origen y healthchecks;
 - acceso local/LAN y browser-check ARM64 reproducible.
 
-No forman parte del MVP: F5, LLM, preselección OSM, GOTPR, fotografías,
-Street View, VLM, diálogo, HNSW, fine-tuning o refinamiento TOLoc.
+No forman parte del MVP: preselección OSM, GOTPR, fotografías, Street View, VLM,
+diálogo, HNSW, fine-tuning o refinamiento TOLoc. Qwen se limita a la
+transformación F5 `en_cartographic`; no extrae coordenadas ni ejecuta variantes
+adicionales.
 
 ## API FastAPI
 
@@ -52,10 +61,11 @@ GET  /api/v1/capabilities
 POST /api/v1/retrievals
 ```
 
-El POST consume y devuelve los contratos F4.6. Las similitudes son coseno, no
-probabilidades. El lifespan carga una sola instancia del modelo y ambas
-galerías. Un lock rechaza una segunda inferencia simultánea con `RUNTIME_BUSY`;
-readiness no recarga ni repara el runtime.
+El POST usa `atlas-experimental-retrieval-request-v2`: `gallery_id` admite solo
+`madrid-25m`/`madrid-50m`, `processing_mode` solo `no_llm`/`with_llm` y
+`top_k=10`. La respuesta v2 conserva el texto original y declara texto efectivo,
+modo, variante, identidad Qwen y tiempos. Las similitudes son coseno, no
+probabilidades. Un lock cubre transformación y retrieval completos.
 
 | Caso | HTTP | Código |
 |---|---:|---|
@@ -63,6 +73,8 @@ readiness no recarga ni repara el runtime.
 | Input de retrieval inválido | 422 | `INVALID_RETRIEVAL_INPUT` |
 | Galería desconocida | 404 | `GALLERY_NOT_FOUND` |
 | Runtime no listo u ocupado | 503 | `RUNTIME_NOT_READY` / `RUNTIME_BUSY` |
+| Qwen no cargado | 503 | `LLM_NOT_READY` |
+| Transformación fallida/rechazada | 503 | `TRANSFORMATION_FAILED` / `TRANSFORMATION_REJECTED` |
 | Inferencia fallida | 503 | `INFERENCE_FAILED` |
 | Error inesperado | 500 | `INTERNAL_ERROR` |
 
@@ -97,10 +109,11 @@ desarrollo. La aplicación desplegada no usa Vite dev server ni datos ficticios.
 
 - Host Linux ARM64 con Docker, Docker Compose y NVIDIA Container Toolkit.
 - GPU NVIDIA compatible con la imagen API. El entorno validado es una GB10.
-- Imagen local `crosstext2loc-gb10:ngc26.02`.
+- Imagen local unificada `crosstext2loc-gb10:f511`.
 - Clon de CVG-Text en `external/CVG-Text` mediante el procedimiento del proyecto.
 - Checkpoint CrossText2Loc y pesos CLIP fuera de Git.
 - Catálogos, imágenes visuales y embeddings canónicos de 25 m y 50 m.
+- Snapshot local Qwen3-8B en la revisión congelada.
 
 La imagen API se reutiliza; el arranque no descarga datos, no renderiza OSM y no
 recalcula embeddings.
@@ -145,6 +158,7 @@ arrancar. No deben añadirse a Git ni copiarse dentro de una imagen Docker:
 | Bundle visual 25 m | `data/processed/visual/f4-madrid-visual-sha256-ebe6c91b8ed5600d65c3021a53c768d6e65545777efda92d7b171f705a0d42e9/` |
 | Bundle embeddings 50 m | `data/embeddings/f4-madrid-embeddings-sha256-199dae0e3eb38b206004557f20fae0ef98f620621458fc64c2dfa3f7ef7f84c1/` |
 | Bundle embeddings 25 m | `data/embeddings/f4-madrid-embeddings-sha256-2874609b95005b65823ce6efb5b7888b9d1500b7ec2f6ba301dfc3083cb56c2a/` |
+| Snapshot Qwen3-8B | Ruta host indicada por `MVP_QWEN_MODEL_DIR` |
 
 El clon externo puede prepararse, después de revisar sus condiciones, con:
 
@@ -167,10 +181,10 @@ d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d
 ### Imagen Docker obligatoria
 
 La imagen API no es un archivo del repositorio. Debe existir localmente con el
-nombre `crosstext2loc-gb10:ngc26.02`. Comprobarla con:
+nombre `crosstext2loc-gb10:f511`. Comprobarla con:
 
 ```bash
-docker image inspect crosstext2loc-gb10:ngc26.02 \
+docker image inspect crosstext2loc-gb10:f511 \
   --format '{{.Id}} {{.Architecture}} {{.Os}}'
 ```
 
@@ -179,7 +193,7 @@ Si no existe, construirla para la arquitectura del host:
 ```bash
 docker build \
   -f docker/crosstext2loc-gb10/Dockerfile \
-  -t crosstext2loc-gb10:ngc26.02 \
+  -t crosstext2loc-gb10:f511 \
   docker/crosstext2loc-gb10
 ```
 
@@ -230,8 +244,9 @@ de Git. Los valores principales son:
 | `MVP_HTTP_PORT` | `8080` | Puerto HTTP del frontend |
 | `MVP_API_CONTAINER_NAME` | `atlas-mvp-api` | Nombre del contenedor FastAPI |
 | `MVP_FRONTEND_CONTAINER_NAME` | `atlas-mvp-frontend` | Nombre del contenedor Nginx |
-| `MVP_API_IMAGE` | `crosstext2loc-gb10:ngc26.02` | Imagen API ARM64/GPU |
+| `MVP_API_IMAGE` | `crosstext2loc-gb10:f511` | Imagen API unificada ARM64/GPU |
 | `MVP_CLIP_CACHE_DIR` | `$HOME/.cache/clip` | Directorio host de pesos CLIP |
+| `MVP_QWEN_MODEL_DIR` | `$HOME/models/hf/Qwen3-8B-b968826d9c46` | Snapshot local Qwen montado read-only |
 | `VITE_TILE_URL` | endpoint público OSM | Plantilla Leaflet compilada |
 | `VITE_TILE_ATTRIBUTION` | atribución OSM | Atribución visible del mapa |
 
@@ -264,7 +279,8 @@ test -f checkpoints/CrossText2Loc/long_model_NewYork-mixed_1e-05_128_osm_epoch30
 test -f data/processed/catalog/manifest-25m.json
 test -f data/processed/catalog/manifest-50m.json
 test -f "${MVP_CLIP_CACHE_DIR:-$HOME/.cache/clip}/ViT-L-14-336px.pt"
-docker image inspect crosstext2loc-gb10:ngc26.02 >/dev/null
+test -f "${MVP_QWEN_MODEL_DIR:-$HOME/models/hf/Qwen3-8B-b968826d9c46}/config.json"
+docker image inspect crosstext2loc-gb10:f511 >/dev/null
 ```
 
 No hace falta comprobar manualmente cada fichero interno de los bundles: el
@@ -320,7 +336,8 @@ MVP_HTTP_PORT=18080 scripts/run_mvp3_stack.sh -d
 ## Healthchecks
 
 - API: `GET /api/v1/health/ready` desde la red Compose. Solo devuelve 200 cuando
-  el modelo y ambas galerías están cargados.
+  CrossText2Loc y ambas galerías están cargados. Declara por separado si Con LLM
+  está disponible; el despliegue Compose F5.11 exige Qwen en startup.
 - Frontend: `GET /healthz` sobre Nginx.
 - Liveness API: `GET /api/v1/health/live`, accesible mediante el proxy.
 
@@ -404,7 +421,7 @@ El script:
 1. construye y arranca el stack;
 2. espera los dos healthchecks;
 3. comprueba un único proceso Uvicorn con `--workers 1`;
-4. ejecuta Top-5 real en 50 m y Top-3 real en 25 m por Nginx;
+4. ejecuta las cuatro combinaciones Top-10 por Nginx;
 5. comprueba coordenadas y repetibilidad exacta;
 6. valida errores 422 y 404;
 7. ejecuta Chromium ARM64 con API simulada;
@@ -468,7 +485,7 @@ ground truth y no permite comparar la precisión de inglés y español.
 | Cobertura de búsqueda | Galería 50 m | 253 candidatos | Catálogo completo disponible para el MVP |
 | Cobertura de búsqueda | Galería 25 m | 1.115 candidatos | Catálogo completo disponible para el MVP |
 | Determinismo técnico | Repetición de una consulta de smoke | IDs, orden, scores y coordenadas idénticos | Confirma reproducibilidad de esa consulta, no precisión |
-| Integración | Casos reales del smoke | Top-5 de 50 m y Top-3 de 25 m completados | Confirma navegador/proxy/API/GPU/mapa |
+| Integración F5.11 | Cuatro combinaciones reales | Top-10 25/50 m con y sin Qwen completados | Confirma navegador/proxy/API/Qwen/CrossText2Loc/mapa |
 | Robustez bilingüe | Top-1 igual inglés-español | 0/6 comparaciones | Sensibilidad lingüística alta en las sondas controladas |
 | Robustez bilingüe | Candidatos compartidos Top-10 | Media 0,5 de 10 | Solapamiento muy bajo entre traducciones |
 | Robustez bilingüe | Jaccard@10 medio | 0,027 | Estabilidad de conjunto baja; no es accuracy |
@@ -568,6 +585,23 @@ reproducibilidad, no un umbral de Recall.
 
 ## Validación realizada en la PGX
 
+### Validación F5.11
+
+La imagen unificada `crosstext2loc-gb10:f511` se construyó y ejecutó realmente.
+Un smoke en un solo proceso cargó CrossText2Loc y Qwen3-8B, transformó texto y
+recuperó Top-10. Mediciones CUDA observadas:
+
+| Etapa | Asignada | Reservada | Pico asignado |
+|---|---:|---:|---:|
+| CrossText2Loc cargado | 1.712.462.336 B | 1.772.093.440 B | — |
+| Ambos cargados | 18.093.952.512 B | 18.161.336.320 B | 18.093.952.512 B |
+| Transformación + Top-10 | 18.107.846.144 B | 18.190.696.448 B | 18.141.917.696 B |
+
+El smoke integrado posterior recorrió las cuatro combinaciones mediante
+Chromium → Nginx → FastAPI → Qwen opcional → CrossText2Loc → Leaflet y terminó
+`PASS`. Esto valida la coexistencia en la GB10 observada; otra GPU, driver o carga
+concurrente requiere repetir la prueba.
+
 El 19 de octubre de 2026 se ejecutaron en la PGX ARM64/GB10:
 
 - 294 tests Python con `unittest discover`: PASS;
@@ -577,8 +611,8 @@ El 19 de octubre de 2026 se ejecutaron en la PGX ARM64/GB10:
 - validación de `compose.mvp.yaml`: PASS;
 - browser-check con API simulada en Chromium 155 ARM64: PASS;
 - browser-check real Nginx → FastAPI → CrossText2Loc GPU: PASS;
-- Top-5 de la galería 50 m: cinco candidatos y marcadores válidos;
-- Top-3 de la galería 25 m: tres candidatos y marcadores válidos;
+- Top-10 de ambas galerías en modo Sin LLM: candidatos y marcadores válidos;
+- Top-10 de ambas galerías en modo Con LLM: una transformación Qwen y un ranking válidos;
 - repetición idéntica en IDs, orden, scores y coordenadas: PASS;
 - errores 422, 404, `RUNTIME_BUSY`, cancelación y guard de respuesta obsoleta:
   PASS entre smoke HTTP, browser-check y tests Node;
@@ -603,6 +637,9 @@ de geolocalización en Madrid.
 - La similitud y su escala porcentual no son probabilidades calibradas.
 - Las coordenadas son centros de candidatos, no una posición continua nueva.
 - El servicio es local/experimental y no está endurecido para Internet.
+- D076 continúa pendiente: `en_cartographic` no es superioridad aprobada.
+- La imagen unificada y la coexistencia GPU Qwen/CrossText2Loc deben validarse
+  con el smoke F5.11 antes de declarar operativo Con LLM en la PGX.
 
 ## Diagnóstico
 

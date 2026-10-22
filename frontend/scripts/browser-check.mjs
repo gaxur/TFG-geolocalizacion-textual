@@ -18,15 +18,16 @@ const apiRequests = [];
 
 function fakeRetrieval(body) {
   return {
-    schema_version: '1.0', contract_version: 'crosstext2loc-retrieval-response-v1', query: body.query,
+    schema_version: '1.0', contract_version: 'atlas-experimental-retrieval-response-v2', query: body.query,
+    processing: { mode: body.processing_mode, variant: body.processing_mode === 'with_llm' ? 'en_cartographic' : 'es_original', effective_query: { ...body.query, text: body.processing_mode === 'with_llm' ? 'In a mapped square near a station.' : body.query.text, language: body.processing_mode === 'with_llm' ? 'en' : body.query.language }, transformer: body.processing_mode === 'with_llm' ? { model_id: 'Qwen/Qwen3-8B', revision: 'b968826d9c46dd6066d109eabc6255188de91218', prompt_version: 'f53b-text-transform-v2' } : null },
     model: { name: 'CLIP-L/14@336', checkpoint_sha256: 'd'.repeat(64) },
-    retrievals: body.gallery_ids.map((galleryId, galleryIndex) => ({
+    retrievals: [body.gallery_id].map((galleryId, galleryIndex) => ({
       gallery_id: galleryId, visual_dataset_id: `visual-${galleryId}`, embedding_dataset_id: `embedding-${galleryId}`,
       gallery_count: galleryId === 'madrid-25m' ? 1115 : 253, requested_k: body.top_k, effective_k: body.top_k,
       ranking_method: 'exhaustive_cosine', tie_break: 'candidate_id_ascending',
       results: Array.from({ length: body.top_k }, (_, index) => ({ rank: index + 1, candidate_id: `${galleryId}-candidate-${index + 1}`, latitude: 40.414 + (index + galleryIndex) * .0003, longitude: -3.705 + index * .0002, cosine_similarity: .31 - index * .01 })),
     })),
-    timings_ms: { text_encoding: 10, ranking_by_gallery: Object.fromEntries(body.gallery_ids.map(id => [id, 1])), total: 12 },
+    timings_ms: { transformation: body.processing_mode === 'with_llm' ? 3500 : 0, text_encoding: 10, ranking_by_gallery: { [body.gallery_id]: 1 }, total: body.processing_mode === 'with_llm' ? 3512 : 12 },
   };
 }
 
@@ -34,7 +35,7 @@ const server = http.createServer((request, response) => {
   const url = new URL(request.url, 'http://localhost');
   if (url.pathname === '/api/v1/capabilities') {
     response.writeHead(200, { 'Content-Type': 'application/json' });
-    response.end(JSON.stringify({ schema_version: '1.0', api_version: 'v1', retrievers: [{ id: 'crosstext2loc', available: true, scores_are_probabilities: false }], galleries: [{ gallery_id: 'madrid-50m', candidate_count: 253 }, { gallery_id: 'madrid-25m', candidate_count: 1115 }], search_area: { region_id: 'madrid_pilot', crs: 'EPSG:4326', bbox: { north: 40.42, south: 40.412, east: -3.699, west: -3.709 } }, supported_languages: { policy_status: 'pending', accepted_codes: ['es', 'en'] } }));
+    response.end(JSON.stringify({ schema_version: '1.0', api_version: 'v2-experimental', retrievers: [{ id: 'crosstext2loc', available: true, scores_are_probabilities: false }], processing_modes:[{id:'no_llm',available:true,variant:'es_original'},{id:'with_llm',available:true,variant:'en_cartographic',experimental:true}], galleries: [{ gallery_id: 'madrid-50m', candidate_count: 253 }, { gallery_id: 'madrid-25m', candidate_count: 1115 }], search_area: { region_id: 'madrid_pilot', crs: 'EPSG:4326', bbox: { north: 40.42, south: 40.412, east: -3.699, west: -3.709 } }, supported_languages: { policy_status: 'experimental', accepted_codes: ['es'] } }));
     return;
   }
   if (url.pathname === '/api/v1/retrievals' && request.method === 'POST') {
@@ -86,12 +87,12 @@ try {
   assert.equal(await evaluate(`document.querySelectorAll('.result-card').length`), 0);
   await fill('Una plaza amplia rodeada de edificios y calles estrechas');
   await click('.search-button');
-  await waitFor(`document.querySelectorAll('.result-card').length === 5`);
+  await waitFor(`document.querySelectorAll('.result-card').length === 10`);
   assert.match(await evaluate(`document.querySelector('.result-card h3').textContent`), /madrid-50m-candidate-1/);
   assert.match(await evaluate(`document.querySelector('.results-footnote').textContent`), /no (?:representa|es) una probabilidad/);
   assert.equal(await evaluate(`document.querySelectorAll('.leaflet-container').length`), 1);
-  assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker').length`), 5);
-  assert.equal(await evaluate(`document.querySelectorAll('.candidate-cell').length`), 5);
+  assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker').length`), 10);
+  assert.equal(await evaluate(`document.querySelectorAll('.candidate-cell').length`), 10);
   assert.match(await evaluate(`document.querySelector('.cell-legend').textContent`), /50 × 50 m/);
   assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker.top-result').length`), 1);
   await click('[data-select="madrid-50m:madrid-50m-candidate-2"]');
@@ -101,16 +102,15 @@ try {
   await click('.candidate-marker-shell:nth-of-type(3) .candidate-marker');
   assert.equal(await evaluate(`document.querySelector('[data-select="madrid-50m:madrid-50m-candidate-3"]').getAttribute('aria-pressed')`), 'true');
   assert.equal(apiRequests.length, 1);
-  assert.equal(apiRequests[0].contract_version, 'crosstext2loc-retrieval-request-v1');
-  assert.deepEqual(apiRequests[0].gallery_ids, ['madrid-50m']);
+  assert.equal(apiRequests[0].contract_version, 'atlas-experimental-retrieval-request-v2');
+  assert.equal(apiRequests[0].gallery_id, 'madrid-50m'); assert.equal(apiRequests[0].processing_mode,'no_llm');
   assert.ok(!Object.hasOwn(apiRequests[0], 'ground_truth'));
   await click('[data-dropdown="gallery"]');
   await waitFor(`!!document.querySelector('[data-select-id="gallery"][data-select-value="madrid-25m"]')`);
   await click('[data-select-id="gallery"][data-select-value="madrid-25m"]');
-  await click('[data-dropdown="top-k"]');
-  await click('[data-select-id="top-k"][data-select-value="3"]');
   assert.match(await evaluate(`document.querySelector('#gallery-value').textContent`), /25 m/);
-  assert.match(await evaluate(`document.querySelector('#top-k-value').textContent`), /Top-3/);
+  await click('[data-dropdown="processing"]'); await click('[data-select-id="processing"][data-select-value="with_llm"]');
+  assert.match(await evaluate(`document.querySelector('#processing-value').textContent`), /Con LLM/);
   assert.match(await evaluate(`document.querySelector('.cell-legend').textContent`), /25 × 25 m/);
   await fill('trigger-busy');
   await click('.search-button');

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "atlas_experimental_retrieval_response.schema.json",
+  "title": "Atlas experimental retrieval response v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "query", "processing", "model", "retrievals", "timings_ms"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "atlas-experimental-retrieval-response-v2"},
+    "query": {"type": "object"},
+    "processing": {"type": "object", "additionalProperties": false, "required": ["mode", "variant", "effective_query", "transformer"], "properties": {"mode": {"enum": ["no_llm", "with_llm"]}, "variant": {"enum": ["es_original", "en_cartographic"]}, "effective_query": {"type": "object"}, "transformer": {"type": ["object", "null"]}}},
+    "model": {"type": "object"},
+    "retrievals": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"type": "object"}},
+    "timings_ms": {"type": "object", "additionalProperties": false, "required": ["transformation", "text_encoding", "ranking_by_gallery", "total"], "properties": {"transformation": {"type": "number", "minimum": 0}, "text_encoding": {"type": "number", "minimum": 0}, "ranking_by_gallery": {"type": "object"}, "total": {"type": "number", "minimum": 0}}}
+  }
+}

@@ -41,16 +41,16 @@ def main() -> int:
     live = call(args.base_url, "GET", "/api/v1/health/live")
     ready = call(args.base_url, "GET", "/api/v1/health/ready")
     capabilities = call(args.base_url, "GET", "/api/v1/capabilities")
-    payload = {"schema_version": "1.0", "contract_version": "crosstext2loc-retrieval-request-v1", "query": {"query_id": "madrid-f42-final-en-001", "text": "A large urban square surrounded by buildings and narrow streets", "language": "en"}, "gallery_ids": ["madrid-25m", "madrid-50m"], "top_k": 10}
+    payload = {"schema_version": "1.0", "contract_version": "atlas-experimental-retrieval-request-v2", "query": {"query_id": "madrid-f42-final-es-001", "text": "Una gran plaza urbana rodeada de edificios y calles estrechas", "language": "es"}, "gallery_id": "madrid-25m", "processing_mode": "no_llm", "top_k": 10}
     started = time.perf_counter()
     first = call(args.base_url, "POST", "/api/v1/retrievals", payload)
     first_ms = (time.perf_counter() - started) * 1000
     repeated = call(args.base_url, "POST", "/api/v1/retrievals", payload)
-    single_25 = call(args.base_url, "POST", "/api/v1/retrievals", dict(payload, gallery_ids=["madrid-25m"]))
-    single_50 = call(args.base_url, "POST", "/api/v1/retrievals", dict(payload, gallery_ids=["madrid-50m"]))
+    single_25 = call(args.base_url, "POST", "/api/v1/retrievals", dict(payload, gallery_id="madrid-25m"))
+    single_50 = call(args.base_url, "POST", "/api/v1/retrievals", dict(payload, gallery_id="madrid-50m"))
     invalid = call(args.base_url, "POST", "/api/v1/retrievals", dict(payload, top_k=0))
-    missing = call(args.base_url, "POST", "/api/v1/retrievals", dict(payload, gallery_ids=["missing"]))
-    if any(response[0] != 200 for response in (live, ready, capabilities, first, repeated, single_25, single_50)) or invalid[0] != 422 or missing[0] != 404:
+    missing = call(args.base_url, "POST", "/api/v1/retrievals", dict(payload, gallery_id="missing"))
+    if any(response[0] != 200 for response in (live, ready, capabilities, first, repeated, single_25, single_50)) or invalid[0] != 422 or missing[0] != 422:
         raise RuntimeError("códigos HTTP inesperados")
     first_rows = {item["gallery_id"]: stable_rows(item) for item in first[2]["retrievals"]}
     repeated_rows = {item["gallery_id"]: stable_rows(item) for item in repeated[2]["retrievals"]}

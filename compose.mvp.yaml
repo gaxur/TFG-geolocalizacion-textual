@@ -3,7 +3,7 @@ name: atlas-mvp
 services:
   api:
     container_name: ${MVP_API_CONTAINER_NAME:-atlas-mvp-api}
-    image: ${MVP_API_IMAGE:-crosstext2loc-gb10:ngc26.02}
+    image: ${MVP_API_IMAGE:-crosstext2loc-gb10:f511}
     gpus: all
     init: true
     read_only: true
@@ -18,11 +18,16 @@ services:
       CLIP_WEIGHTS_PATH: /root/.cache/clip/ViT-L-14-336px.pt
       ATLAS_API_HOST: 0.0.0.0
       ATLAS_API_PORT: "8000"
+      ATLAS_QWEN_MODEL_PATH: /models/Qwen3-8B
+      ATLAS_QWEN_MODEL_ID: Qwen/Qwen3-8B
+      ATLAS_QWEN_MODEL_REVISION: b968826d9c46dd6066d109eabc6255188de91218
+      ATLAS_QWEN_REQUIRED: "true"
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=1g
     volumes:
       - .:/workspace/project:ro
       - ${MVP_CLIP_CACHE_DIR:-${HOME}/.cache/clip}:/root/.cache/clip:ro
+      - ${MVP_QWEN_MODEL_DIR:-${HOME}/models/hf/Qwen3-8B-b968826d9c46}:/models/Qwen3-8B:ro
     working_dir: /workspace/project
     command:
       - /bin/bash
@@ -37,8 +42,8 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3).read()"]
       interval: 5s
       timeout: 4s
-      retries: 24
-      start_period: 10s
+      retries: 36
+      start_period: 120s
     networks:
       - internal
 

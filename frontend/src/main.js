@@ -1,7 +1,7 @@
 import './minimal.css';
 import { icon } from './visuals.js';
 import { AtlasApiError, apiBaseUrl, getCapabilities, retrieve } from './api.js';
-import { adaptRetrievalResponse, buildRetrievalRequest, createQueryId, createRequestGuard, galleryLabel } from './retrieval.js';
+import { adaptRetrievalResponse, buildRetrievalRequest, createQueryId, createRequestGuard, galleryLabel, processingLabel } from './retrieval.js';
 import { createResultsMap } from './map.js';
 
 const $ = selector => document.querySelector(selector);
@@ -13,8 +13,8 @@ const examples = [
   { label: 'Parque y estanque', text: 'Estoy en un parque y delante de mí hay un estanque. Al otro lado veo un monumento grande rodeado de columnas.' },
 ];
 const state = {
-  page: 'explore', mobileView: 'description', text: examples[0].text, language: 'es', topK: 5,
-  galleryIds: ['madrid-50m'], capabilities: { status: 'loading', data: null, error: null },
+  page: 'explore', mobileView: 'description', text: examples[0].text, language: 'es', topK: 10,
+  galleryIds: ['madrid-50m'], processingMode: 'no_llm', capabilities: { status: 'loading', data: null, error: null },
   request: { status: 'idle', error: null, requestId: null, response: null },
   results: [], selected: '', hasRun: false, last: null, mapView: null, openSelect: '',
 };
@@ -29,7 +29,7 @@ try {
   history = Array.isArray(stored) ? stored.filter(item =>
     item?.mode === 'real' && typeof item.text === 'string' && item.text.length <= 1200 &&
     typeof item.date === 'string' && Array.isArray(item.galleryIds) && item.galleryIds.length > 0 &&
-    item.galleryIds.every(id => typeof id === 'string') && [3, 5, 10].includes(item.topK)
+    item.galleryIds.every(id => typeof id === 'string') && item.topK === 10 && ['no_llm', 'with_llm'].includes(item.processingMode)
   ).slice(0, 12) : [];
 } catch { /* La aplicación también funciona sin almacenamiento local. */ }
 
@@ -116,6 +116,8 @@ async function loadCapabilities() {
     const available = new Set(data.galleries.map(item => item.gallery_id));
     state.galleryIds = state.galleryIds.filter(id => available.has(id));
     if (!state.galleryIds.length) state.galleryIds = [available.has('madrid-50m') ? 'madrid-50m' : data.galleries[0].gallery_id];
+    const availableModes = new Set(data.processing_modes.filter(item => item.available).map(item => item.id));
+    if (!availableModes.has(state.processingMode)) state.processingMode = 'no_llm';
   } catch (error) {
     if (!requestGuard.isCurrent(epoch)) return;
     state.capabilities = { status: 'error', data: null, error: normalizeUiError(error) };
@@ -126,7 +128,7 @@ async function loadCapabilities() {
 function normalizeUiError(error) {
   if (error?.name === 'AbortError') return { code: 'CANCELLED', message: 'La espera se ha cancelado. La inferencia iniciada puede continuar en el servidor.', requestId: '' };
   if (error instanceof AtlasApiError) {
-    const messages = { RUNTIME_BUSY: 'El recuperador está ocupado. Espera un momento antes de reintentar.', RUNTIME_NOT_READY: 'El servicio todavía no está preparado.', INFERENCE_FAILED: 'CrossText2Loc no pudo completar la consulta.', TIMEOUT: 'La consulta tardó más de lo esperado.' };
+    const messages = { RUNTIME_BUSY: 'El recuperador está ocupado. Espera un momento antes de reintentar.', RUNTIME_NOT_READY: 'El servicio todavía no está preparado.', LLM_NOT_READY: 'El modo Con LLM no está disponible en este arranque.', TRANSFORMATION_FAILED: 'Qwen no pudo transformar la descripción.', TRANSFORMATION_REJECTED: 'La transformación no superó los controles automáticos.', INFERENCE_FAILED: 'CrossText2Loc no pudo completar la consulta.', TIMEOUT: 'La consulta tardó más de lo esperado.' };
     return { code: error.code, message: messages[error.code] || error.message, requestId: error.requestId };
   }
   return { code: 'INVALID_API_RESPONSE', message: error?.message || 'La respuesta del servicio no es válida.', requestId: '' };
@@ -144,15 +146,15 @@ async function runSearch() {
   state.results = []; state.selected = ''; state.hasRun = false; state.mapView = null;
   render();
   try {
-    const request = buildRetrievalRequest({ text, language: state.language, galleryIds: state.galleryIds, topK: state.topK, queryId });
-    const raw = await retrieve(request, { baseUrl: apiBaseUrl, signal: controller.signal, timeoutMs: 30000 });
+    const request = buildRetrievalRequest({ text, language: state.language, galleryId: state.galleryIds[0], processingMode: state.processingMode, topK: 10, queryId });
+    const raw = await retrieve(request, { baseUrl: apiBaseUrl, signal: controller.signal, timeoutMs: state.processingMode === 'with_llm' ? 90000 : 30000 });
     if (!requestGuard.isCurrent(epoch)) return;
     const response = adaptRetrievalResponse(raw, request);
     state.request = { status: 'success', error: null, requestId: queryId, response };
     state.results = response.retrievals;
     state.selected = response.retrievals[0]?.results[0]?.key || '';
     state.hasRun = true; state.mobileView = 'results'; state.mapView = null;
-    state.last = { mode: 'real', text, language: state.language, galleryIds: [...state.galleryIds], topK: state.topK, date: new Date().toISOString() };
+    state.last = { mode: 'real', text, language: state.language, galleryIds: [...state.galleryIds], processingMode: state.processingMode, topK: 10, date: new Date().toISOString() };
     history.unshift({ ...state.last }); history = history.slice(0, 12); persist();
   } catch (error) {
     if (!requestGuard.isCurrent(epoch)) return;
@@ -176,18 +178,19 @@ function explorePage() {
   const status = state.capabilities.status === 'loading' ? '<div class="service-state">Comprobando disponibilidad del servicio...</div>' : state.capabilities.status === 'error' ? `<div class="service-state error"><strong>Backend no disponible</strong><span>${escapeHtml(state.capabilities.error.message)}</span><button type="button" class="secondary" data-action="retry-capabilities">Reintentar conexión</button></div>` : '';
   const requestError = state.request.error ? `<div class="service-state ${state.request.status === 'cancelled' ? '' : 'error'}" role="alert"><strong>${state.request.status === 'cancelled' ? 'Petición cancelada' : 'No se pudo completar la búsqueda'}</strong><span>${escapeHtml(state.request.error.message)}</span>${state.request.error.requestId ? `<small>Referencia: ${escapeHtml(state.request.error.requestId)}</small>` : ''}</div>` : '';
   const galleryOptions = galleries.map(gallery => ({ value: gallery.gallery_id, label: `${galleryLabel(gallery.gallery_id)} · ${gallery.candidate_count} candidatos` }));
-  const topKOptions = [3, 5, 10].map(value => ({ value: String(value), label: `Top-${value}` }));
+  const modes = state.capabilities.data?.processing_modes || [];
+  const modeOptions = modes.filter(mode => mode.available).map(mode => ({ value: mode.id, label: mode.id === 'with_llm' ? 'Con LLM · en_cartographic (experimental)' : 'Sin LLM · texto original' }));
   const selectedCellSize = /-(25|50)m$/.exec(state.galleryIds[0])?.[1] || '';
   return `<section class="page-heading"><div><div class="eyebrow">RECUPERACIÓN CROSSTEXT2LOC</div><h1>Encuentra el lugar que describes.</h1><p>Explora ubicaciones compatibles dentro de la región piloto de Madrid.</p></div><div class="location-pill">${icon('pin', 16)} Madrid, España</div></section>
   <div class="mobile-view-switch" role="group" aria-label="Vista de exploración"><button data-mobile="description" aria-pressed="${state.mobileView === 'description'}">${icon('chat', 16)} Descripción</button><button data-mobile="results" aria-pressed="${state.mobileView === 'results'}">${icon('pin', 16)} Mapa y resultados</button></div>
-  <div class="workspace" data-mobile-view="${state.mobileView}"><section class="search-panel panel"><div class="panel-heading"><span class="panel-kicker">01 · CONSULTA</span><h2>¿Qué ves a tu alrededor?</h2><p>Incluye edificios, espacios abiertos y detalles distintivos.</p></div>${status}<form id="search-form"><label for="description" class="field-label">Descripción del entorno</label><div class="textarea-wrap"><textarea id="description" maxlength="1200" rows="4" placeholder="Veo una plaza amplia rodeada de edificios..." ${loading ? 'disabled' : ''}>${escapeHtml(state.text)}</textarea><div class="textarea-footer"><span>Idioma: español</span><span id="char-count">${state.text.length} / 1.200</span></div></div><div class="example-label">Consultas de referencia</div><div class="example-chips">${examples.map((example, index) => `<button type="button" class="example-chip" data-example="${index}" ${loading ? 'disabled' : ''}>${escapeHtml(example.label)}</button>`).join('')}</div>${selectControl({ id: 'gallery', label: 'Resolución de la galería', iconName: 'layers', disabled: !ready || loading, value: state.galleryIds[0], options: galleryOptions })}${selectControl({ id: 'top-k', label: 'Número de candidatos', iconName: 'target', disabled: !ready || loading, value: String(state.topK), options: topKOptions })}<p class="form-error" id="form-error" role="alert"></p><button class="primary search-button" type="submit" ${!ready || loading ? 'disabled' : ''}>${loading ? '<span class="spinner"></span> Analizando descripción...' : icon('search', 18) + ' Buscar candidatos ' + icon('arrow', 18)}</button></form>${loading ? '<button class="cancel-button" data-action="cancel">Cancelar espera</button>' : ''}<div class="privacy-note">${icon('info', 15)}<span>La descripción se envía al servicio interno. No introduzcas datos sensibles.</span></div>${requestError}</section>
-  <section class="exploration"><div class="map-panel panel"><div class="map-top"><div class="map-title"><span class="panel-kicker">02 · MAPA</span><strong>Candidatos recuperados</strong></div><div class="map-legend"><span class="evaluation-legend"><i></i>Área evaluada</span>${selectedCellSize ? `<span class="cell-legend"><i></i>Celda ${selectedCellSize} × ${selectedCellSize} m</span>` : ''}<span class="map-meta">WGS84</span></div></div><div id="results-map" class="real-map" aria-label="Mapa geográfico de candidatos y área aproximada de sus celdas"></div></div>${loading ? '<div class="pipeline-strip" aria-live="polite"><span class="pipeline-label"><span class="spinner small-spinner"></span> Recuperación CrossText2Loc en curso</span></div>' : ''}<div class="results-heading"><div><span class="panel-kicker">03 · RANKING</span><h2>${count ? 'Resultados de la consulta' : 'Aún no hay resultados'}</h2></div><span class="result-count">${count} candidatos</span></div>${state.results.length ? state.results.map(galleryResults).join('') : `<div class="empty-state compact">${icon('search', 26)}<h3>${state.hasRun ? 'La respuesta no contiene candidatos' : 'Describe tu entorno para comenzar'}</h3><p>Los candidatos aparecerán aquí y se sincronizarán con el mapa.</p></div>`}<div class="results-footnote">${icon('info', 13)} Cada rectángulo representa el área aproximada de la celda candidata; su centro no confirma la posición exacta del observador. La similitud coseno no es una probabilidad.</div></section></div>`;
+  <div class="workspace" data-mobile-view="${state.mobileView}"><section class="search-panel panel"><div class="panel-heading"><span class="panel-kicker">01 · CONSULTA</span><h2>¿Qué ves a tu alrededor?</h2><p>Incluye edificios, espacios abiertos y detalles distintivos.</p></div>${status}<form id="search-form"><label for="description" class="field-label">Descripción del entorno</label><div class="textarea-wrap"><textarea id="description" maxlength="1200" rows="4" placeholder="Veo una plaza amplia rodeada de edificios..." ${loading ? 'disabled' : ''}>${escapeHtml(state.text)}</textarea><div class="textarea-footer"><span>Idioma: español</span><span id="char-count">${state.text.length} / 1.200</span></div></div><div class="example-label">Consultas de referencia</div><div class="example-chips">${examples.map((example, index) => `<button type="button" class="example-chip" data-example="${index}" ${loading ? 'disabled' : ''}>${escapeHtml(example.label)}</button>`).join('')}</div>${selectControl({ id: 'gallery', label: 'Galería', iconName: 'layers', disabled: !ready || loading, value: state.galleryIds[0], options: galleryOptions })}${selectControl({ id: 'processing', label: 'Procesamiento', iconName: 'chat', disabled: !ready || loading, value: state.processingMode, options: modeOptions })}<div class="unknown-note">${state.processingMode === 'with_llm' ? 'Con LLM transforma una sola vez con Qwen en_cartographic. Puede tardar más y no es una variante científicamente superior.' : 'Sin LLM envía el texto español directamente a CrossText2Loc.'}</div><p class="form-error" id="form-error" role="alert"></p><button class="primary search-button" type="submit" ${!ready || loading ? 'disabled' : ''}>${loading ? '<span class="spinner"></span> ' + (state.processingMode === 'with_llm' ? 'Transformando y recuperando...' : 'Recuperando candidatos...') : icon('search', 18) + ' Buscar Top-10 ' + icon('arrow', 18)}</button></form>${loading ? '<button class="cancel-button" data-action="cancel">Cancelar espera</button>' : ''}<div class="privacy-note">${icon('info', 15)}<span>La descripción se envía al servicio interno. No introduzcas datos sensibles.</span></div>${requestError}</section>
+  <section class="exploration"><div class="map-panel panel"><div class="map-top"><div class="map-title"><span class="panel-kicker">02 · MAPA</span><strong>Candidatos recuperados</strong></div><div class="map-legend"><span class="evaluation-legend"><i></i>Área evaluada</span>${selectedCellSize ? `<span class="cell-legend"><i></i>Celda ${selectedCellSize} × ${selectedCellSize} m</span>` : ''}<span class="map-meta">WGS84</span></div></div><div id="results-map" class="real-map" aria-label="Mapa geográfico de candidatos y área aproximada de sus celdas"></div></div>${loading ? `<div class="pipeline-strip" aria-live="polite"><span class="pipeline-label"><span class="spinner small-spinner"></span> ${state.processingMode === 'with_llm' ? 'Qwen + CrossText2Loc en curso' : 'CrossText2Loc en curso'}</span></div>` : ''}<div class="results-heading"><div><span class="panel-kicker">03 · RANKING</span><h2>${count ? 'Resultados de la consulta' : 'Aún no hay resultados'}</h2></div><span class="result-count">${count} candidatos</span></div>${state.results.length ? state.results.map(galleryResults).join('') : `<div class="empty-state compact">${icon('search', 26)}<h3>${state.hasRun ? 'La respuesta no contiene candidatos' : 'Describe tu entorno para comenzar'}</h3><p>Los candidatos aparecerán aquí y se sincronizarán con el mapa.</p></div>`}<div class="results-footnote">${icon('info', 13)} Cada rectángulo representa el área aproximada de la celda candidata; su centro no confirma la posición exacta del observador. La similitud coseno no es una probabilidad.</div></section></div>`;
 }
 
 function selectValue(id, value) {
   state.openSelect = '';
   if (id === 'gallery') state.galleryIds = [value];
-  else if (id === 'top-k') state.topK = Number(value);
+  else if (id === 'processing') state.processingMode = value;
   clearResults();
   render();
 }
@@ -213,7 +216,7 @@ function handleOptionKeydown(event) {
 }
 
 function galleryResults(retrieval) {
-  return `<section class="gallery-results"><header><div><h3>${escapeHtml(galleryLabel(retrieval.galleryId))}</h3><p>${retrieval.galleryCount} candidatos evaluados · Top-${retrieval.effectiveK}</p></div></header><div class="result-grid real-results">${retrieval.results.map(candidate => resultCard(candidate, candidate.key === state.selected)).join('')}</div></section>`;
+  return `<section class="gallery-results"><header><div><p>${retrieval.galleryCount} candidatos evaluados · Top-${retrieval.effectiveK}</p></div></header><div class="result-grid real-results">${retrieval.results.map(candidate => resultCard(candidate, candidate.key === state.selected)).join('')}</div></section>`;
 }
 
 function resultCard(candidate, selected) {
@@ -231,7 +234,7 @@ function mountMap() {
 }
 
 function historyPage() {
-  return `<section class="page-heading"><div><div class="eyebrow">HISTORIAL LOCAL</div><h1>Consultas recientes.</h1><p>Se conservan únicamente los ajustes de las últimas búsquedas en este navegador.</p></div><button class="secondary" data-action="clear-history" ${history.length ? '' : 'disabled'}>${icon('trash', 16)} Borrar historial</button></section><section class="history-list panel">${history.length ? history.map((item, index) => `<article class="history-item"><div class="history-item-icon">${icon('history', 23)}</div><div><span class="section-label">${escapeHtml(new Date(item.date).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' }))}</span><h3>${escapeHtml(item.text)}</h3><p>${escapeHtml(item.galleryIds.join(', '))} · Top-${item.topK}</p></div><button class="secondary" data-restore="${index}">Recuperar ${icon('arrow', 15)}</button></article>`).join('') : `<div class="empty-state">${icon('history', 38)}<h2>Aún no hay consultas</h2><p>Haz una búsqueda para poder recuperarla después.</p><button class="primary" data-page="explore">Empezar a explorar ${icon('arrow', 17)}</button></div>`}</section>`;
+  return `<section class="page-heading"><div><div class="eyebrow">HISTORIAL LOCAL</div><h1>Consultas recientes.</h1><p>Se conservan únicamente los ajustes de las últimas búsquedas en este navegador.</p></div><button class="secondary" data-action="clear-history" ${history.length ? '' : 'disabled'}>${icon('trash', 16)} Borrar historial</button></section><section class="history-list panel">${history.length ? history.map((item, index) => `<article class="history-item"><div class="history-item-icon">${icon('history', 23)}</div><div><span class="section-label">${escapeHtml(new Date(item.date).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' }))}</span><h3>${escapeHtml(item.text)}</h3><p>${escapeHtml(item.galleryIds.join(', '))} · ${escapeHtml(processingLabel(item.processingMode))} · Top-10</p></div><button class="secondary" data-restore="${index}">Recuperar ${icon('arrow', 15)}</button></article>`).join('') : `<div class="empty-state">${icon('history', 38)}<h2>Aún no hay consultas</h2><p>Haz una búsqueda para poder recuperarla después.</p><button class="primary" data-page="explore">Empezar a explorar ${icon('arrow', 17)}</button></div>`}</section>`;
 }
 
 function openModal(content) {
@@ -264,7 +267,7 @@ async function handleClick(event) {
     const available = new Set(state.capabilities.data?.galleries?.map(gallery => gallery.gallery_id) || []);
     const restored = item.galleryIds.filter(id => available.has(id));
     if (!restored.length) { toast('La galería guardada ya no está disponible.'); return; }
-    state.galleryIds = restored; state.topK = item.topK; navigate('explore'); toast('Consulta recuperada.'); return;
+    state.galleryIds = restored; state.processingMode = item.processingMode; state.topK = 10; navigate('explore'); toast('Consulta recuperada.'); return;
   }
   if (data.copy) {
     const candidate = allCandidates().find(item => item.key === data.copy);

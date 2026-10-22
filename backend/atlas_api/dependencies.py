@@ -11,3 +11,11 @@ def get_retriever(request: Request) -> CrossText2LocRetriever:
         from .errors import ApiServiceUnavailable
         raise ApiServiceUnavailable("RUNTIME_NOT_READY", "El recuperador todavía no está disponible.")
     return retriever
+
+
+def get_transformer(request: Request):
+    transformer = getattr(request.app.state, "transformer", None)
+    if transformer is None:
+        from .errors import ApiServiceUnavailable
+        raise ApiServiceUnavailable("LLM_NOT_READY", "El modo Con LLM no está disponible en este arranque.")
+    return transformer

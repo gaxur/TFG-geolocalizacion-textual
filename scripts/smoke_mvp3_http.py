@@ -20,13 +20,14 @@ def call(base_url: str, method: str, path: str, body=None):
         return error.code, dict(error.headers), json.loads(error.read())
 
 
-def payload(query_id: str, gallery_id: str, top_k: int):
+def payload(query_id: str, gallery_id: str, mode: str = "no_llm"):
     return {
         "schema_version": "1.0",
-        "contract_version": "crosstext2loc-retrieval-request-v1",
+        "contract_version": "atlas-experimental-retrieval-request-v2",
         "query": {"query_id": query_id, "text": "Estoy en una plaza urbana amplia rodeada de edificios y calles estrechas", "language": "es"},
-        "gallery_ids": [gallery_id],
-        "top_k": top_k,
+        "gallery_id": gallery_id,
+        "processing_mode": mode,
+        "top_k": 10,
     }
 
 
@@ -45,15 +46,17 @@ def main() -> int:
     live = call(args.base_url, "GET", "/api/v1/health/live")
     ready = call(args.base_url, "GET", "/api/v1/health/ready")
     capabilities = call(args.base_url, "GET", "/api/v1/capabilities")
-    case_50 = call(args.base_url, "POST", "/api/v1/retrievals", payload("mvp3-50m", "madrid-50m", 5))
-    case_25 = call(args.base_url, "POST", "/api/v1/retrievals", payload("mvp3-25m", "madrid-25m", 3))
-    repeated_a = call(args.base_url, "POST", "/api/v1/retrievals", payload("mvp3-repeat-a", "madrid-50m", 5))
-    repeated_b = call(args.base_url, "POST", "/api/v1/retrievals", payload("mvp3-repeat-b", "madrid-50m", 5))
-    invalid = call(args.base_url, "POST", "/api/v1/retrievals", dict(payload("mvp3-invalid", "madrid-50m", 5), top_k=0))
-    missing = call(args.base_url, "POST", "/api/v1/retrievals", payload("mvp3-missing", "missing", 3))
+    case_50 = call(args.base_url, "POST", "/api/v1/retrievals", payload("mvp3-50m", "madrid-50m"))
+    case_25 = call(args.base_url, "POST", "/api/v1/retrievals", payload("mvp3-25m", "madrid-25m"))
+    llm_50 = call(args.base_url, "POST", "/api/v1/retrievals", payload("mvp3-llm-50m", "madrid-50m", "with_llm"))
+    llm_25 = call(args.base_url, "POST", "/api/v1/retrievals", payload("mvp3-llm-25m", "madrid-25m", "with_llm"))
+    repeated_a = call(args.base_url, "POST", "/api/v1/retrievals", payload("mvp3-repeat-a", "madrid-50m"))
+    repeated_b = call(args.base_url, "POST", "/api/v1/retrievals", payload("mvp3-repeat-b", "madrid-50m"))
+    invalid = call(args.base_url, "POST", "/api/v1/retrievals", dict(payload("mvp3-invalid", "madrid-50m"), top_k=0))
+    missing = call(args.base_url, "POST", "/api/v1/retrievals", payload("mvp3-missing", "missing"))
 
-    expected_statuses = [live[0], ready[0], capabilities[0], case_50[0], case_25[0], repeated_a[0], repeated_b[0], invalid[0], missing[0]]
-    if expected_statuses != [200, 200, 200, 200, 200, 200, 200, 422, 404]:
+    expected_statuses = [live[0], ready[0], capabilities[0], case_50[0], case_25[0], llm_50[0], llm_25[0], repeated_a[0], repeated_b[0], invalid[0], missing[0]]
+    if expected_statuses != [200, 200, 200, 200, 200, 200, 200, 200, 200, 422, 422]:
         raise RuntimeError(f"códigos HTTP inesperados: {expected_statuses}")
     rows_50 = stable_rows(case_50[2])
     rows_25 = stable_rows(case_25[2])
@@ -66,14 +69,16 @@ def main() -> int:
         "live": live[2],
         "ready": ready[2],
         "galleries": galleries,
-        "case_50m": {"requested_k": 5, "returned": len(rows_50), "rows": rows_50},
-        "case_25m": {"requested_k": 3, "returned": len(rows_25), "rows": rows_25},
+        "case_50m_no_llm": {"requested_k": 10, "returned": len(rows_50), "rows": rows_50},
+        "case_25m_no_llm": {"requested_k": 10, "returned": len(rows_25), "rows": rows_25},
+        "case_50m_with_llm": {"returned": len(stable_rows(llm_50[2])), "processing": llm_50[2]["processing"]},
+        "case_25m_with_llm": {"returned": len(stable_rows(llm_25[2])), "processing": llm_25[2]["processing"]},
         "repeated_ranking_identical": deterministic,
         "coordinates_valid": coordinates_valid,
         "invalid_request_status": invalid[0],
         "missing_gallery_status": missing[0],
     }
-    if not all((html_ok, galleries == {"madrid-50m": 253, "madrid-25m": 1115}, len(rows_50) == 5, len(rows_25) == 3, deterministic, coordinates_valid)):
+    if not all((html_ok, galleries == {"madrid-50m": 253, "madrid-25m": 1115}, len(rows_50) == 10, len(rows_25) == 10, len(stable_rows(llm_50[2])) == 10, len(stable_rows(llm_25[2])) == 10, deterministic, coordinates_valid)):
         raise RuntimeError("el smoke integrado no verificó todas las invariantes")
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ -f "$ROOT/.env" ]]; then
   declare -A ENV_OVERRIDES=()
-  for name in MVP_BIND_HOST MVP_HTTP_PORT MVP_API_CONTAINER_NAME MVP_FRONTEND_CONTAINER_NAME MVP_API_IMAGE MVP_FRONTEND_IMAGE MVP_BROWSER_IMAGE MVP_CLIP_CACHE_DIR VITE_TILE_URL VITE_TILE_ATTRIBUTION; do
+  for name in MVP_BIND_HOST MVP_HTTP_PORT MVP_API_CONTAINER_NAME MVP_FRONTEND_CONTAINER_NAME MVP_API_IMAGE MVP_FRONTEND_IMAGE MVP_BROWSER_IMAGE MVP_CLIP_CACHE_DIR MVP_QWEN_MODEL_DIR VITE_TILE_URL VITE_TILE_ATTRIBUTION; do
     if [[ -v "$name" ]]; then ENV_OVERRIDES["$name"]=${!name}; fi
   done
   set -a
@@ -20,9 +20,12 @@ COMPOSE=(docker compose)
 if [[ -n "${MVP_COMPOSE_PROJECT:-}" ]]; then COMPOSE+=(-p "$MVP_COMPOSE_PROJECT"); fi
 COMPOSE+=(-f "$ROOT/compose.mvp.yaml")
 CLIP_DIR=${MVP_CLIP_CACHE_DIR:-$HOME/.cache/clip}
+QWEN_DIR=${MVP_QWEN_MODEL_DIR:-$HOME/models/hf/Qwen3-8B-b968826d9c46}
 
 test -f "$ROOT/external/CVG-Text/utils.py"
 test -f "$CLIP_DIR/ViT-L-14-336px.pt"
+test -f "$QWEN_DIR/config.json"
+test -f "$QWEN_DIR/tokenizer.json"
 python - "$ROOT" <<'PY'
 import json
 from pathlib import Path
@@ -39,5 +42,6 @@ if missing:
 PY
 
 export MVP_CLIP_CACHE_DIR=$CLIP_DIR
+export MVP_QWEN_MODEL_DIR=$QWEN_DIR
 export MVP_BIND_HOST=${MVP_BIND_HOST:-0.0.0.0}
 exec "${COMPOSE[@]}" up --build "$@"

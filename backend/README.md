@@ -1,7 +1,7 @@
 # Atlas API — MVP.1
 
-API HTTP interna y de un solo worker para `CrossText2LocRetriever`. No implementa
-F5 y no carga CUDA al importar módulos. En el despliegue integrado la sirve
+API HTTP interna y de un solo worker para CrossText2Loc y el modo experimental
+Qwen `en_cartographic`. No carga CUDA al importar módulos. En el despliegue integrado la sirve
 indirectamente Nginx mediante `/api`; su puerto no se publica en el host.
 
 ## Despliegue integrado recomendado
@@ -24,6 +24,13 @@ docker compose -f compose.mvp.yaml down
 ```
 
 El contenedor integrado utiliza el nombre estable `atlas-mvp-api`.
+
+`POST /api/v1/retrievals` exige `gallery_id`, `processing_mode` y Top-10. Cada
+petición ejecuta una galería y un modo. Un fallo Qwen devuelve error; no existe
+fallback a texto original.
+
+El despliegue F5.11 utiliza `crosstext2loc-gb10:f511` y monta el snapshot Qwen
+mediante `MVP_QWEN_MODEL_DIR`. Ambos modelos se cargan una vez durante lifespan.
 
 La guía completa está en
 [`docs/MVP.md`](../docs/MVP.md).

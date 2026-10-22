@@ -30,14 +30,14 @@ try {
   const fill = text => evaluate(`document.querySelector('#description').value=${JSON.stringify(text)};document.querySelector('#description').dispatchEvent(new Event('input',{bubbles:true}))`);
   const waitFor = async (expression, attempts = 400) => { for (let i = 0; i < attempts; i++) { if (await evaluate(expression)) return; await delay(100); } throw new Error(`Timeout: ${expression}`); };
   const choose = async (id, value) => { await click(`[data-dropdown="${id}"]`); await waitFor(`!!document.querySelector('[data-select-id="${id}"][data-select-value="${value}"]')`); await click(`[data-select-id="${id}"][data-select-value="${value}"]`); };
-  const run = async (gallery, topK) => {
+  const run = async (gallery, mode) => {
     await choose('gallery', gallery);
-    await choose('top-k', String(topK));
+    await choose('processing', mode);
     await fill('Estoy en una plaza urbana amplia rodeada de edificios y calles estrechas');
     await click('.search-button');
-    await waitFor(`document.querySelectorAll('.result-card').length === ${topK}`);
-    assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker').length`), topK);
-    assert.equal(await evaluate(`document.querySelectorAll('.candidate-cell').length`), topK);
+    await waitFor(`document.querySelectorAll('.result-card').length === 10`);
+    assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker').length`), 10);
+    assert.equal(await evaluate(`document.querySelectorAll('.candidate-cell').length`), 10);
     assert.match(await evaluate(`document.querySelector('.cell-legend').textContent`), new RegExp(`${gallery.includes('25m') ? '25' : '50'} × ${gallery.includes('25m') ? '25' : '50'} m`));
     assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker.top-result').length`), 1);
     assert.equal(await evaluate(`[...document.querySelectorAll('.coordinate-compact')].every(x => /^-?\\d+\\.\\d+, -?\\d+\\.\\d+$/.test(x.textContent.trim()))`), true);
@@ -48,15 +48,17 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1080, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: baseUrl });
   await waitFor(`!!document.querySelector('#description') && !document.querySelector('[data-dropdown="gallery"]').disabled`);
-  const rows50 = await run('madrid-50m', 5);
+  const rows50 = await run('madrid-50m', 'no_llm');
   await click('.candidate-marker-shell:nth-of-type(2) .candidate-marker');
   assert.equal(await evaluate(`document.querySelectorAll('.result-card.selected').length`), 1);
-  const rows25 = await run('madrid-25m', 3);
+  const rows25 = await run('madrid-25m', 'no_llm');
+  const llm50 = await run('madrid-50m', 'with_llm');
+  const llm25 = await run('madrid-25m', 'with_llm');
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await delay(300);
   assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ status: 'pass', base_url: baseUrl, gallery_50m: rows50, gallery_25m: rows25, leaflet_markers: true, mobile: true }));
+  console.log(JSON.stringify({ status: 'pass', base_url: baseUrl, no_llm_50m: rows50, no_llm_25m: rows25, with_llm_50m: llm50, with_llm_25m: llm25, leaflet_markers: true, mobile: true }));
 } finally {
   ws?.close(); browser.kill();
 }

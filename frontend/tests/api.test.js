@@ -6,14 +6,13 @@ import { adaptRetrievalResponse, buildRetrievalRequest, createQueryId, createReq
 const response = (body, status = 200, headers = {}) => ({ ok: status >= 200 && status < 300, status, headers: { get: key => headers[key.toLowerCase()] || null }, json: async () => body });
 const searchArea = { region_id: 'madrid_pilot', crs: 'EPSG:4326', bbox: { north: 40.42, south: 40.412, east: -3.699, west: -3.709 } };
 
-test('construye exactamente la petición F4.6 y genera query_id', () => {
-  const request = buildRetrievalRequest({ text: '  Una plaza  ', galleryIds: ['madrid-50m'], topK: 5 });
+test('construye petición experimental exclusiva y genera query_id', () => {
+  const request = buildRetrievalRequest({ text: '  Una plaza  ', galleryId: 'madrid-50m', processingMode: 'no_llm', topK: 10 });
   assert.equal(request.schema_version, '1.0');
-  assert.equal(request.contract_version, 'crosstext2loc-retrieval-request-v1');
+  assert.equal(request.contract_version, 'atlas-experimental-retrieval-request-v2');
   assert.equal(request.query.text, 'Una plaza');
   assert.match(request.query.query_id, /^browser-/);
-  assert.deepEqual(request.gallery_ids, ['madrid-50m']);
-  assert.equal(request.top_k, 5);
+  assert.equal(request.gallery_id, 'madrid-50m'); assert.equal(request.processing_mode,'no_llm'); assert.equal(request.top_k,10);
   assert.ok(!Object.hasOwn(request, 'ground_truth'));
   assert.notEqual(createQueryId(), createQueryId());
 });
@@ -21,7 +20,7 @@ test('construye exactamente la petición F4.6 y genera query_id', () => {
 test('retrieve envía body, base URL y AbortSignal sin duplicar', async () => {
   let calls = 0, captured;
   const controller = new AbortController();
-  const request = buildRetrievalRequest({ text: 'Una plaza', galleryIds: ['madrid-25m'], topK: 3, queryId: 'q1' });
+  const request = buildRetrievalRequest({ text: 'Una plaza', galleryId: 'madrid-25m', processingMode: 'with_llm', topK: 10, queryId: 'q1' });
   const fetchImpl = async (url, options) => { calls++; captured = { url, options }; return response({ schema_version: '1.0', contract_version: 'crosstext2loc-retrieval-response-v1', retrievals: [] }); };
   await retrieve(request, { baseUrl: '/custom', signal: controller.signal, fetchImpl });
   assert.equal(calls, 1);
@@ -31,12 +30,12 @@ test('retrieve envía body, base URL y AbortSignal sin duplicar', async () => {
 });
 
 test('adapta candidatos conservando orden y similitud negativa', () => {
-  const document = { schema_version: '1.0', contract_version: 'crosstext2loc-retrieval-response-v1', query: {}, model: {}, timings_ms: { total: 1 }, retrievals: [{ gallery_id: 'madrid-50m', gallery_count: 253, requested_k: 2, effective_k: 2, visual_dataset_id: 'v', embedding_dataset_id: 'e', results: [{ rank: 1, candidate_id: 'b', latitude: 40.4, longitude: -3.7, cosine_similarity: 0.2 }, { rank: 2, candidate_id: 'a', latitude: 40.41, longitude: -3.71, cosine_similarity: -0.1 }] }] };
+  const document = { schema_version: '1.0', contract_version: 'atlas-experimental-retrieval-response-v2', query: {}, processing:{}, model: {}, timings_ms: { total: 1 }, retrievals: [{ gallery_id: 'madrid-50m', gallery_count: 253, requested_k: 2, effective_k: 2, visual_dataset_id: 'v', embedding_dataset_id: 'e', results: [{ rank: 1, candidate_id: 'b', latitude: 40.4, longitude: -3.7, cosine_similarity: 0.2 }, { rank: 2, candidate_id: 'a', latitude: 40.41, longitude: -3.71, cosine_similarity: -0.1 }] }] };
   document.query = { query_id: 'q', text: 'text', language: 'es' };
   document.model = { name: 'CLIP-L/14@336', checkpoint_sha256: 'd'.repeat(64) };
-  document.timings_ms = { text_encoding: 1, ranking_by_gallery: { 'madrid-50m': 1 }, total: 2 };
+  document.processing={mode:'no_llm',variant:'es_original',effective_query:document.query,transformer:null}; document.timings_ms = { transformation:0,text_encoding: 1, ranking_by_gallery: { 'madrid-50m': 1 }, total: 2 };
   document.retrievals[0].visual_dataset_id = 'visual'; document.retrievals[0].embedding_dataset_id = 'embedding'; document.retrievals[0].requested_k = 2; document.retrievals[0].effective_k = 2; document.retrievals[0].ranking_method = 'exhaustive_cosine'; document.retrievals[0].tie_break = 'candidate_id_ascending';
-  const adapted = adaptRetrievalResponse(document, { query: document.query, gallery_ids: ['madrid-50m'], top_k: 2 });
+  const adapted = adaptRetrievalResponse(document, { query: document.query, gallery_id:'madrid-50m',processing_mode:'no_llm',top_k:2 });
   assert.deepEqual(adapted.retrievals[0].results.map(x => x.id), ['b', 'a']);
   assert.equal(adapted.retrievals[0].results[1].similarity, -0.1);
   assert.equal(adapted.retrievals[0].results[0].key, 'madrid-50m:b');
@@ -55,18 +54,18 @@ test('distingue error de red, timeout y cancelación', async () => {
 });
 
 test('rechaza respuestas exitosas malformadas y coordenadas inválidas', () => {
-  const request = { query: { query_id: 'q', text: 't', language: 'es' }, gallery_ids: ['madrid-50m'], top_k: 1 };
+  const request = { query: { query_id: 'q', text: 't', language: 'es' }, gallery_id:'madrid-50m',processing_mode:'no_llm',top_k:1 };
   assert.throws(() => adaptRetrievalResponse({ contract_version: 'otro' }, request));
   const invalid = { schema_version: '1.0', contract_version: 'crosstext2loc-retrieval-response-v1', retrievals: [{ gallery_id: 'madrid-50m', results: [{ rank: 1, candidate_id: 'x', latitude: 200, longitude: -3, cosine_similarity: 0.2 }] }] };
   assert.throws(() => adaptRetrievalResponse(invalid, request));
 });
 
 test('rechaza query_id, K y capacidades incompatibles', async () => {
-  const request = { query: { query_id: 'q', text: 't', language: 'es' }, gallery_ids: ['madrid-50m'], top_k: 1 };
-  const invalid = { schema_version: '1.0', contract_version: 'crosstext2loc-retrieval-response-v1', query: { query_id: 'otra', text: 't', language: 'es' }, model: { name: 'CLIP-L/14@336', checkpoint_sha256: 'd'.repeat(64) }, timings_ms: { text_encoding: 1, ranking_by_gallery: { 'madrid-50m': 1 }, total: 2 }, retrievals: [] };
+  const request = { query: { query_id: 'q', text: 't', language: 'es' }, gallery_id:'madrid-50m',processing_mode:'no_llm',top_k:1 };
+  const invalid = { schema_version: '1.0', contract_version: 'atlas-experimental-retrieval-response-v2', query: { query_id: 'otra', text: 't', language: 'es' }, model: { name: 'CLIP-L/14@336', checkpoint_sha256: 'd'.repeat(64) }, timings_ms: { transformation:0,text_encoding: 1, ranking_by_gallery: { 'madrid-50m': 1 }, total: 2 }, retrievals: [] };
   assert.throws(() => adaptRetrievalResponse(invalid, request));
-  await assert.rejects(() => getCapabilities({ fetchImpl: async () => response({ schema_version: '1.0', api_version: 'v1', retrievers: [], galleries: [{ gallery_id: '<b>x</b>', candidate_count: '253' }], search_area: searchArea }) }), error => error.code === 'INVALID_API_RESPONSE');
-  await assert.rejects(() => getCapabilities({ fetchImpl: async () => response({ schema_version: '1.0', api_version: 'v1', retrievers: [], galleries: [], search_area: { ...searchArea, bbox: { ...searchArea.bbox, north: 100 } } }) }), error => error.code === 'INVALID_API_RESPONSE');
+  await assert.rejects(() => getCapabilities({ fetchImpl: async () => response({ schema_version: '1.0', api_version: 'v2-experimental', retrievers: [], processing_modes:[], galleries: [{ gallery_id: '<b>x</b>', candidate_count: '253' }], search_area: searchArea }) }), error => error.code === 'INVALID_API_RESPONSE');
+  await assert.rejects(() => getCapabilities({ fetchImpl: async () => response({ schema_version: '1.0', api_version: 'v2-experimental', retrievers: [], processing_modes:[], galleries: [], search_area: { ...searchArea, bbox: { ...searchArea.bbox, north: 100 } } }) }), error => error.code === 'INVALID_API_RESPONSE');
 });
 
 test('el guard impide que respuestas canceladas u obsoletas publiquen estado', () => {

@@ -1,6 +1,6 @@
 const REQUEST_VERSION = '1.0';
-const REQUEST_CONTRACT = 'crosstext2loc-retrieval-request-v1';
-const RESPONSE_CONTRACT = 'crosstext2loc-retrieval-response-v1';
+const REQUEST_CONTRACT = 'atlas-experimental-retrieval-request-v2';
+const RESPONSE_CONTRACT = 'atlas-experimental-retrieval-response-v2';
 
 export function createQueryId() {
   const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -12,16 +12,18 @@ export function createRequestGuard() {
   return { next: () => ++current, cancel: () => ++current, isCurrent: value => value === current, value: () => current };
 }
 
-export function buildRetrievalRequest({ text, language = 'es', galleryIds, topK, queryId = createQueryId() }) {
+export function buildRetrievalRequest({ text, language = 'es', galleryId, processingMode, topK = 10, queryId = createQueryId() }) {
   const cleanText = String(text || '').trim();
   if (!cleanText) throw new TypeError('La descripción no puede estar vacía.');
-  if (!Array.isArray(galleryIds) || !galleryIds.length || new Set(galleryIds).size !== galleryIds.length) throw new TypeError('Selecciona al menos una galería válida.');
-  if (!Number.isInteger(topK) || topK < 1) throw new TypeError('Top-K debe ser un entero positivo.');
+  if (!['madrid-25m', 'madrid-50m'].includes(galleryId)) throw new TypeError('Selecciona una galería válida.');
+  if (!['no_llm', 'with_llm'].includes(processingMode)) throw new TypeError('Selecciona un modo de procesamiento válido.');
+  if (topK !== 10) throw new TypeError('El MVP experimental utiliza Top-10.');
   return {
     schema_version: REQUEST_VERSION,
     contract_version: REQUEST_CONTRACT,
     query: { query_id: queryId, text: cleanText, language },
-    gallery_ids: [...galleryIds],
+    gallery_id: galleryId,
+    processing_mode: processingMode,
     top_k: topK,
   };
 }
@@ -31,9 +33,10 @@ function validCandidate(row, expectedRank) {
 }
 
 export function adaptRetrievalResponse(document, request) {
-  const requestedGalleryIds = request.gallery_ids;
-  if (document?.schema_version !== '1.0' || document?.contract_version !== RESPONSE_CONTRACT || !document.query || document.query.query_id !== request.query.query_id || document.query.text !== request.query.text || document.query.language !== request.query.language || document.model?.name !== 'CLIP-L/14@336' || !/^[0-9a-f]{64}$/.test(document.model.checkpoint_sha256 || '') || !document.timings_ms || !Array.isArray(document.retrievals) || !document.retrievals.length) throw new TypeError('Respuesta de recuperación incompatible.');
-  const requested = new Set(requestedGalleryIds);
+  const processing = document?.processing;
+  const expectedVariant = request.processing_mode === 'with_llm' ? 'en_cartographic' : 'es_original';
+  if (document?.schema_version !== '1.0' || document?.contract_version !== RESPONSE_CONTRACT || !document.query || document.query.query_id !== request.query.query_id || document.query.text !== request.query.text || document.query.language !== request.query.language || processing?.mode !== request.processing_mode || processing?.variant !== expectedVariant || processing?.effective_query?.query_id !== request.query.query_id || typeof processing.effective_query.text !== 'string' || !processing.effective_query.text || (request.processing_mode === 'no_llm' && (processing.effective_query.text !== request.query.text || processing.effective_query.language !== request.query.language || processing.transformer !== null)) || (request.processing_mode === 'with_llm' && (processing.effective_query.language !== 'en' || processing.transformer?.model_id !== 'Qwen/Qwen3-8B' || processing.transformer?.prompt_version !== 'f53b-text-transform-v2')) || document.model?.name !== 'CLIP-L/14@336' || !/^[0-9a-f]{64}$/.test(document.model.checkpoint_sha256 || '') || !document.timings_ms || !Array.isArray(document.retrievals) || document.retrievals.length !== 1) throw new TypeError('Respuesta de recuperación incompatible.');
+  const requested = new Set([request.gallery_id]);
   const seen = new Set();
   const retrievals = document.retrievals.map(retrieval => {
     if (!retrieval || typeof retrieval.gallery_id !== 'string' || !requested.has(retrieval.gallery_id) || seen.has(retrieval.gallery_id) || typeof retrieval.visual_dataset_id !== 'string' || !retrieval.visual_dataset_id || typeof retrieval.embedding_dataset_id !== 'string' || !retrieval.embedding_dataset_id || !Number.isInteger(retrieval.gallery_count) || retrieval.gallery_count < 1 || retrieval.requested_k !== request.top_k || retrieval.effective_k !== retrieval.results?.length || retrieval.effective_k !== Math.min(request.top_k, retrieval.gallery_count) || retrieval.ranking_method !== 'exhaustive_cosine' || retrieval.tie_break !== 'candidate_id_ascending' || !Array.isArray(retrieval.results) || !retrieval.results.length) throw new TypeError('Galería inesperada en la respuesta.');
@@ -44,10 +47,12 @@ export function adaptRetrievalResponse(document, request) {
     });
     return { galleryId: retrieval.gallery_id, galleryCount: retrieval.gallery_count, requestedK: retrieval.requested_k, effectiveK: retrieval.effective_k, visualDatasetId: retrieval.visual_dataset_id, embeddingDatasetId: retrieval.embedding_dataset_id, results };
   });
-  if (seen.size !== requested.size) throw new TypeError('Faltan galerías solicitadas en la respuesta.');
-  if (!Number.isFinite(document.timings_ms.text_encoding) || document.timings_ms.text_encoding < 0 || !Number.isFinite(document.timings_ms.total) || document.timings_ms.total < 0 || !document.timings_ms.ranking_by_gallery || Object.keys(document.timings_ms.ranking_by_gallery).length !== requested.size || [...requested].some(id => !Number.isFinite(document.timings_ms.ranking_by_gallery[id]) || document.timings_ms.ranking_by_gallery[id] < 0)) throw new TypeError('Tiempos inválidos en la respuesta.');
-  return { query: document.query, model: document.model, retrievals, timingsMs: document.timings_ms, raw: document };
+  if (seen.size !== 1) throw new TypeError('Falta la galería solicitada en la respuesta.');
+  if (!Number.isFinite(document.timings_ms.transformation) || document.timings_ms.transformation < 0 || !Number.isFinite(document.timings_ms.text_encoding) || document.timings_ms.text_encoding < 0 || !Number.isFinite(document.timings_ms.total) || document.timings_ms.total < 0 || !document.timings_ms.ranking_by_gallery || Object.keys(document.timings_ms.ranking_by_gallery).length !== 1 || !Number.isFinite(document.timings_ms.ranking_by_gallery[request.gallery_id]) || document.timings_ms.ranking_by_gallery[request.gallery_id] < 0) throw new TypeError('Tiempos inválidos en la respuesta.');
+  return { query: document.query, processing, model: document.model, retrievals, timingsMs: document.timings_ms, raw: document };
 }
+
+export function processingLabel(mode) { return mode === 'with_llm' ? 'Con LLM · en_cartographic' : 'Sin LLM · texto original'; }
 
 export function galleryLabel(galleryId) {
   return galleryId === 'madrid-25m' ? 'Madrid · cuadrícula 25 m' : galleryId === 'madrid-50m' ? 'Madrid · cuadrícula 50 m' : galleryId;

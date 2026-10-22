@@ -10,16 +10,17 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from .errors import install_error_handlers
-from .lifespan import build_lifespan, default_retriever_factory
+from .lifespan import build_lifespan, default_retriever_factory, default_transformer_factory
 from .routes.health import router as health_router
 from .routes.retrieval import router as retrieval_router
 from .settings import Settings
 
 
-def create_app(*, settings: Settings | None = None, retriever_factory: Callable | None = None) -> FastAPI:
+def create_app(*, settings: Settings | None = None, retriever_factory: Callable | None = None, transformer_factory: Callable | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     factory = retriever_factory or default_retriever_factory
-    app = FastAPI(title="Geolocalización textual", version="1.0", lifespan=build_lifespan(settings, factory))
+    qwen_factory = transformer_factory or default_transformer_factory
+    app = FastAPI(title="Geolocalización textual", version="2.0-experimental", lifespan=build_lifespan(settings, factory, qwen_factory))
     app.state.inference_gate = asyncio.Lock()
     app.state.reject_when_busy = settings.reject_when_busy
     app.state.search_area = {"region_id": "madrid_pilot", "crs": "EPSG:4326", "bbox": settings.region_bbox()}

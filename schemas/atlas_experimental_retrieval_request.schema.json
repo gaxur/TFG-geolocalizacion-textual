@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "atlas_experimental_retrieval_request.schema.json",
+  "title": "Atlas experimental retrieval request v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "query", "gallery_id", "processing_mode", "top_k"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "atlas-experimental-retrieval-request-v2"},
+    "query": {"type": "object", "additionalProperties": false, "required": ["query_id", "text", "language"], "properties": {"query_id": {"type": "string", "minLength": 1}, "text": {"type": "string", "minLength": 1}, "language": {"const": "es"}}},
+    "gallery_id": {"enum": ["madrid-25m", "madrid-50m"]},
+    "processing_mode": {"enum": ["no_llm", "with_llm"]},
+    "top_k": {"const": 10}
+  }
+}

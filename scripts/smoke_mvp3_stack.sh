@@ -16,12 +16,13 @@ export MVP_HTTP_PORT=$PORT
 export MVP_COMPOSE_PROJECT=$PROJECT
 export MVP_BIND_HOST=${MVP_BIND_HOST:-127.0.0.1}
 export MVP_CLIP_CACHE_DIR=${MVP_CLIP_CACHE_DIR:-$HOME/.cache/clip}
+export MVP_QWEN_MODEL_DIR=${MVP_QWEN_MODEL_DIR:-$HOME/models/hf/Qwen3-8B-b968826d9c46}
 export MVP_API_CONTAINER_NAME=${MVP_API_CONTAINER_NAME:-$PROJECT-api}
 export MVP_FRONTEND_CONTAINER_NAME=${MVP_FRONTEND_CONTAINER_NAME:-$PROJECT-frontend}
 
 "$ROOT/scripts/run_mvp3_stack.sh" -d
 
-for attempt in $(seq 1 90); do
+for attempt in $(seq 1 240); do
   status=$(curl -s -o /tmp/atlas-mvp3-health.json -w '%{http_code}' "http://127.0.0.1:$PORT/healthz" || true)
   api_id=$("${COMPOSE[@]}" ps -q api)
   frontend_id=$("${COMPOSE[@]}" ps -q frontend)

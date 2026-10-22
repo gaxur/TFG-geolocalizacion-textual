@@ -59,8 +59,9 @@ Abrir `http://127.0.0.1:5173/`.
 ## Funciones
 
 - Descripción libre enviada al servicio interno.
-- Galerías de 25 m y 50 m obtenidas mediante `/api/v1/capabilities`.
-- Selección de Top-3, Top-5 o Top-10.
+- Selección exclusiva de galería 25 m o 50 m.
+- Selección Sin LLM o Con LLM experimental (`en_cartographic`).
+- Top-10 fijo para una sola combinación.
 - Candidatos con ID, coordenadas WGS84 y similitud coseno.
 - Mapa Leaflet con tarjetas y marcadores sincronizados.
 - Estados de carga, cancelación y errores del backend.
@@ -68,7 +69,8 @@ Abrir `http://127.0.0.1:5173/`.
 - Vista adaptada a escritorio y móvil.
 
 CrossText2Loc no produce una ubicación confirmada y su similitud no es una
-probabilidad. No se ejecutan LLM, GOTPR, VLM, diálogo ni TOLoc. Enviar la
+probabilidad. El modo Con LLM no implica superioridad científica. No se ejecutan
+GOTPR, VLM, diálogo ni TOLoc. Enviar la
 descripción a la API interna y solicitar teselas al proveedor configurado puede
 implicar tratamiento de datos; no se deben introducir datos sensibles.
 

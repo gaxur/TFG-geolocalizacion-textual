@@ -19,6 +19,10 @@ class Settings:
     clip_weights_path: str
     allowed_origins: tuple[str, ...]
     reject_when_busy: bool = True
+    qwen_model_path: Path | None = None
+    qwen_model_id: str = "Qwen/Qwen3-8B"
+    qwen_model_revision: str = "b968826d9c46dd6066d109eabc6255188de91218"
+    qwen_required: bool = False
 
     def region_bbox(self) -> dict[str, float]:
         try:
@@ -41,4 +45,8 @@ class Settings:
         except KeyError as error:
             raise ValueError(f"variable obligatoria ausente: {error.args[0]}") from error
         origins = tuple(value.strip() for value in os.environ.get("ATLAS_ALLOWED_ORIGINS", "").split(",") if value.strip())
-        return cls(runtime_config, region_config, cvg_utils_sha256, clip_weights_path, origins)
+        qwen_path = os.environ.get("ATLAS_QWEN_MODEL_PATH")
+        qwen_required = os.environ.get("ATLAS_QWEN_REQUIRED", "false").casefold() in {"1", "true", "yes"}
+        if qwen_required and not qwen_path:
+            raise ValueError("ATLAS_QWEN_MODEL_PATH es obligatorio cuando ATLAS_QWEN_REQUIRED=true")
+        return cls(runtime_config, region_config, cvg_utils_sha256, clip_weights_path, origins, True, Path(qwen_path) if qwen_path else None, os.environ.get("ATLAS_QWEN_MODEL_ID", "Qwen/Qwen3-8B"), os.environ.get("ATLAS_QWEN_MODEL_REVISION", "b968826d9c46dd6066d109eabc6255188de91218"), qwen_required)

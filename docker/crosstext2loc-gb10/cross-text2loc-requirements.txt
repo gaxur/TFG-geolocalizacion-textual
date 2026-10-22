@@ -1,5 +1,6 @@
-accelerate==0.33.0
-transformers==4.44.2
+accelerate==1.13.0
+transformers==5.9.0
+huggingface_hub==1.15.0
 fastapi==0.115.14
 uvicorn==0.34.3
 pydantic==2.12.5

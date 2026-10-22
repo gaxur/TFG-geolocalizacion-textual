@@ -24,7 +24,7 @@ async def ready(request: Request):
         gallery_ids = list(retriever.gallery_ids)
     except Exception as error:
         raise ApiInternalError("readiness failure") from error
-    return {"status": "ready", "runtime": "crosstext2loc", "gallery_ids": gallery_ids}
+    return {"status": "ready", "runtime": "crosstext2loc", "gallery_ids": gallery_ids, "processing_modes": {"no_llm": True, "with_llm": getattr(request.app.state, "transformer", None) is not None}}
 
 
 @router.get("/capabilities", responses={500: {"model": ErrorResponse}})
@@ -34,4 +34,5 @@ async def capabilities(request: Request):
         galleries = [] if retriever is None else [{"gallery_id": gallery_id, "candidate_count": retriever.gallery_count(gallery_id)} for gallery_id in retriever.gallery_ids]
     except Exception as error:
         raise ApiInternalError("capabilities failure") from error
-    return {"schema_version": "1.0", "api_version": "v1", "retrievers": [{"id": "crosstext2loc", "available": retriever is not None, "scores_are_probabilities": False}], "galleries": galleries, "search_area": request.app.state.search_area, "supported_languages": {"policy_status": "pending", "accepted_codes": ["es", "en"]}}
+    qwen = getattr(request.app.state, "transformer", None)
+    return {"schema_version": "1.0", "api_version": "v2-experimental", "retrievers": [{"id": "crosstext2loc", "available": retriever is not None, "scores_are_probabilities": False}], "processing_modes": [{"id": "no_llm", "available": retriever is not None, "variant": "es_original"}, {"id": "with_llm", "available": retriever is not None and qwen is not None, "variant": "en_cartographic", "experimental": True}], "galleries": galleries, "search_area": request.app.state.search_area, "supported_languages": {"policy_status": "experimental", "accepted_codes": ["es"]}}

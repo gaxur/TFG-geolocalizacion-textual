@@ -25,15 +25,16 @@ class QueryModel(StrictModel):
 
 class RetrievalRequest(StrictModel):
     schema_version: Literal["1.0"]
-    contract_version: Literal["crosstext2loc-retrieval-request-v1"]
+    contract_version: Literal["atlas-experimental-retrieval-request-v2"]
     query: QueryModel
-    gallery_ids: list[NonEmpty] = Field(min_length=1, max_length=2, json_schema_extra={"uniqueItems": True})
-    top_k: StrictInt = Field(ge=1, le=1115)
+    gallery_id: Literal["madrid-25m", "madrid-50m"]
+    processing_mode: Literal["no_llm", "with_llm"]
+    top_k: Literal[10]
 
     @model_validator(mode="after")
-    def unique_galleries(self):
-        if len(set(self.gallery_ids)) != len(self.gallery_ids):
-            raise ValueError("gallery_ids must be unique")
+    def spanish_original_only(self):
+        if self.query.language != "es":
+            raise ValueError("query.language must be es")
         return self
 
 
@@ -63,6 +64,7 @@ class ModelIdentity(StrictModel):
 
 
 class ResponseTimings(StrictModel):
+    transformation: NonNegativeFloat
     text_encoding: NonNegativeFloat
     ranking_by_gallery: dict[NonEmpty, NonNegativeFloat]
     total: NonNegativeFloat
@@ -70,11 +72,25 @@ class ResponseTimings(StrictModel):
 
 class RetrievalResponse(StrictModel):
     schema_version: Literal["1.0"]
-    contract_version: Literal["crosstext2loc-retrieval-response-v1"]
+    contract_version: Literal["atlas-experimental-retrieval-response-v2"]
     query: QueryModel
+    processing: "ProcessingMetadata"
     model: ModelIdentity
-    retrievals: list[GalleryRetrieval] = Field(min_length=1, max_length=2)
+    retrievals: list[GalleryRetrieval] = Field(min_length=1, max_length=1)
     timings_ms: ResponseTimings
+
+
+class TransformerIdentity(StrictModel):
+    model_id: Literal["Qwen/Qwen3-8B"]
+    revision: Literal["b968826d9c46dd6066d109eabc6255188de91218"]
+    prompt_version: Literal["f53b-text-transform-v2"]
+
+
+class ProcessingMetadata(StrictModel):
+    mode: Literal["no_llm", "with_llm"]
+    variant: Literal["es_original", "en_cartographic"]
+    effective_query: QueryModel
+    transformer: TransformerIdentity | None
 
 
 class ErrorDetail(StrictModel):
