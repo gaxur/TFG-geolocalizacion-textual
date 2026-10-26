@@ -317,6 +317,19 @@ confianza baja-media, no una demostración de superioridad general de Qwen.
 
 ## Reproducción
 
+El informe HTML completo generado por la campaña, con control de calidad,
+transformaciones Qwen, resultados individuales, 600 candidatos y la conclusión
+comparativa, puede consultarse localmente en:
+
+```text
+/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual/results/generated/f5/h11-h25-independent/final/report.html
+```
+
+La ruta pertenece al entorno local validado y `results/generated/` no se versiona.
+El informe se regenera mediante `scripts/evaluate_h11_h25.py`; no debe editarse
+manualmente. Sus fuentes contractuales son `evaluation.json`, `rankings.json` y
+`manifest.json` del mismo directorio/árbol de campaña.
+
 ```bash
 .venv-geo/bin/python scripts/prepare_h11_h25.py \
   --output results/generated/f5/h11-h25-independent/dataset.json

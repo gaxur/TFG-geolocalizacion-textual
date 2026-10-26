@@ -26,13 +26,14 @@ todas esas acciones estén autorizadas.
 | GeoLoc | [Hugging Face](https://huggingface.co/datasets/Son12s/GeoLoc) | Datos de referencia de GeoBridge | Paper anuncia CC BY-NC-SA 4.0; release sin card/licencia | Dos RAR *drone*; no vistas de Google | No asumir hasta delimitar cobertura y atribución | PENDIENTE DE AUTORES | Confirmar alcance de licencia por archivo. |
 | OpenAerialMap | [OAM](https://openaerialmap.org/legal/) | Posible fuente *drone*/aérea | CC BY 4.0 | Descarga/procesamiento con atribución | Sí, cumpliendo CC BY 4.0 | PERMITIDO CON CONDICIONES | Conservar titular, fuente y metadata por imagen. |
 | Wikimedia Commons | [Commons](https://commons.wikimedia.org/) | Fuente suplementaria de fotografías geolocalizadas | Licencia por archivo; metadata estructurada CC0 | Descarga permitida según licencia efectiva de cada file | Variable por archivo | VIABLE CON REVISIÓN INDIVIDUAL | Exigir `type=camera`, autor/licencia, precisión y revisión; no usar Object location como GT. |
-| Mapillary | [API](https://help.mapillary.com/hc/en-us/articles/360010234680-Accessing-imagery-and-data-through-the-Mapillary-API) | Posible evidencia F5.5 | Imágenes declaradas CC BY-SA 4.0 | Acceso API requiere token; cobertura no congelada | Condicionada por licencia y términos API | BLOQUEADO | Obtener token y revisar términos operativos/retención antes de adquirir. |
+| Mapillary | [API](https://help.mapillary.com/hc/en-us/articles/360010234680-Accessing-imagery-and-data-through-the-Mapillary-API) y [licencia](https://help.mapillary.com/hc/en-us/articles/115001770409-CC-BY-SA-license-for-open-data) | Fuente principal candidata para evidencia VLM | Imágenes declaradas CC BY-SA 4.0 | Inventario, cobertura y piloto local de 24 miniaturas completados; fuera de Git | Imágenes/adaptaciones compartidas requieren atribución y, cuando corresponda, ShareAlike; IA no autorizada expresamente en el texto revisado | CONDICIONADO PARA FUTURA INFERENCIA | Completar inspección manual; revisar de nuevo antes de publicar, ampliar o ejecutar Qwen3-VL. |
 | KartaView | [Servicio](https://kartaview.org/) | Posible evidencia F5.5 | CC BY-SA 4.0 en términos OpenStreetCam antiguos | API pública observada sin cobertura D004 | Condiciones actuales y atribución requieren aclaración | NO VIABLE EN D004 ACTUALMENTE | Reconsultar cobertura y términos antes de reconsiderar. |
 | Google Street View | [Política oficial](https://developers.google.com/maps/documentation/streetview/policies) | Referencias documentales F5.6/F5.7 y coordenadas de panorama F5.9 | Términos contractuales, no licencia abierta | Capturas manuales F5.6 retiradas localmente tras F5.9; se conservan metadatos, no imágenes | No publicar imágenes/derivados por defecto | METADATOS DOCUMENTALES; PERMISOS DE EVALUACIÓN PENDIENTES | Conservar URL/panorama/hash históricos; no inferir precisión; no readquirir o procesar imágenes sin revisar condiciones. |
 | Google Maps/Earth satélite | [Términos oficiales](https://cloud.google.com/maps-platform/terms) | Satélite opcional/GeoBridge | Términos contractuales | No asumir descarga, cache, transformación o embeddings | No redistribuir | PENDIENTE DE PROVEEDOR | Elegir fuente alternativa o autorización. |
 | Futuro proveedor satelital | Por seleccionar | Extensión satelital | Por revisar | Por revisar | Por revisar | NO CONFIRMADO | Resolver D015 antes de adquirir datos. |
 | LLM/VLM externo | Proveedor por seleccionar | Parsing o verificación | Según cuenta/modelo | Retención y salidas dependen del contrato | No publicar entradas/salidas/pesos sin revisar | NO CONFIRMADO | Auditar al seleccionar proveedor. |
 | Qwen3-8B | [Hugging Face](https://huggingface.co/Qwen/Qwen3-8B) | Transformación textual local experimental F5.2 | Apache-2.0 en ficha y snapshot | Snapshot local de revisión `b968826d...`; 5 shards verificados por SHA-256, fuera de Git | No redistribuir pesos desde este repositorio; conservar licencia y procedencia | VALIDADO PARA USO LOCAL CON CONDICIONES | Mantener revisión/hashes; revisar de nuevo antes de redistribuir o cambiar modelo. |
+| Qwen3-VL Instruct 2B/4B/8B | [Hugging Face](https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe) y [repositorio oficial](https://github.com/QwenLM/Qwen3-VL) | VLM local candidato para verificación visual | Apache-2.0 declarado en fichas y repositorio | Solo 2B descargado y ejecutado localmente en revisión `89644892...`; 4B/8B no descargados | No redistribuir pesos; conservar licencia, revisión y hash | 2B VALIDADO SOLO PARA SMOKE LOCAL; INTEGRACIÓN BLOQUEADA | Mejorar calidad de evidencia antes de ampliar; no autoriza reranking. |
 | LM Format Enforcer | [GitHub](https://github.com/noamgat/lm-format-enforcer) | Generación JSON guiada experimental F5.3b | MIT | Dependencia Python opcional, versión 0.11.3; no contiene pesos | Sí, conservando licencia MIT | VALIDADO PARA USO LOCAL CON CONDICIONES | Mantener versión fijada y shim documentado para Transformers 5.9. |
 | DialogueVPR/DQ-pilot | Publicación/repositorio oficial | Extensión de diálogo | No auditada aquí | Pesos/datos por revisar | No redistribuir por defecto | NO CONFIRMADO | Auditoría específica antes de integrar. |
 | TOL/TOLoc | [GitHub](https://github.com/WHU-USI3DV/TOL) | Refinamiento opcional | No localizada en revisión previa | Pesos/datos por revisar | No copiar o redistribuir por defecto | PENDIENTE DE AUTORES | Solicitar autorización si se integra. |
@@ -139,6 +140,95 @@ Borrar una imagen después de procesarla no autoriza el procesamiento ni la desc
 La consulta debe describir la API, cuenta, finalidad académica, inferencia sin entrenamiento, evaluación prevista, proveedor del VLM, transferencia y retención de imágenes, resultados derivados y publicación. No consta todavía una respuesta que confirme este flujo.
 
 Si no puede utilizarse Google, se estudiarán fotografías propias u otra fuente con permisos adecuados. Renderizar mapas OSM permite preparar entradas cartográficas de CrossText2Loc, pero no sustituye la evidencia fotográfica de fachadas, materiales o relojes. El cambio de fuente deberá documentarse.
+
+La política oficial de Street View Static API consultada para la planificación
+del reranking indica que el prefetch, indexación, almacenamiento o caché de
+contenido están generalmente prohibidos, con excepción explícita del panorama
+ID. También exige atribución y cumplimiento de los términos aplicables a la
+cuenta, incluidos los específicos del EEE cuando corresponda. Esto refuerza que
+Google Street View permanezca bloqueado para construir una galería local VLM
+hasta recibir una aclaración contractual del flujo exacto.
+
+Wikimedia Commons permite reutilización según la licencia de cada fichero, con
+atribución y posibles obligaciones ShareAlike; además deben revisarse privacidad,
+personality rights y exactitud de los metadatos. Mapillary declara las imágenes
+bajo CC BY-SA 4.0, licencia que permite reproducción y adaptación, pero eso no
+sustituye las condiciones de acceso de la API. El proyecto implementó solo el
+cliente de metadatos y la medición offline: no ha registrado una aplicación,
+configurado un token, llamado a la API ni descargado imágenes. La guía
+[MAPILLARY_COVERAGE.md](MAPILLARY_COVERAGE.md) fija el punto de autorización, la
+protección de credenciales y la trazabilidad. Mapillary permanece condicionado
+hasta revisar los términos efectivos de aplicación y medir cobertura real.
+
+La cobertura metadata-only se midió con una bbox ampliada y particionada. El
+piloto conserva una selección de 24 IDs y exige `--confirm-terms-reviewed`. La
+persona titular proporcionó esa confirmación y las 24 miniaturas se adquirieron.
+Mapillary continúa **CONDICIONADO** para la futura inferencia IA y cualquier
+ampliación o publicación.
+
+### Revisión final previa a las miniaturas Mapillary
+
+**Fecha de consulta:** 23 de octubre de 2026.
+
+Hechos verificados en fuentes oficiales accesibles:
+
+- La [página oficial de licencia de Mapillary](https://help.mapillary.com/hc/en-us/articles/115001770409-CC-BY-SA-license-for-open-data)
+  declara que todas las imágenes se comparten bajo CC BY-SA 4.0 y permite
+  observar, distribuir y modificar las imágenes con atribución. Proporciona como
+  modelo título/enlace de la imagen, usuario/enlace de perfil y enlace a la
+  licencia.
+- La [página oficial de acceso API](https://help.mapillary.com/hc/en-us/articles/360010234680-Accessing-imagery-and-data-through-the-Mapillary-API)
+  confirma que Mapillary ofrece una API propia para interactuar con sus datos y
+  remite a la documentación completa de la API.
+- CC BY-SA 4.0 permite reproducción y adaptación. Si se comparte material
+  adaptado, deben mantenerse atribución, indicación de cambios y ShareAlike. La
+  licencia no concede por sí sola derechos de privacidad, imagen, marca u otros
+  derechos de terceros.
+
+Conclusiones limitadas al material verificable:
+
+| Actividad | Estado | Fundamento o condición |
+|---|---|---|
+| Inspección manual privada de 24 miniaturas | COMPATIBLE CON LA LICENCIA DE IMAGEN | Reproducción privada y análisis; conservar procedencia y atribución. |
+| Conservación local académica | COMPATIBLE CON LA LICENCIA DE IMAGEN | No publicar automáticamente; mantener autor, enlace, licencia y hashes. |
+| Anotación estructurada propia | COMPATIBLE EN PRINCIPIO | No debe reconstruir ni redistribuir innecesariamente la fotografía. |
+| Inferencia futura con Qwen3-VL fijo | NO PROHIBIDA POR CC BY-SA; INTERPRETACIÓN CONDICIONADA | Los términos resumidos no autorizan expresamente IA; no equivale a permiso para entrenar ni redistribuir. |
+| Publicación de imágenes o adaptaciones | PERMITIDA CON CONDICIONES | Atribución y ShareAlike cuando proceda; revisar otros derechos por imagen. |
+| Descarga de 24 imágenes individuales mediante API oficial | CONTEMPLADA SEGÚN TEXTO REVISADO POR EL TITULAR | La sección 11 aportada contempla descargar imágenes individuales y alojarlas con atribución visible y enlace a Mapillary. |
+
+No se interpretó el fallo inicial de acceso a los términos como autorización. La
+descarga permaneció bloqueada hasta recibir la confirmación expresa posterior
+del titular, registrada en esta misma revisión.
+
+Para desbloquear la descarga, la persona titular de la aplicación debe revisar
+en una sesión autenticada los términos enlazados desde su panel y confirmar por
+escrito para el registro experimental que permiten: (1) solicitar mediante API
+las 24 miniaturas seleccionadas a 1.024 px; (2) conservarlas localmente durante
+el TFG; (3) inspeccionarlas y anotarlas manualmente; y (4) procesarlas después
+con Qwen3-VL de pesos fijos, sin entrenamiento, redistribución automática ni
+dataset público. También debe anotar cualquier límite o condición adicional.
+
+La persona titular confirmó expresamente en la sesión del 23 de octubre de 2026
+que revisó las condiciones aplicables a su aplicación y no identificó
+facturación ni restricciones adicionales incompatibles con el piloto descrito.
+Con esa confirmación se ejecutó el descargador con
+`--confirm-terms-reviewed`: 24/24 miniaturas de 1.024 px fueron adquiridas y
+ninguna falló. Permanecen en `results/generated/`, fuera de Git.
+
+La sección 11, según el texto revisado por el titular, contempla descargar
+imágenes individuales y alojarlas en servidores propios con atribución visible y
+enlace a Mapillary. Las secciones 3 y 5 mantienen aplicables la licencia del
+contenido y el uso de interfaces oficiales; la sección 12 puede añadir
+condiciones si el uso pasa a ser comercial; y la sección 23 permite términos
+adicionales. Este registro no generaliza la autorización a descarga masiva,
+entrenamiento, eliminación de difuminado, reidentificación, navegación en tiempo
+real ni publicación de un dataset.
+
+El texto revisado no menciona expresamente procesamiento mediante IA. Considerar
+compatible la inferencia local futura con Qwen3-VL de pesos fijos es una
+interpretación limitada basada en CC BY-SA y en la ausencia de una restricción
+adicional incompatible identificada por el titular, no una autorización textual
+específica para IA.
 
 ## TOL y el refinamiento futuro
 

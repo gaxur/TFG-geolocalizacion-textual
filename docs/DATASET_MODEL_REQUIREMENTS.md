@@ -31,10 +31,38 @@ oficial de GOTPR.
 | GOTPR para una ciudad nueva | EXPERIMENTAL | `scene_graph.py:46-117`; `scene_graph_candidates_extraction.py:8-76` | Constructor OSM→Scene Graph, reglas espaciales y embeddings | El checkpoint puede no ser compatible |
 | Indexación GOTPR/Milvus | CONFIRMADO | `scene_graph_candidates_extraction.py:8-36` | Escoger Milvus o comparación completa | Coste y dependencia de CUDA |
 | Street View | BLOQUEADO/PENDIENTE | APIs y términos de Google Maps Platform | Confirmar descarga, procesamiento, caché y publicación | Restricciones contractuales |
-| VLM | PENDIENTE | No hay proveedor fijado en el proyecto | Modelo, contrato, coste y retención | Privacidad y coste |
+| Mapillary metadata | IMPLEMENTADO, PENDIENTE DE EJECUCIÓN AUTORIZADA | Cliente API v4 y medición local en `mapillary_coverage.py`; guía `MAPILLARY_COVERAGE.md` | Registrar aplicación, revisar términos, configurar token y medir D004 | Cobertura y límites reales desconocidos |
+| VLM | SMOKE 2B COMPLETADO; INTEGRACIÓN BLOQUEADA | Qwen3-VL-2B, revisión `89644892e4d85e24eaac8bacfd4f463576704203`, 3/3 JSON válidos en GB10 | Mejorar y validar la fidelidad de evidencias antes de verificar candidatos o reordenar | Sobreafirmación visual; muestra n=3; privacidad y licencia condicionadas |
 | DialogueVPR | EXPERIMENTAL | Referencia científica en `BASELINE.md` | Política de preguntas propia | No es necesario para el MVP |
 | TOLoc | EXPERIMENTAL | Referencia científica en `BASELINE.md` | Compatibilidad, datos y licencia | Ampliación fuera del alcance inicial |
 | Recall@K y Haversine | CONFIRMADO | `external/CVG-Text/evaluate.py:11-17,271-342`; `external/GOTPR/eval_utils.py:28-93`; D030–D031 | Umbrales y métrica principal pendientes de experimento | Las métricas oficiales no son idénticas |
+
+Actualización experimental: se descargó con autorización expresa únicamente
+Qwen3-VL-2B-Instruct, revisión
+`89644892e4d85e24eaac8bacfd4f463576704203`. El peso ocupa 4.255.140.312 B y su
+SHA-256 es `7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0`.
+El smoke aislado produjo 3/3 JSON válidos, tardó 34,83 s incluida la carga y usó
+un pico CUDA asignado de 4.479.027.712 B. El acuerdo ordinal con las anotaciones
+humanas fue 1/3 y se observaron sobreafirmaciones, por lo que no se integra ni se
+usa para reranking. No se descargó el modelo 4B. Véase
+[PHASE_VLM_VISUAL_RERANKING_PLAN.md](PHASE_VLM_VISUAL_RERANKING_PLAN.md).
+
+La fase de cobertura Mapillary implementa una separación estricta entre
+adquisición y evaluación local. `acquire_mapillary_d004_inventory.py` consulta
+solo metadatos de la bbox D004 y exige `MAPILLARY_ACCESS_TOKEN` antes de abrir red.
+`evaluate_mapillary_d004_coverage.py` consume el inventario congelado, los
+manifests F1 reales y únicamente las filas de rankings H11-H25, sin abrir el
+dataset de referencias. Calcula radios 10/25/50/100 m para 1.115 candidatos de
+25 m, 253 de 50 m y 88 candidatos Top-10 únicos. La adquisición real y sus
+porcentajes siguen pendientes de autorización; véase
+[MAPILLARY_COVERAGE.md](MAPILLARY_COVERAGE.md).
+
+Actualización del piloto: la adquisición ampliada usa un buffer de 100 m en
+EPSG:25830 y una cuadrícula 2×2 para evitar truncamiento de borde y submuestreo de
+la consulta monolítica. Congeló 5.337 metadatos y elevó la cobertura espacial de
+los 88 candidatos Top-10 a 47/88 a 25 m, 74/88 a 50 m y 86/88 a 100 m. Se
+seleccionaron diez candidatos y 24 fotografías potenciales, todavía no
+descargadas. Estas cifras no miden utilidad visual.
 
 ## Estado de la auditoría
 

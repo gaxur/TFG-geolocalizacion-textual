@@ -1,0 +1,35 @@
+{
+  "contract_version": "mapillary-qwen3-vl-v1-manual-audit-v1",
+  "source_result_sha256": "7d1d12b9cc3e0556cd8d834c4c0dd4b9fa781fa1616677260f41aa2f7b0e1bdb",
+  "records": [
+    {
+      "image_id": "1210433070142949",
+      "correct_matches": ["iglesia", "puerta en arco", "estructura de ladrillo"],
+      "unsupported_matches": ["inmobiliaria", "tienda de tejidos"],
+      "incorrect_contradictions": [],
+      "should_be_unverifiable": ["inmobiliaria", "tienda de tejidos", "relaciones izquierda/derecha"],
+      "orientation_error": "Afirmó relaciones izquierda/derecha y a la vez reconoció que la orientación no era inequívoca."
+    },
+    {
+      "image_id": "1539904880777289",
+      "correct_matches": ["edificio blanco"],
+      "unsupported_matches": ["calle empedrada que desemboca en plaza", "columnas", "edificio de piedra con banderas"],
+      "incorrect_contradictions": [],
+      "should_be_unverifiable": ["desembocadura en plaza", "relaciones izquierda/derecha", "banderas"],
+      "orientation_error": "Declaró strong_match pese a reconocer que la orientación no era inequívoca."
+    },
+    {
+      "image_id": "483221386454901",
+      "correct_matches": [],
+      "unsupported_matches": ["plaza peatonal"],
+      "incorrect_contradictions": [],
+      "should_be_unverifiable": ["plaza peatonal", "edificio de varias plantas", "edificio de ladrillo", "escaleras a aparcamiento"],
+      "orientation_error": null
+    }
+  ],
+  "limitations": [
+    "manual_post_hoc_audit",
+    "development_pilot_not_independent_evaluation",
+    "human_annotations_are_not_geographic_ground_truth"
+  ]
+}

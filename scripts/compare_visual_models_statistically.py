@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+import argparse,hashlib,json,sys
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
+from src.tfg_phase0.visual_reranking import canonical_bytes
+from src.tfg_phase0.visual_statistics import exact_mcnemar,paired_cluster_bootstrap,wilson_interval
+def digest(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--two-b-evaluation',type=Path,required=True);p.add_argument('--eight-b-evaluation',type=Path,required=True);p.add_argument('--annotations',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();left=json.loads(a.two_b_evaluation.read_text());right=json.loads(a.eight_b_evaluation.read_text());human=json.loads(a.annotations.read_text());l={(r['candidate_id'],r['image_id'],r['claim_id']):r for r in left['per_record']};rr={(r['candidate_id'],r['image_id'],r['claim_id']):r for r in right['per_record']};h={(r['candidate_id'],r['image_id'],r['claim_id']):r for r in human['records']};assert set(l)==set(rr)==set(h);rows=[]
+ for key in sorted(h):rows.append({'query_id':h[key]['query_id'],'candidate_id':key[0],'image_id':key[1],'claim_id':key[2],'human':h[key]['human_verdict'],'left_correct':l[key]['correct'],'right_correct':rr[key]['correct'],'two_b':l[key]['predicted'],'eight_b':rr[key]['predicted']})
+ n=len(rows);lc=sum(r['left_correct'] for r in rows);rc=sum(r['right_correct'] for r in rows);doc={'schema_version':'1.0','contract_version':'visual-model-statistical-comparison-v1','inputs':{'two_b_sha256':digest(a.two_b_evaluation),'eight_b_sha256':digest(a.eight_b_evaluation),'annotations_sha256':digest(a.annotations)},'counts':{'pairs':n,'queries':len({r['query_id'] for r in rows}),'two_b_correct':lc,'eight_b_correct':rc,'same_prediction':sum(r['two_b']==r['eight_b'] for r in rows)},'intervals':{'two_b_accuracy_wilson_95':wilson_interval(lc,n),'eight_b_accuracy_wilson_95':wilson_interval(rc,n)},'paired':{'mcnemar':exact_mcnemar([r['left_correct'] for r in rows],[r['right_correct'] for r in rows]),'query_cluster_bootstrap':paired_cluster_bootstrap(rows,iterations=10000,seed=20261026)},'per_pair':rows,'interpretation':'Development data previously used for contract design. Intervals quantify uncertainty but are not confirmatory generalization; failure to reject equality is not evidence of equivalence.'};a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_bytes(canonical_bytes(doc)+b'\n');print(json.dumps({**doc['counts'],**doc['paired']},sort_keys=True));return 0
+if __name__=='__main__':raise SystemExit(main())

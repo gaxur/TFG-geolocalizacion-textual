@@ -94,6 +94,10 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D076 | Seleccionar variante textual e integración de Qwen para el objetivo Top-10 | PENDIENTE DE EXPERIMENTO | F5 / estrategia textual |
 | D077 | Retirar las capturas locales SV y mantener F5.6/F5.7 como trazabilidad histórica | ACEPTADA | F5 / minimización de datos |
 | D078 | Ofrecer dos galerías y dos modos exclusivos en el MVP experimental | ACEPTADA | MVP / experimentación interactiva |
+| D079 | Separar D004 de la bbox fotográfica y adquirir Mapillary con buffer 100 m particionado 2×2 | PROPUESTA | VLM / cobertura visual |
+| D080 | Autorizar Qwen3-VL-2B solo para un smoke aislado, sin reranking ni cambios del baseline | ACEPTADA | VLM / smoke local |
+| D081 | Mantener bloqueados reranking y descarte tras la validación atómica 2B | ACEPTADA | VLM / integridad experimental |
+| D082 | Mantener 2B como modelo visual de desarrollo tras diagnóstico 8B sin mejora | ACEPTADA | VLM / selección de modelo |
 
 ## D053 — API HTTP interna del MVP
 
@@ -685,6 +689,40 @@ secundarias. No se define una suma ponderada ni un score compuesto. Si 50 m y
 100 m favorecen alternativas distintas, el compromiso se elevará al responsable
 en lugar de inventar pesos.
 
+### Justificación metodológica del uso de Top-10
+
+El objetivo del TFG es recuperar una lista útil de ubicaciones candidatas, no
+estimar una coordenada continua con precisión centimétrica. La prioridad de
+GeoRecall@10 y Recall@10 se justifica por las condiciones reales del protocolo:
+
+- CrossText2Loc se usa en transferencia zero-shot a Madrid con un checkpoint
+  preentrenado en Nueva York y sin entrenamiento o fine-tuning sobre las
+  descripciones humanas H01–H25;
+- la salida es una celda del catálogo y su centro, no una regresión de la posición
+  exacta del observador;
+- las galerías de 25 m y 50 m contienen candidatos próximos y representaciones
+  OSM solapadas, por lo que varias celdas vecinas pueden ser geográficamente
+  plausibles aunque solo una ocupe el primer puesto;
+- las referencias Street View utilizadas en las campañas exploratorias tienen
+  incertidumbre desconocida y no equivalen a Ground Truth métrico validado;
+- las descripciones contienen detalles visuales, orientación egocéntrica y
+  nombres que no siempre aparecen en el raster OSM.
+
+En este contexto, Recall@1 y GeoRecall@1 son especialmente sensibles a pequeños
+cambios del orden, a la discretización y a candidatos visualmente similares. Una
+transformación textual puede desplazar una candidata cercana entre las primeras
+posiciones sin cambiar que el Top-10 contenga una solución útil. Por ello las
+métricas @1 no se eliminan: se conservan para analizar la calidad de la primera
+propuesta y futuras etapas de reranking, pero no actúan como criterio principal
+para seleccionar variante textual o galería en el baseline actual.
+
+Esta decisión no presupone que las diferencias @1 entre variantes sean siempre
+mínimas. Establece que, mientras no exista entrenamiento específico y una
+referencia más precisa, las métricas @10 proporcionan una medida más robusta y
+alineada con la salida Top-K del sistema. Una futura etapa VLM de reranking sí
+deberá volver a priorizar GeoRecall@1 y error Top-1, porque un reranker que
+conserva los mismos diez candidatos pretende mejorar su orden, no su cobertura.
+
 ### Interpretación y consecuencias
 
 GeoRecall@10 a 100 m es la proporción de consultas para las que al menos una de
@@ -811,6 +849,126 @@ La condición se verificó en la GB10 con la imagen `crosstext2loc-gb10:f511`: e
 smoke conjunto completó transformación y Top-10 con ambos modelos residentes, y
 el smoke integrado completó las cuatro combinaciones mediante Chromium. Esta
 validación cierra la viabilidad técnica F5.11, no D076.
+
+## D079 — Bbox fotográfica Mapillary con buffer y partición
+
+**Estado:** PROPUESTA
+**Componente:** VLM / cobertura visual
+**Fecha:** 2026-10-22
+**Origen:** Auditoría del piloto visual Mapillary.
+
+### Propuesta
+
+Mantener D004 como región de estudio y ampliar únicamente la bbox de adquisición
+fotográfica mediante un buffer de 100 m calculado en EPSG:25830. Consultar la
+bbox resultante en una cuadrícula 2×2 y unir metadatos por `image_id`.
+
+### Justificación
+
+Diecinueve de los 88 candidatos Top-10 están a menos de 100 m del límite de
+D004. Una consulta limitada a D004 puede omitir cámaras válidas situadas fuera.
+Además, la consulta monolítica ampliada no devolvió un inventario estable: solo
+347 IDs coincidían con el inventario original. Cuatro particiones bajo el límite
+de 2.000 resultados congelaron 5.337 IDs sin alcanzar el máximo por celda.
+
+El margen coincide con el mayor radio medido y su suficiencia se comprueba sobre
+bordes y esquinas. No modifica candidatos, embeddings, rankings, consultas o GT.
+Las cifras resultantes miden proximidad espacial, no utilidad visual. La
+evidencia completa y la comparación se documentan en
+[MAPILLARY_COVERAGE.md](MAPILLARY_COVERAGE.md).
+
+### Condición de aceptación
+
+La decisión no pasa a `ACEPTADA` sin aprobación expresa. Una futura adquisición
+de imágenes requiere además revisar los términos aplicables a la aplicación y
+mantener Mapillary como fuente condicionada.
+
+## D080 — Smoke aislado de Qwen3-VL-2B
+
+**Estado:** ACEPTADA
+**Componente:** VLM / smoke local
+**Fecha:** 2026-10-23
+**Origen:** Autorización expresa del responsable del TFG.
+
+### Decisión
+
+Descargar exclusivamente `Qwen/Qwen3-VL-2B-Instruct` en la revisión
+`89644892e4d85e24eaac8bacfd4f463576704203` y ejecutar un smoke aislado sobre
+tres fotografías Mapillary ya anotadas. No descargar el 4B, no implementar
+reranking y no modificar el baseline CrossText2Loc.
+
+### Resultado y límite
+
+El modelo produjo 3/3 salidas JSON contractuales en la NVIDIA GB10, con un pico
+CUDA asignado de 4.479.027.712 B. Solo 1/3 grados coincidió con la equivalencia
+ordinal predefinida de utilidad humana. Además, sobreafirmó como visibles
+elementos que la revisión humana consideró no verificables. Se valida la
+viabilidad técnica del smoke, no la calidad para integrar el verificador.
+
+Qwen3-VL-2B permanece fuera del MVP y no se autoriza reranking. Un avance a la
+Fase 3 requiere revisar prompt y evidencia sobre una fixture de desarrollo sin
+usar este piloto como test ciego.
+
+### Evaluación conservadora ampliada
+
+La variante de prompt v2 ejecutada sobre las 24 fotografías obtuvo 19/24 JSON
+válidos. La comparación descriptiva encontró 11/24 imágenes con coincidencias
+sobreafirmadas y 11/24 con contradicciones injustificadas. Se adopta la categoría
+B: apoyo exploratorio con revisión humana obligatoria. Esta evidencia refuerza,
+no levanta, el bloqueo de integración y reranking. Véase
+[PHASE_QWEN3_VL_2B_CONSERVATIVE_EVALUATION.md](PHASE_QWEN3_VL_2B_CONSERVATIVE_EVALUATION.md).
+
+## D081 — Bloqueo de reranking y descarte tras validación atómica 2B
+
+**Estado:** ACEPTADA
+**Componente:** VLM / integridad experimental
+**Fecha:** 2026-10-26
+**Origen:** Criterios de aceptación ya fijados y evaluación humana de 60 pares.
+
+### Decisión
+
+No ejecutar H11, reranking, descarte o sustitución de candidatos con las salidas
+actuales de Qwen3-VL-2B. Mantener el modelo únicamente como apoyo exploratorio
+con revisión humana.
+
+### Evidencia
+
+La variante compacta guiada produjo 24/60 resultados utilizables, incluidos tres
+abstenciones determinadas por política. Los 21 resultados del modelo aceptados
+fueron `unverifiable`; no hubo ningún `supported` o `contradicted` contractual.
+Treinta y seis outputs se rechazaron. Macro-F1: 0,213. Esta conducta no permite
+medir ni controlar falsos descartes y queda muy lejos del requisito previo de
+100 % de outputs atómicos válidos.
+
+Detalles:
+[PHASE_VISUAL_ATOMIC_VALIDATION_RESULTS.md](PHASE_VISUAL_ATOMIC_VALIDATION_RESULTS.md).
+
+### Actualización V4
+
+El contrato que separa decisión y explicación recuperó 60/60 veredictos válidos,
+pero no detectó ninguna de las dos contradicciones humanas y produjo seis falsos
+soportes. Se permite continuar investigación de soporte/abstención, pero no se
+levanta el bloqueo de descarte, penalización negativa, H11 o MVP.
+
+## D082 — Selección visual tras diagnóstico 8B
+
+**Estado:** ACEPTADA
+**Componente:** VLM / selección de modelo
+**Fecha:** 2026-10-26
+**Origen:** Comparación autorizada 2B/8B con contrato V4.
+
+### Decisión
+
+Mantener Qwen3-VL-2B como baseline y modelo visual de desarrollo. Conservar el 8B
+descargado y verificado, pero no adoptarlo como modelo principal ni ejecutar los
+60 pares con él.
+
+### Evidencia
+
+El smoke 8B BF16 fue compatible con GB10. En los diez pares diagnósticos produjo
+exactamente las mismas decisiones que el 2B: 4 soportes, 6 abstenciones y cero
+contradicciones. El coste fue 3,98× en pico CUDA, 3,94× en carga y 2,34× en
+ejecución. Véase [PHASE_QWEN3_VL_8B_DIAGNOSTIC.md](PHASE_QWEN3_VL_8B_DIAGNOSTIC.md).
 
 ## D001 — Identidad del candidato
 

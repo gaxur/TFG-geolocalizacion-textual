@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/mapillary_visual_annotation.schema.json",
+  "title": "Anotación manual del piloto visual Mapillary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "selection_id", "records", "instructions"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "mapillary-visual-annotation-v1"},
+    "selection_id": {"type": "string"},
+    "instructions": {"type": "object"},
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["query_id", "candidate_id", "image_id", "coverage_status", "review_status", "utility", "matches", "contradictions", "unverifiable", "limitations"],
+        "properties": {
+          "query_id": {"type": "string"},
+          "candidate_id": {"type": "string"},
+          "image_id": {"type": ["string", "null"]},
+          "coverage_status": {"type": "string"},
+          "review_status": {"enum": ["pending", "reviewed", "not_applicable"]},
+          "utility": {"type": ["string", "null"], "enum": ["useful", "partially_useful", "not_useful", "unverifiable", null]},
+          "matches": {"type": "array"},
+          "contradictions": {"type": "array"},
+          "unverifiable": {"type": "array"},
+          "limitations": {"type": "array"},
+          "reviewer": {"type": ["string", "null"]},
+          "reviewed_at_utc": {"type": ["string", "null"]},
+          "notes": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

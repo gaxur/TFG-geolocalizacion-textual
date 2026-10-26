@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/mapillary_vlm_verification.schema.json",
+  "title": "Salida preliminar de verificación Qwen3-VL",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "records", "reranking_performed"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "mapillary-vlm-verification-v1"},
+    "reranking_performed": {"const": false},
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["candidate_id", "image_ids", "matches", "contradictions", "unverifiable", "verification_level", "evidence", "provenance"],
+        "properties": {
+          "candidate_id": {"type": "string"},
+          "image_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "matches": {"type": "array"},
+          "contradictions": {"type": "array"},
+          "unverifiable": {"type": "array"},
+          "verification_level": {"enum": ["strong_match", "partial_match", "insufficient", "contradiction"]},
+          "evidence": {"type": "array"},
+          "provenance": {"type": "object"}
+        }
+      }
+    }
+  }
+}

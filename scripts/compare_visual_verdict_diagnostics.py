@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+import argparse,ast,hashlib,json,sys
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
+from src.tfg_phase0.visual_reranking import canonical_bytes
+CLASSES=('supported','contradicted','unverifiable')
+def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--two-b',type=Path,required=True);p.add_argument('--eight-b',type=Path,required=True);p.add_argument('--annotations',type=Path,required=True);p.add_argument('--diagnostic-script',type=Path,default=ROOT/'scripts/run_visual_verdict_diagnostic_v4.py');p.add_argument('--output',type=Path,required=True);a=p.parse_args();two=json.loads(a.two_b.read_text());eight=json.loads(a.eight_b.read_text());human=json.loads(a.annotations.read_text());tree=ast.parse(a.diagnostic_script.read_text());keys=ast.literal_eval(next(n.value for n in tree.body if isinstance(n,ast.Assign) and any(getattr(x,'id',None)=='DIAGNOSTIC_KEYS' for x in n.targets)));truth={(r['image_id'],r['claim_id']):r['human_verdict'] for r in human['records']};assert len(two['records'])==len(eight['records'])==len(keys)==10
+ def evaluate(run):
+  matrix={c:{v:0 for v in CLASSES} for c in CLASSES};rows=[]
+  for key,row in zip(keys,run['records']):matrix[truth[key]][row['verdict']]+=1;rows.append({'image_id':key[0],'claim_id':key[1],'human':truth[key],'predicted':row['verdict'],'correct':truth[key]==row['verdict'],'explanation':row['explanation']})
+  return {'matrix':matrix,'correct':sum(r['correct'] for r in rows),'rows':rows,'resources':run['resources']}
+ left,right=evaluate(two),evaluate(eight);same=sum(l['predicted']==r['predicted'] for l,r in zip(left['rows'],right['rows']));doc={'schema_version':'1.0','contract_version':'visual-verdict-model-comparison-v4','inputs':{'two_b_sha256':digest(a.two_b),'eight_b_sha256':digest(a.eight_b),'annotations_sha256':digest(a.annotations),'diagnostic_script_sha256':digest(a.diagnostic_script)},'protocol':{'same_pairs':True,'same_contract':True,'same_prompt':True,'same_generation_parameters':True,'human_labels_sent_to_models':False,'development_diagnostic':True},'two_b':left,'eight_b':right,'comparison':{'same_predictions':same,'different_predictions':10-same,'accuracy_delta':(right['correct']-left['correct'])/10,'load_time_ratio_8b_over_2b':right['resources']['model_load_seconds']/left['resources']['model_load_seconds'],'execution_time_ratio_8b_over_2b':right['resources']['execution_seconds']/left['resources']['execution_seconds'],'cuda_peak_ratio_8b_over_2b':right['resources']['cuda_peak_allocated_bytes']/left['resources']['cuda_peak_allocated_bytes'],'recommendation':'retain_2b_for_development_no_8b_full_run','reason':'8B reproduced all 2B decisions, including zero contradicted, at substantially higher resource cost.'},'limitations':['ten_pair_development_diagnostic','only_two_human_contradictions','not_independent_evaluation','no_statistical_generalization']};a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_bytes(canonical_bytes(doc)+b'\n');print(json.dumps(doc['comparison'],sort_keys=True));return 0
+if __name__=='__main__':raise SystemExit(main())

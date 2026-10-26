@@ -165,6 +165,11 @@ H11–H25 añade una evaluación humana independiente de `es_original` frente a
 `en_cartographic`, con H16 interior separado y 60 rankings reales:
 [PHASE_H11_H25_EVALUATION.md](docs/PHASE_H11_H25_EVALUATION.md).
 
+La siguiente fase propuesta estudia evidencia fotográfica autorizada y un VLM
+como verificador/reranker del Top-10, comenzando por contratos y una fixture
+propia antes de integrar modelos:
+[PHASE_VLM_VISUAL_RERANKING_PLAN.md](docs/PHASE_VLM_VISUAL_RERANKING_PLAN.md).
+
 El check bilingüe F4.5/F5.2 pertenece al contrato HTTP histórico anterior. La API
 experimental F5.11 acepta descripciones originales españolas y compara Sin LLM
 frente a Qwen; no reutiliza ese script como prueba operativa.

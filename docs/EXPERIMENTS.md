@@ -732,6 +732,47 @@ Después, el smoke integrado real validó las cuatro combinaciones mediante
 Nginx/FastAPI/GPU/Leaflet y Chromium ARM64. D076 permanece pendiente porque esta
 validación es funcional, no evidencia de superioridad científica.
 
+## Smoke aislado Qwen3-VL-2B con Mapillary
+
+El 23 de octubre de 2026 se ejecutó un smoke local, sin servidor, GT, reranking
+ni CrossText2Loc residente. Se usó `Qwen/Qwen3-VL-2B-Instruct` en la revisión
+autorizada `89644892e4d85e24eaac8bacfd4f463576704203`; no se descargó el 4B. El
+peso `model.safetensors` mide 4.255.140.312 B y tiene SHA-256
+`7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0`.
+
+La muestra se fijó antes de inferencia con tres fotografías ya anotadas: una
+`useful`, una `partially_useful` y una `not_useful`. El request recibió solo la
+descripción española, un `candidate_id` opaco y la imagen. Las anotaciones
+humanas se unieron después para la comparación.
+
+| Medida | Resultado |
+|---|---:|
+| JSON contractuales | 3/3 |
+| Acuerdo ordinal con utilidad humana | 1/3 |
+| Carga del modelo | 26,57 s |
+| Ejecución total | 34,83 s |
+| Inferencia por imagen | 3,99 / 2,63 / 1,51 s |
+| Pico CUDA asignado | 4.479.027.712 B |
+| Pico CUDA reservado | 4.513.071.104 B |
+| Pico RSS | 5.357.838.336 B |
+| Espacio libre posterior | 9.297.989.632 B |
+
+El contrato técnico fue viable, pero la revisión cualitativa detectó
+sobreafirmaciones. El modelo declaró visibles una inmobiliaria y una tienda que
+la anotación humana marcó como no verificables, y clasificó como
+`partial_match` una fotografía humana `not_useful`. Por tanto, el smoke no
+autoriza Fase 3, reranking ni integración. El resultado local está en
+`results/generated/mapillary/qwen3-vl-2b-isolated-smoke/result.json`, SHA-256
+`7d1d12b9cc3e0556cd8d834c4c0dd4b9fa781fa1616677260f41aa2f7b0e1bdb`.
+
+La evaluación de desarrollo posterior aplicó un prompt conservador distinto a
+las 24 imágenes. Obtuvo 19/24 JSON válidos, 14/24 acuerdos con un proxy ordinal
+explícito, 11/24 imágenes con coincidencias sobreafirmadas y 11/24 con
+contradicciones injustificadas. Cinco salidas se truncaron por repetición. Se
+adopta la categoría B: apoyo exploratorio con revisión humana, sin integración ni
+reranking. Detalles:
+[PHASE_QWEN3_VL_2B_CONSERVATIVE_EVALUATION.md](PHASE_QWEN3_VL_2B_CONSERVATIVE_EVALUATION.md).
+
 ## CrossText2Loc NewYork-mixed OSM en GB10
 
 ### Objetivo y resultado

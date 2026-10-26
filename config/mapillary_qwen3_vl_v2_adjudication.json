@@ -1,0 +1,41 @@
+{
+  "contract_version": "mapillary-qwen3-vl-v2-manual-adjudication-v1",
+  "inference_sha256": "0e6f5cf828fffec7546968c347e25a8c7464f12bad6c1c51b7b13f0fe15158ea",
+  "policy": {
+    "overclaimed_match": "Al menos una coincidencia no respaldada por la anotación humana, un nombre/OCR sin evidencia o una afirmación internamente inconsistente.",
+    "unjustified_contradiction": "Contradicción basada en ausencia, vista parcial u orientación no comparable, sin incompatibilidad visual inequívoca.",
+    "orientation_error": "Afirmación de relación egocéntrica o geometría no comprobable desde la vista."
+  },
+  "records": [
+    {"image_id":"1210433070142949","overclaimed_match":true,"unjustified_contradiction":true,"orientation_error":false,"error_types":["establishment_without_legible_sign","internal_inconsistency","facade_attribute"]},
+    {"image_id":"1401333830797121","overclaimed_match":false,"unjustified_contradiction":true,"orientation_error":false,"error_types":["absence_as_contradiction"]},
+    {"image_id":"1467353800748949","overclaimed_match":false,"unjustified_contradiction":true,"orientation_error":false,"error_types":["absence_as_contradiction"]},
+    {"image_id":"483221386454901","overclaimed_match":false,"unjustified_contradiction":false,"orientation_error":false,"error_types":[]},
+    {"image_id":"174852081596618","overclaimed_match":false,"unjustified_contradiction":true,"orientation_error":false,"error_types":["absence_as_contradiction"]},
+    {"image_id":"496369941555121","overclaimed_match":false,"unjustified_contradiction":false,"orientation_error":false,"error_types":[]},
+    {"image_id":"1116233698895289","overclaimed_match":false,"unjustified_contradiction":true,"orientation_error":true,"error_types":["partial_view_as_contradiction","spatial_relation"]},
+    {"image_id":"2885559761711069","overclaimed_match":true,"unjustified_contradiction":true,"orientation_error":false,"error_types":["establishment_without_legible_sign","absence_as_contradiction","internal_inconsistency"]},
+    {"image_id":"1829926473853096","overclaimed_match":false,"unjustified_contradiction":false,"orientation_error":false,"error_types":[]},
+    {"image_id":"390624879673869","overclaimed_match":true,"unjustified_contradiction":true,"orientation_error":true,"error_types":["unsupported_architecture","spatial_relation","partial_view_as_contradiction"]},
+    {"image_id":"4037471469647059","overclaimed_match":true,"unjustified_contradiction":true,"orientation_error":true,"error_types":["unsupported_architecture","spatial_relation","absence_as_contradiction"]},
+    {"image_id":"1539904880777289","overclaimed_match":true,"unjustified_contradiction":false,"orientation_error":false,"error_types":["invalid_json_truncation","repetition","unsupported_architecture"]},
+    {"image_id":"1000448337748748","overclaimed_match":false,"unjustified_contradiction":false,"orientation_error":false,"error_types":[]},
+    {"image_id":"224548649040144","overclaimed_match":true,"unjustified_contradiction":true,"orientation_error":false,"error_types":["ocr_without_legible_text","absence_as_contradiction"]},
+    {"image_id":"880688654590164","overclaimed_match":false,"unjustified_contradiction":false,"orientation_error":false,"error_types":[]},
+    {"image_id":"2857005767845410","overclaimed_match":true,"unjustified_contradiction":true,"orientation_error":false,"error_types":["invalid_json_truncation","establishment_without_legible_sign","ocr_without_legible_text","absence_as_contradiction"]},
+    {"image_id":"894063571492856","overclaimed_match":true,"unjustified_contradiction":true,"orientation_error":false,"error_types":["establishment_without_legible_sign","ocr_without_legible_text","absence_as_contradiction","internal_inconsistency"]},
+    {"image_id":"363313801773839","overclaimed_match":true,"unjustified_contradiction":false,"orientation_error":false,"error_types":["invalid_json_truncation","repetition","establishment_without_legible_sign"]},
+    {"image_id":"1139242494618668","overclaimed_match":false,"unjustified_contradiction":false,"orientation_error":false,"error_types":[]},
+    {"image_id":"764752502806292","overclaimed_match":true,"unjustified_contradiction":false,"orientation_error":false,"error_types":["invalid_json_truncation","repetition","generic_similarity"]},
+    {"image_id":"1387347911639563","overclaimed_match":true,"unjustified_contradiction":false,"orientation_error":false,"error_types":["invalid_json_truncation","repetition","generic_similarity"]},
+    {"image_id":"484760569616148","overclaimed_match":false,"unjustified_contradiction":false,"orientation_error":false,"error_types":[]},
+    {"image_id":"1353042103210892","overclaimed_match":false,"unjustified_contradiction":false,"orientation_error":false,"error_types":[]},
+    {"image_id":"284314086703727","overclaimed_match":false,"unjustified_contradiction":false,"orientation_error":false,"error_types":[]}
+  ],
+  "limitations": [
+    "manual_post_inference_adjudication",
+    "same_human_reviewer_source_for_reference_annotations",
+    "no_blinding_guarantee_for_adjudicator",
+    "development_only_not_statistically_generalizable"
+  ]
+}

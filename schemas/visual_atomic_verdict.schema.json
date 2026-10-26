@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/visual_atomic_verdict.schema.json",
+  "title": "Veredicto VLM de una evidencia y una fotografía",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["claim_id", "candidate_id", "image_id", "verdict", "observed_evidence", "ocr_text", "orientation_comparable", "limitations"],
+  "properties": {
+    "claim_id": {"type": "string", "pattern": "^visual-claim-sha256-[0-9a-f]{64}$"},
+    "candidate_id": {"type": "string", "minLength": 1},
+    "image_id": {"type": "string", "minLength": 1},
+    "verdict": {"enum": ["supported", "contradicted", "unverifiable"]},
+    "observed_evidence": {"type": ["string", "null"], "maxLength": 240},
+    "ocr_text": {"type": ["string", "null"], "maxLength": 160},
+    "orientation_comparable": {"type": "boolean"},
+    "limitations": {"type": "array", "uniqueItems": true, "maxItems": 4, "items": {"enum": ["none", "partial_view", "out_of_frame", "occluded", "too_far", "low_resolution", "unreadable_text", "orientation_not_comparable", "generation_failed"]}}
+  }
+}

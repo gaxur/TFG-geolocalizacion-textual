@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/visual_atomic_human_annotations.schema.json",
+  "title": "Anotaciones humanas claim-imagen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "records", "instructions"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "visual-atomic-human-annotations-v1"},
+    "instructions": {"type": "object"},
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["query_id", "candidate_id", "image_id", "claim_id", "human_verdict", "observed_evidence", "reason", "review_status", "reviewer", "reviewed_at_utc"],
+        "properties": {
+          "query_id": {"type": "string", "minLength": 1},
+          "candidate_id": {"type": "string", "minLength": 1},
+          "image_id": {"type": "string", "minLength": 1},
+          "claim_id": {"type": "string", "pattern": "^visual-claim-sha256-[0-9a-f]{64}$"},
+          "human_verdict": {"type": ["string", "null"], "enum": ["supported", "contradicted", "unverifiable", null]},
+          "observed_evidence": {"type": ["string", "null"], "maxLength": 240},
+          "reason": {"type": ["string", "null"], "maxLength": 240},
+          "review_status": {"enum": ["pending", "reviewed"]},
+          "reviewer": {"type": ["string", "null"]},
+          "reviewed_at_utc": {"type": ["string", "null"], "format": "date-time"}
+        }
+      }
+    }
+  }
+}

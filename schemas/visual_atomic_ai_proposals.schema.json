@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/visual_atomic_ai_proposals.schema.json",
+  "title": "Propuestas visuales de un anotador AI para revisión humana",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "fixture_id", "provenance", "records"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "visual-atomic-ai-proposals-v1"},
+    "fixture_id": {"type": "string", "minLength": 1},
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["annotation_kind", "agent", "generated_at_utc", "human_validated"],
+      "properties": {
+        "annotation_kind": {"const": "AI-proposed"},
+        "agent": {"type": "string", "minLength": 1},
+        "generated_at_utc": {"type": "string", "format": "date-time"},
+        "human_validated": {"const": false}
+      }
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["query_id", "candidate_id", "image_id", "claim_id", "proposed_verdict", "observed_evidence", "justification", "limitations", "orientation_issue", "ambiguity", "proposal_status"],
+        "properties": {
+          "query_id": {"type": "string", "minLength": 1},
+          "candidate_id": {"type": "string", "minLength": 1},
+          "image_id": {"type": "string", "minLength": 1},
+          "claim_id": {"type": "string", "pattern": "^visual-claim-sha256-[0-9a-f]{64}$"},
+          "proposed_verdict": {"enum": ["supported", "contradicted", "unverifiable"]},
+          "observed_evidence": {"type": ["string", "null"], "maxLength": 400},
+          "justification": {"type": "string", "minLength": 1, "maxLength": 500},
+          "limitations": {"type": "array", "uniqueItems": true, "items": {"enum": ["none", "partial_view", "out_of_frame", "occluded", "too_far", "low_resolution", "unreadable_text", "orientation_not_comparable", "ambiguous_scene"]}},
+          "orientation_issue": {"type": "boolean"},
+          "ambiguity": {"type": ["string", "null"], "maxLength": 400},
+          "proposal_status": {"const": "AI-proposed"}
+        }
+      }
+    }
+  }
+}

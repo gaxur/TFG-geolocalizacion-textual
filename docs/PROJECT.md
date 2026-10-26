@@ -285,6 +285,17 @@ La verificación visual permite revisar la selección y el orden de los candidat
 
 Las condiciones de Google y del proveedor del VLM deben revisarse para el flujo concreto, incluida la transferencia de imágenes y su retención. Inferencia con pesos fijos y evaluación de modelos son actividades distintas; no se afirma una prohibición universal de cualquier inferencia. Véase [LICENSES_AND_PERMISSIONS.md](LICENSES_AND_PERMISSIONS.md).
 
+La planificación posterior a F5.11, incluidas fuentes visuales, VLM candidatos,
+contratos, prevención de fuga y fases de reranking, se documenta en
+[PHASE_VLM_VISUAL_RERANKING_PLAN.md](PHASE_VLM_VISUAL_RERANKING_PLAN.md). Es una
+propuesta pendiente, no una funcionalidad implementada ni una autorización para
+adquirir imágenes.
+
+La evolución futura que diferencia verificación, reranking, descarte reversible,
+sustitución desde una reserva Top-N, nueva recuperación y DialogueBot se resume
+en [FUTURE_HYBRID_ROADMAP.md](FUTURE_HYBRID_ROADMAP.md). Ninguna de esas etapas
+está habilitada por la evaluación VLM actual.
+
 ## 7. Resultado esperado
 
 Cada candidato de la lista final debería permitir entender:
