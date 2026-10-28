@@ -98,6 +98,14 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D080 | Autorizar Qwen3-VL-2B solo para un smoke aislado, sin reranking ni cambios del baseline | ACEPTADA | VLM / smoke local |
 | D081 | Mantener bloqueados reranking y descarte tras la validación atómica 2B | ACEPTADA | VLM / integridad experimental |
 | D082 | Mantener 2B como modelo visual de desarrollo tras diagnóstico 8B sin mejora | ACEPTADA | VLM / selección de modelo |
+| D083 | Mantener D004 para la campaña H26+ inicial y reservar bbox B como fallback | ACEPTADA | Madrid / evaluación independiente |
+| D084 | Sustituir la recogida presencial H26-H61 por evaluación remota Mapillary reproducible | ACEPTADA | Evaluación remota / Mapillary |
+| D085 | Mantener sin activar VLM/promoción tras la evaluación geográfica histórica H01-H25 | ACEPTADA | VLM / evaluación geográfica |
+| D086 | Exigir bloques simétricos H16/H23 y claims de la variante exacta antes de promoción | ACEPTADA | VLM / promoción multicandidato |
+| D087 | Versionar la corrección H16 y claims con entidades sin reinterpretar el ranking v1 | ACEPTADA | VLM / claims y ranking corregidos |
+| D088 | Evaluar reranking visual simétrico y cobertura multifuente como variantes separadas | PROPUESTA | VLM / reranking y fuentes visuales |
+| D089 | Estudiar adquisición adaptativa por oportunidad con límites duros y sin chase-supported | PROPUESTA | VLM / adquisición adaptativa |
+| D090 | Priorizar asociaciones cámara-celda explicables en una variante geométrica separada | PROPUESTA | VLM / asociación espacial |
 
 ## D053 — API HTTP interna del MVP
 
@@ -959,9 +967,8 @@ levanta el bloqueo de descarte, penalización negativa, H11 o MVP.
 
 ### Decisión
 
-Mantener Qwen3-VL-2B como baseline y modelo visual de desarrollo. Conservar el 8B
-descargado y verificado, pero no adoptarlo como modelo principal ni ejecutar los
-60 pares con él.
+Mantener Qwen3-VL-2B como baseline operativo y Qwen3-VL-8B como candidato de
+calidad para validación independiente. Ninguno se integra todavía en el MVP.
 
 ### Evidencia
 
@@ -969,6 +976,263 @@ El smoke 8B BF16 fue compatible con GB10. En los diez pares diagnósticos produj
 exactamente las mismas decisiones que el 2B: 4 soportes, 6 abstenciones y cero
 contradicciones. El coste fue 3,98× en pico CUDA, 3,94× en carga y 2,34× en
 ejecución. Véase [PHASE_QWEN3_VL_8B_DIAGNOSTIC.md](PHASE_QWEN3_VL_8B_DIAGNOSTIC.md).
+
+### Actualización ampliada
+
+El 8B se ejecutó posteriormente sobre 60 y 72 pares. En los 72 obtuvo 60 aciertos
+frente a 54 del 2B y detectó 3/4 contradicciones, pero con cuatro consultas de
+development y referencia humana asistida por Codex. Se prioriza 8B para el futuro
+test independiente por calidad potencial, sin declararlo ganador definitivo.
+
+## D083 — D004 para la campaña H26+ inicial
+
+**Estado:** ACEPTADA
+**Componente:** Madrid / evaluación independiente
+**Fecha:** 2026-10-26
+**Origen:** Plan H26+ y necesidad de diversidad fuera de D004.
+
+### Decisión
+
+Mantener D004, la galería principal de 50 m, sus `candidate_id` y los artefactos
+F1–F4 actuales para la primera campaña H26–H61. Usar bloques de 150 m en
+EPSG:25830, separación/exclusión objetivo de 75 m, máximo dos observaciones por
+bloque y una fila o columna de guardia entre development y test.
+
+La bbox B (`south=40.4020, west=-3.7200, north=40.4320, east=-3.6880`) permanece
+documentada como fallback si el trabajo de campo demuestra diversidad ambiental
+insuficiente, no como ampliación autorizada.
+
+### Condiciones previas
+
+- split espacial H26+ congelado antes de recoger;
+- nueva revisión del alcance Mapillary.
+
+La decisión no autoriza regenerar D004 ni ampliar Madrid. Véase
+[PHASE_MADRID_EXPANSION_PROPOSAL.md](PHASE_MADRID_EXPANSION_PROPOSAL.md).
+
+## D084 — Campaña remota Mapillary H26-H61
+
+**Estado:** ACEPTADA
+**Componente:** Evaluación remota / Mapillary
+**Fecha:** 2026-10-27
+**Origen:** Corrección expresa del responsable del TFG: no habrá desplazamiento,
+GNSS ni fotografías propias.
+
+### Decisión
+
+H26-H61 conserva sus identificadores, D004, galería principal de 50 m y split
+12 development/24 test, pero sustituye el supuesto presencial por referencias
+remotas Mapillary. La coordenada reportada de cámara es una referencia aproximada
+con precisión desconocida, no GT centimétrico. D084 sustituye para esta campaña
+la prioridad presencial de D070 y la condición de observación in situ de D068;
+no reinterpreta ni invalida artefactos históricos.
+
+La selección espacial no usa rankings, salidas VLM, errores, distancia a centros
+de galería ni calidad visual del candidato correcto. Referencias y verificaciones
+son roles disjuntos. Otra secuencia es un requisito mínimo, seguido por SHA-256,
+similitud perceptual y revisión humana cuando existan píxeles autorizados.
+
+### Consecuencias
+
+Las consultas sin verificación independiente cuentan como falta de cobertura y
+no reutilizan su referencia. Development selecciona K y parámetros; el test se
+abre una sola vez. La evaluación informa sensibilidad por umbral y sesgos de
+cobertura. No se autoriza ninguna descarga nueva, DialogueBotVPR, ampliación de
+Madrid ni activación del VLM en el MVP.
+
+### Evidencia
+
+- `docs/INDEPENDENT_H26_COLLECTION_PROTOCOL.md`
+- `schemas/remote_mapillary_observation.schema.json`
+- `src/tfg_phase0/remote_mapillary_campaign.py`
+- `scripts/build_remote_annotation_package.py`
+
+## D085 — Resultado geográfico VLM sobre H01-H25
+
+**Estado:** ACEPTADA
+**Componente:** VLM / evaluación geográfica
+**Fecha:** 2026-10-27
+**Origen:** Evaluación solicitada sobre artefactos históricos y fotografías ya
+autorizadas.
+
+### Decisión
+
+Mantener Qwen3-VL-2B/8B, reranking y promoción fuera del MVP. H11, único caso con
+Top-10 multicandidato fotografiado, no mejora distancia Top-1 ni GeoRecall@1/5/10
+a 50 m con 1, 3 o 5 vistas por candidato y evidencia positiva. En tres consultas
+parcialmente enlazables, ninguno de los modelos modifica esas métricas.
+
+El 8B mejora métricas de clasificación visual en una fixture de 72 pares, pero
+esa mejora no puede presentarse como mejora geográfica. No hay cobertura para
+evaluar promoción desde Top-100 ni ocho imágenes. Descarte permanece no disponible.
+
+### Consecuencias
+
+Antes de ampliar la adquisición se propone completar únicamente H11 a ocho
+vistas mediante un lote incremental de 23 imágenes, sujeto a autorización. H01-H25
+continúa siendo development histórico; H26-H61 permanece cerrado.
+
+### Evidencia
+
+- `docs/PHASE_H01_H25_VLM_GEOGRAPHIC_EVALUATION.md`
+- `scripts/evaluate_h11_multiview_counts.py`
+- `scripts/evaluate_partial_visual_candidates.py`
+- `results/generated/mapillary/h01-h25-vlm-geographic-v1/` (local, fuera de Git)
+
+## D086 — Promoción multicandidato H16/H23
+
+**Estado:** ACEPTADA
+**Componente:** VLM / promoción multicandidato
+**Fecha:** 2026-10-27
+**Origen:** Preparación solicitada de promoción real desde Top-K sobre H16/H23.
+
+### Decisión
+
+Usar exclusivamente `en_cartographic + madrid-50m` del Top-100 congelado. Los
+candidatos visuales se abren mediante bloques completos iguales para ambas
+consultas: primero Top-20 y, si queda fijado antes de observar resultados, Top-50.
+No se eligen individualmente los candidatos que el techo posterior identifica
+como próximos.
+
+Los veredictos históricos `es_original` no se reutilizan porque sus claim IDs y
+hashes textuales no corresponden a la variante objetivo. Antes de inferencia se
+requiere revisión humana de los claims ingleses, autorización del lote exacto y
+los mismos assets para 2B/8B. Ausencia, fallo, conflicto y `unverifiable` son
+neutrales; descarte y evidencia negativa siguen desactivados.
+
+### Evidencia y bloqueo
+
+Top-20 contiene 40 slots, 312 asociaciones, 230 IDs únicos y requiere 206 nuevas
+imágenes. Top-50 acumulado requiere 379. Sin autorización y revisión de claims no
+se ejecuta promoción ni se publican métricas CT2L+VLM. H16 se informa como control
+interior/exterior separado.
+
+### Actualización Top-50 predefinida
+
+Por instrucción expresa posterior, Top-50 queda fijado como profundidad primaria
+antes de observar outputs VLM; Top-20 es solo análisis secundario. Se congelan el
+fixture, plan Mapillary, versiones 2B/8B, prompt V4, generación determinista,
+agregación positiva, `positive_weight=0,2`, ausencia de evidencia negativa,
+métricas y criterios de mejora/regresión en
+`config/h16_h23_top50_experiment.json`. Los gates de revisión humana y
+autorización continúan pendientes.
+
+## D087 — Variante H16 y extractor de claims v2
+
+**Estado:** ACEPTADA
+**Componente:** VLM / claims y ranking corregidos
+**Fecha:** 2026-10-27
+**Origen:** Autorización expresa para corregir errores técnicos de extracción y
+la traducción `retablo oscuro` → `dark choir`.
+
+### Decisión
+
+Conservar `en_cartographic` y todos sus artefactos v1. Crear en paralelo la
+variante H16 `en_cartographic_corrected_v2`, que usa `dark altarpiece`, y ejecutar
+un Top-100 nuevo con el mismo checkpoint y embeddings congelados, sin GT. H23
+mantiene su texto y actúa como control de reproducibilidad.
+
+Introducir `visual-atomic-claims-v2` con entidades por mención y asociación local
+bidireccional de atributos y relaciones. V1 permanece disponible para reproducir
+experimentos históricos. Claims o decisiones v1 no se atribuyen automáticamente
+a v2.
+
+### Evidencia
+
+H16 cambia Top-10, conjunto Top-50 y orden Top-100; H23 reproduce los tres
+exactamente. Por ello se generan fixture, plan Mapillary, protocolo, formulario,
+revisión y visor v2 nuevos. La revisión v1 estaba completamente pendiente y se
+transfieren cero decisiones.
+
+- `docs/PHASE_H16_H23_CLAIMS_V2_CORRECTION.md`
+- `schemas/visual_atomic_claims_v2.schema.json`
+- `results/generated/f5/h16-h23-corrected-v2/` (local)
+- `results/generated/mapillary/h16-h23-multicandidate-top50-v2/` (local)
+
+## D088 — Reranking simétrico y fuentes visuales múltiples
+
+**Estado:** PROPUESTA
+**Componente:** VLM / reranking y fuentes visuales
+**Fecha:** 2026-10-27
+
+### Propuesta
+
+Conservar la promoción asimétrica v1 para reproducción e introducir un reranking
+Top-50 global que aplique `minmax(CT2L)+0,2×evidencia_positiva` a todos los
+candidatos. Tratar Mapillary, Panoramax, KartaView y Commons mediante inventarios
+separados y un contrato provider-neutral; no mezclar fuentes en el protocolo
+Mapillary v2.
+
+### Evidencia exploratoria
+
+Con la cobertura parcial, el reranking simétrico elimina la sustitución H23 pero
+eleva H16 rank 3 a Top-1 y empeora la distancia media Top-1, sin ganar GeoRecall.
+Panoramax cubre cinco candidatos únicos a 100 m, todos ya cubiertos por Mapillary.
+KartaView y Commons carecen de snapshots congelados y no se consideran cobertura
+cero.
+
+### Condición de aceptación
+
+Requiere evaluación sobre cobertura completa y equilibrada, protocolo prospectivo,
+licencias/inventarios por proveedor y separación estricta de variantes geométrica
+y semántica. No modifica D086 ni activa el MVP.
+
+## D089 — Adquisición adaptativa por oportunidad
+
+**Estado:** PROPUESTA
+**Componente:** VLM / adquisición adaptativa
+**Fecha:** 2026-10-27
+
+### Propuesta
+
+Comparar adquisición fija con una variante provider-neutral que distribuya el
+presupuesto por déficit de oportunidades independientes en rondas prospectivas
+25/50/100 m, sin consultar píxeles, veredictos VLM, ranking modificado o GT.
+Fijar límites de rondas, radio, ocho imágenes/grupos por candidato, assets, jobs
+y almacenamiento. Finalizar adquisición antes de iniciar Qwen3-VL.
+
+La adaptación por cantidad de `supported` se conserva solo como control sesgado
+`chase-supported`, no elegible como estrategia principal. Candidatos bajo la
+cobertura mínima hipotética conservan CT2L y no se penalizan.
+
+### Condición de aceptación
+
+Requiere nueva autorización, protocolo congelado, comparación pareada fija frente
+a adaptativa y evaluación independiente. No modifica el plan Mapillary v2 ni sus
+resultados.
+
+## D090 — Asociación espacial cámara-celda
+
+**Estado:** PROPUESTA
+**Componente:** VLM / asociación espacial
+**Fecha:** 2026-10-27
+
+### Propuesta
+
+Calcular en EPSG:25830 distancia cámara-centro/superficie, interior/borde,
+bearing, diferencia angular y cono-celda. Mantener FOV perspectiva como hipótesis
+explícita con sensibilidad 60/90/120° y conservar asociaciones ambiguas frente a
+toda la galería. Usar geometría solo para priorizar dentro del reparto adaptativo
+max-min, no como prueba de visibilidad.
+
+### Evidencia exploratoria
+
+En 99 asociaciones parciales, 21 cámaras están dentro de celda, 38 tienen cono
+hipotéticamente incompatible y 40 son compatibles pero ambiguas. La selección
+geométrica metadata-only mantiene 98/100 slots con 315 assets, pero 305/568
+asociaciones son ambiguas y no hay inferencia nueva que demuestre mejora.
+
+### Condición de aceptación
+
+Requiere inventario compatible con la geometría elegida, FOV conocido o política
+prospectiva, autorización y evaluación separada. No reemplaza el selector histórico
+ni modifica D086/D089.
+
+### Evidencia
+
+- `docs/PHASE_H16_H23_MULTICANDIDATE_PROMOTION.md`
+- `scripts/prepare_h16_h23_multicandidate.py`
+- `results/generated/mapillary/h16-h23-multicandidate-top20-v1/` (local)
 
 ## D001 — Identidad del candidato
 

@@ -1,8 +1,9 @@
+import hashlib
 import json
 import unittest
 
 from src.tfg_phase0.visual_reranking import (
-    VisualRerankingError, aggregate_candidate_evidence, atomic_verification_prompt, compact_atomic_verdict_schema, compact_atomic_verification_prompt, compile_atomic_claims,
+    VisualRerankingError, aggregate_candidate_evidence, atomic_verification_prompt, compact_atomic_verdict_schema, compact_atomic_verification_prompt, compile_atomic_claims, compile_atomic_claims_v2, validate_atomic_claims_v2,
     evaluate_topk_transition, parse_atomic_verdict, parse_compact_atomic_verdict, parse_verdict_only, plan_multiview_associations, rerank_experimental, verdict_only_prompt, verdict_only_schema,
 )
 
@@ -99,6 +100,71 @@ class AggregateRerankingTests(unittest.TestCase):
         self.assertEqual(plan["association_count"],2)
         self.assertEqual(plan["unique_asset_count"],1)
 
+    def test_multiview_plan_accepts_eight_images_per_candidate(self):
+        candidates=[{"candidate_id":"a","latitude":40.0,"longitude":-3.0}]
+        images=[{"image_id":str(index),"latitude":40.0,"longitude":-3.0,"orientation_degrees":index*40,"sequence_id":str(index),"camera_type":"perspective","quality_score":1.0} for index in range(8)]
+        plan=plan_multiview_associations(candidates,images,max_images_per_candidate=8)
+        self.assertEqual(plan["association_count"],8)
+
+    def test_english_cartographic_claims_keep_exact_source_hash(self):
+        text="To my left is a white building with columns and to my right is a stone building with flags."
+        document=compile_atomic_claims(text)
+        self.assertEqual(document["source_text_sha256"],hashlib.sha256(text.encode()).hexdigest())
+        self.assertTrue({"building","column","flag"}<={row["value"].get("object_type") for row in document["claims"] if row["kind"]=="object_presence"})
+        self.assertTrue(any(row["requires_orientation"] for row in document["claims"]))
+
+    def test_v2_facing_targets_main_altar(self):
+        document=compile_atomic_claims_v2("I am inside a church, facing the main altar.")
+        claim=next(row for row in document["claims"] if row["kind"]=="egocentric_relation")
+        self.assertEqual(claim["value"]["subject_type"],"altar")
+        self.assertIn(claim["value"]["subject_entity_id"],{row["entity_id"] for row in document["entities"]})
+
+    def test_v2_front_targets_dark_altarpiece(self):
+        document=compile_atomic_claims_v2("In front of me is a dark altarpiece with columns.")
+        relation=next(row for row in document["claims"] if row["kind"]=="egocentric_relation")
+        dark=next(row for row in document["claims"] if row["kind"]=="attribute" and row["evidence"]["text"].casefold()=="dark")
+        self.assertEqual(relation["value"]["subject_type"],"altarpiece")
+        self.assertEqual(dark["value"]["subject_entity_id"],relation["value"]["subject_entity_id"])
+
+    def test_v2_repeated_buildings_keep_distinct_entities(self):
+        text="To my left is a large white building with columns, and to my right is a stone building with flags."
+        document=compile_atomic_claims_v2(text)
+        buildings=[row for row in document["entities"] if row["object_type"]=="building"]
+        self.assertEqual(len(buildings),2)
+        self.assertNotEqual(buildings[0]["entity_id"],buildings[1]["entity_id"])
+        white=next(row for row in document["claims"] if row["kind"]=="attribute" and row["evidence"]["text"]=="white")
+        stone=next(row for row in document["claims"] if row["kind"]=="attribute" and row["evidence"]["text"]=="stone")
+        left=next(row for row in document["claims"] if row["kind"]=="egocentric_relation" and "left" in row["evidence"]["text"].casefold())
+        right=next(row for row in document["claims"] if row["kind"]=="egocentric_relation" and "right" in row["evidence"]["text"].casefold())
+        self.assertEqual(white["value"]["subject_entity_id"],left["value"]["subject_entity_id"])
+        self.assertEqual(stone["value"]["subject_entity_id"],right["value"]["subject_entity_id"])
+        self.assertNotEqual(white["value"]["subject_entity_id"],stone["value"]["subject_entity_id"])
+
+    def test_v2_relation_can_target_preceding_entity(self):
+        document=compile_atomic_claims_v2("The church is to my right.")
+        relation=next(row for row in document["claims"] if row["kind"]=="egocentric_relation")
+        self.assertEqual(relation["value"]["subject_type"],"church")
+
+    def test_v2_missing_subject_is_unknown_not_invented(self):
+        document=compile_atomic_claims_v2("To my left there is nothing identifiable.")
+        relation=next(row for row in document["claims"] if row["kind"]=="egocentric_relation")
+        self.assertEqual(relation["value"],{"subject_entity_id":None,"subject_type":"unknown","relation":"left_of_observer"})
+
+    def test_v2_spans_hashes_and_entity_references_validate(self):
+        text="A large white building has columns."
+        document=compile_atomic_claims_v2(text)
+        self.assertEqual(document["source_text_sha256"],hashlib.sha256(text.encode()).hexdigest())
+        validate_atomic_claims_v2(document)
+        for row in document["claims"]:
+            span=row["evidence"]["span"]
+            self.assertEqual(text[span["start"]:span["end"]],row["evidence"]["text"])
+        manipulated=json.loads(json.dumps(document))
+        attribute=next(row for row in manipulated["claims"] if row["kind"]=="attribute")
+        attribute["value"]["subject_entity_id"]="visual-entity-sha256-"+"0"*64
+        attribute["claim_id"]="visual-claim-sha256-"+hashlib.sha256(json.dumps({k:v for k,v in attribute.items() if k!="claim_id"},ensure_ascii=False,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+        with self.assertRaisesRegex(VisualRerankingError,"entidad"):
+            validate_atomic_claims_v2(manipulated)
+
     def test_multiview_and_reranking_reject_ground_truth(self):
         with self.assertRaisesRegex(ValueError,"GT"):
             plan_multiview_associations([{"candidate_id":"a","latitude":40.0,"longitude":-3.0,"ground_truth":True}],[])
@@ -111,6 +177,7 @@ class AggregateRerankingTests(unittest.TestCase):
         result=evaluate_topk_transition(baseline,experimental,reference_latitude=40.0,reference_longitude=-3.0)
         self.assertEqual(result["transition"]["top1"],"improved")
         self.assertTrue(result["transition"]["top10_set_invariant"])
+        self.assertTrue(result["experimental"]["geo5_50"])
         with self.assertRaises(VisualRerankingError): evaluate_topk_transition(baseline,[{"candidate_id":"c"},{"candidate_id":"a"}],reference_latitude=40.0,reference_longitude=-3.0)
 
 

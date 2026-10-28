@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/independent_human_observation.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["query_id", "partition", "location_id", "spatial_block_id", "collection_session_id", "collected_at_utc", "collector_pseudonym", "description_es", "observer_position", "orientation", "evidence", "claims", "consent", "freeze", "review"],
+  "properties": {
+    "query_id": {"pattern": "^H(?:2[6-9]|[3-9][0-9]|[1-9][0-9]{2,})$"},
+    "partition": {"enum": ["development", "test_sealed"]},
+    "location_id": {"type": "string", "minLength": 1},
+    "spatial_block_id": {"type": "string", "minLength": 1},
+    "collection_session_id": {"type": "string", "minLength": 1},
+    "collected_at_utc": {"type": "string", "format": "date-time"},
+    "collector_pseudonym": {"type": "string", "minLength": 1},
+    "description_es": {"type": "string", "minLength": 40},
+    "observer_position": {"type": "object", "additionalProperties": false, "required": ["latitude", "longitude", "crs", "method", "reported_accuracy_m", "raw_frozen_before_rankings"], "properties": {"latitude": {"type": "number", "minimum": -90, "maximum": 90}, "longitude": {"type": "number", "minimum": -180, "maximum": 180}, "crs": {"const": "EPSG:4326"}, "method": {"enum": ["device_gnss_multi_sample", "surveyed", "other_documented"]}, "reported_accuracy_m": {"type": "number", "exclusiveMinimum": 0}, "raw_frozen_before_rankings": {"const": true}}},
+    "orientation": {"type": "object", "additionalProperties": false, "required": ["status", "heading_degrees", "uncertainty_degrees", "meaning"], "properties": {"status": {"enum": ["measured", "unknown"]}, "heading_degrees": {"type": ["number", "null"], "minimum": 0, "exclusiveMaximum": 360}, "uncertainty_degrees": {"type": ["number", "null"], "minimum": 0, "maximum": 180}, "meaning": {"enum": ["camera_heading", "body_heading", "unknown"]}}},
+    "evidence": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["logical_path", "sha256", "captured_at_utc", "source", "original_query_evidence_not_candidate_view"], "properties": {"logical_path": {"type": "string"}, "sha256": {"pattern": "^[0-9a-f]{64}$"}, "captured_at_utc": {"type": "string", "format": "date-time"}, "source": {"const": "human_collector_owned"}, "original_query_evidence_not_candidate_view": {"const": true}}}},
+    "claims": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["claim_id", "text", "kind", "review_status"], "properties": {"claim_id": {"type": "string", "minLength": 1}, "text": {"type": "string", "minLength": 1}, "kind": {"enum": ["object_presence", "attribute", "visible_text", "egocentric_relation", "other"]}, "review_status": {"enum": ["pending", "approved", "rejected"]}}}},
+    "consent": {"type": "object", "additionalProperties": false, "required": ["academic_processing", "public_redistribution"], "properties": {"academic_processing": {"const": true}, "public_redistribution": {"type": "boolean"}}},
+    "freeze": {"type": "object", "additionalProperties": false, "required": ["observation_frozen_at_utc", "rankings_executed_at_utc", "edited_after_ranking"], "properties": {"observation_frozen_at_utc": {"type": "string", "format": "date-time"}, "rankings_executed_at_utc": {"type": ["string", "null"], "format": "date-time"}, "edited_after_ranking": {"const": false}}},
+    "review": {"type": "object", "additionalProperties": false, "required": ["status", "factual_reviewer", "geographic_reviewer", "rankings_seen_by_reviewers"], "properties": {"status": {"enum": ["pending", "approved", "rejected"]}, "factual_reviewer": {"type": ["string", "null"]}, "geographic_reviewer": {"type": ["string", "null"]}, "rankings_seen_by_reviewers": {"const": false}}}
+  }
+}

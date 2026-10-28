@@ -31,11 +31,14 @@ def build_lifespan(settings: Settings, retriever_factory: Callable[[Settings], o
     async def lifespan(app: FastAPI):
         app.state.retriever = None
         app.state.transformer = None
+        app.state.visual_promoter = None
         app.state.retriever = await anyio.to_thread.run_sync(retriever_factory, settings)
         try:
             app.state.transformer = await anyio.to_thread.run_sync(transformer_factory, settings)
             if settings.qwen_required and app.state.transformer is None:
                 raise RuntimeError("Qwen requerido no disponible")
+            if settings.visual_promotion_enabled:
+                raise RuntimeError("promoción visual configurada pero no activada en el MVP")
         except Exception:
             await anyio.to_thread.run_sync(app.state.retriever.close)
             app.state.retriever = None

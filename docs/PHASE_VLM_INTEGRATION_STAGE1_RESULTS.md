@@ -87,3 +87,6 @@ mantiene ventaja de coste y es el default de desarrollo.
 Se detiene la expansión GPU hasta recibir las 72 anotaciones. No se activa
 reranking: elegir lambdas con H11/GT o con el mismo conjunto del prompt invalidaría
 la evaluación.
+
+La evaluación ampliada y la sensibilidad H11 posteriores se documentan en
+[PHASE_VLM_EXPANDED_EVALUATION_AND_RERANKING.md](PHASE_VLM_EXPANDED_EVALUATION_AND_RERANKING.md).

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/visual_atomic_claims_v2.schema.json",
+  "title": "Claims visuales con entidades por mención",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "source_text", "source_text_sha256", "entities", "claims", "extractor"],
+  "properties": {
+    "schema_version": {"const": "2.0"},
+    "contract_version": {"const": "visual-atomic-claims-v2"},
+    "source_text": {"type": "string", "minLength": 1},
+    "source_text_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "entities": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["entity_id", "object_type", "evidence"], "properties": {"entity_id": {"type": "string", "pattern": "^visual-entity-sha256-[0-9a-f]{64}$"}, "object_type": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/evidence"}}}},
+    "claims": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["claim_id", "source_text_sha256", "kind", "value", "evidence", "specificity", "requires_ocr", "requires_orientation"], "properties": {"claim_id": {"type": "string", "pattern": "^visual-claim-sha256-[0-9a-f]{64}$"}, "source_text_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "kind": {"enum": ["object_presence", "attribute", "visible_text", "egocentric_relation"]}, "value": {"type": "object"}, "evidence": {"$ref": "#/$defs/evidence"}, "specificity": {"enum": ["generic", "distinctive"]}, "requires_ocr": {"type": "boolean"}, "requires_orientation": {"type": "boolean"}}}},
+    "extractor": {"type": "object", "additionalProperties": false, "required": ["kind", "version"], "properties": {"kind": {"const": "deterministic_rules"}, "version": {"const": "visual-atomic-rules-v2"}}}
+  },
+  "$defs": {"evidence": {"type": "object", "additionalProperties": false, "required": ["text", "span"], "properties": {"text": {"type": "string", "minLength": 1}, "span": {"type": "object", "additionalProperties": false, "required": ["start", "end"], "properties": {"start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 1}}}}}}
+}

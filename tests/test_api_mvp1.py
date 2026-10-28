@@ -95,6 +95,9 @@ class MvpApiTests(unittest.TestCase):
             self.assertEqual(capabilities["galleries"], [{"gallery_id": "madrid-50m", "candidate_count": 253}, {"gallery_id": "madrid-25m", "candidate_count": 1115}])
             self.assertEqual(capabilities["search_area"], {"region_id": "madrid_pilot", "crs": "EPSG:4326", "bbox": {"north": 40.42, "south": 40.412, "east": -3.699, "west": -3.709}})
             self.assertTrue(next(x for x in capabilities["processing_modes"] if x["id"]=="with_llm")["available"])
+            visual = next(x for x in capabilities["postprocessing_capabilities"] if x["id"] == "topn_visual_promotion")
+            self.assertFalse(visual["available"]); self.assertFalse(visual["enabled"]); self.assertEqual(visual["fallback"], "baseline")
+            self.assertIsNone(app.state.visual_promoter)
             response = client.post("/api/v1/retrievals", json=request("madrid-25m","no_llm"))
             self.assertEqual(response.status_code, 200)
             document = response.json()
@@ -179,6 +182,12 @@ class MvpApiTests(unittest.TestCase):
             fake.release.set()
             thread.join(timeout=2)
             self.assertEqual(responses[0].status_code, 200)
+
+    def test_visual_promotion_settings_are_disabled_by_default(self):
+        self.assertFalse(SETTINGS.visual_promotion_enabled)
+        self.assertIsNone(SETTINGS.visual_promotion_policy_path)
+        self.assertEqual(SETTINGS.visual_promotion_fallback, "baseline")
+        self.assertFalse(SETTINGS.visual_promotion_required)
 
 
 if __name__ == "__main__":

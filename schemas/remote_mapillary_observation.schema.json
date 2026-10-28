@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/remote_mapillary_observation.schema.json",
+  "title": "Observación remota Mapillary H26-H61 v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "query_id", "partition", "location_id", "spatial_block_id", "lifecycle_status",
+    "reference_asset", "verification_assets", "description", "orientation", "claims",
+    "uncertainties", "freeze", "human_review", "independence", "limitations"
+  ],
+  "properties": {
+    "query_id": {"type": "string", "pattern": "^H(?:2[6-9]|[3-5][0-9]|6[01])$"},
+    "partition": {"enum": ["development", "test_sealed"]},
+    "location_id": {"type": "string", "minLength": 1},
+    "spatial_block_id": {"type": "string", "pattern": "^B150-[0-9]+-[0-9]+$"},
+    "lifecycle_status": {"enum": ["metadata_selected", "annotation_pending", "approved", "rejected", "frozen"]},
+    "reference_asset": {"$ref": "#/$defs/referenceAsset"},
+    "verification_assets": {"type": "array", "maxItems": 2, "items": {"$ref": "#/$defs/verificationAsset"}},
+    "description": {
+      "type": "object", "additionalProperties": false,
+      "required": ["text_es", "creation_method", "ai_proposal", "human_reviewed", "author_pseudonym", "reviewed_at_utc"],
+      "properties": {
+        "text_es": {"type": ["string", "null"], "minLength": 40},
+        "creation_method": {"enum": ["pending", "human_from_reference", "ai_proposed_human_reviewed"]},
+        "ai_proposal": {"$ref": "#/$defs/aiProvenance"},
+        "human_reviewed": {"type": "boolean"},
+        "author_pseudonym": {"type": ["string", "null"]},
+        "reviewed_at_utc": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "orientation": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "heading_degrees", "uncertainty_degrees", "meaning", "reliability"],
+          "properties": {
+            "status": {"const": "provider_camera_heading"},
+            "heading_degrees": {"type": "number", "minimum": 0, "exclusiveMaximum": 360},
+            "uncertainty_degrees": {"type": "null"},
+            "meaning": {"const": "camera_heading_not_body_heading"},
+            "reliability": {"const": "unknown"}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "heading_degrees", "uncertainty_degrees", "meaning", "reliability"],
+          "properties": {
+            "status": {"const": "unknown"}, "heading_degrees": {"type": "null"},
+            "uncertainty_degrees": {"type": "null"}, "meaning": {"const": "unknown"},
+            "reliability": {"const": "unknown"}
+          }
+        }
+      ]
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["claim_id", "text_es", "kind", "source", "ai_proposed", "human_reviewed", "reviewer", "review_status"],
+        "properties": {
+          "claim_id": {"type": "string", "pattern": "^[a-z0-9_-]+$"},
+          "text_es": {"type": "string", "minLength": 1},
+          "kind": {"enum": ["object", "attribute", "relation", "visible_text", "scene"]},
+          "source": {"const": "reference_images_only"},
+          "ai_proposed": {"type": "boolean"}, "human_reviewed": {"type": "boolean"},
+          "reviewer": {"type": ["string", "null"]},
+          "review_status": {"enum": ["pending", "accepted", "corrected", "rejected"]}
+        }
+      }
+    },
+    "uncertainties": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "freeze": {
+      "type": "object", "additionalProperties": false,
+      "required": ["selected_at_utc", "frozen_at_utc", "canonical_sha256", "rankings_executed_at_utc", "edited_after_freeze"],
+      "properties": {
+        "selected_at_utc": {"type": "string", "format": "date-time"},
+        "frozen_at_utc": {"type": ["string", "null"], "format": "date-time"},
+        "canonical_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "rankings_executed_at_utc": {"type": ["string", "null"], "format": "date-time"},
+        "edited_after_freeze": {"const": false}
+      }
+    },
+    "human_review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "primary_reviewer", "secondary_reviewer", "reviewed_at_utc", "rankings_seen", "vlm_outputs_seen", "ai_proposals_visible"],
+      "properties": {
+        "status": {"enum": ["pending", "approved", "rejected"]},
+        "primary_reviewer": {"type": ["string", "null"]}, "secondary_reviewer": {"type": ["string", "null"]},
+        "reviewed_at_utc": {"type": ["string", "null"], "format": "date-time"},
+        "rankings_seen": {"const": false}, "vlm_outputs_seen": {"const": false},
+        "ai_proposals_visible": {"type": "boolean"}
+      }
+    },
+    "independence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["same_image_excluded", "same_reference_sequence_excluded", "exact_hash_checked", "perceptual_similarity_checked", "human_overlap_reviewed", "status"],
+      "properties": {
+        "same_image_excluded": {"const": true}, "same_reference_sequence_excluded": {"const": true},
+        "exact_hash_checked": {"type": "boolean"}, "perceptual_similarity_checked": {"type": "boolean"},
+        "human_overlap_reviewed": {"type": "boolean"},
+        "status": {"enum": ["metadata_only_pending_pixel_checks", "pending_human_overlap_review", "independent_verified", "insufficient_independent_verification"]}
+      }
+    },
+    "limitations": {
+      "type": "array", "uniqueItems": true,
+      "items": {"enum": ["remote_provider_image", "not_human_in_situ", "camera_coordinate_unknown_accuracy", "heading_reliability_unknown", "not_centimetric_ground_truth", "mapillary_coverage_bias", "verification_views_pending", "independence_pending"]},
+      "allOf": [
+        {"contains": {"const": "not_human_in_situ"}},
+        {"contains": {"const": "camera_coordinate_unknown_accuracy"}},
+        {"contains": {"const": "not_centimetric_ground_truth"}}
+      ]
+    }
+  },
+  "$defs": {
+    "position": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reported_latitude", "reported_longitude", "crs", "coordinate_source", "reported_accuracy_m", "accuracy_status", "observer_position_estimate", "evaluation_policy"],
+      "properties": {
+        "reported_latitude": {"type": "number", "minimum": 40.412, "maximum": 40.420},
+        "reported_longitude": {"type": "number", "minimum": -3.709, "maximum": -3.699},
+        "crs": {"const": "EPSG:4326"}, "coordinate_source": {"enum": ["computed_geometry", "geometry"]},
+        "reported_accuracy_m": {"type": ["number", "null"], "minimum": 0},
+        "accuracy_status": {"enum": ["provider_reported", "unknown"]},
+        "observer_position_estimate": {"const": "reference_camera_coordinate"},
+        "evaluation_policy": {"const": "approximate_reference_with_sensitivity_analysis"}
+      }
+    },
+    "download": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["status", "logical_path", "sha256", "perceptual_hash"], "properties": {"status": {"enum": ["not_authorized", "authorized_not_downloaded", "failed"]}, "logical_path": {"type": "null"}, "sha256": {"type": "null"}, "perceptual_hash": {"type": "null"}}},
+        {"type": "object", "additionalProperties": false, "required": ["status", "logical_path", "sha256", "perceptual_hash"], "properties": {"status": {"const": "downloaded"}, "logical_path": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "perceptual_hash": {"type": "string", "pattern": "^[0-9a-f]+$"}}}
+      ]
+    },
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["provider", "inventory_id", "inventory_sha256", "license", "source_page_url", "creator", "attribution", "conditions_review_status"],
+      "properties": {
+        "provider": {"const": "Mapillary"}, "inventory_id": {"type": "string", "minLength": 1},
+        "inventory_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "license": {"const": "CC-BY-SA-4.0"},
+        "source_page_url": {"type": ["string", "null"], "format": "uri"}, "creator": {"type": ["string", "null"]},
+        "attribution": {"type": ["string", "null"]},
+        "conditions_review_status": {"enum": ["pending_new_authorization", "authorized_for_campaign"]}
+      }
+    },
+    "referenceAsset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["image_id", "sequence_id", "captured_at", "camera_type", "position", "provider_heading_degrees", "heading_reliability", "source", "download", "role"],
+      "properties": {
+        "image_id": {"type": "string", "pattern": "^[0-9]+$"}, "sequence_id": {"type": "string", "minLength": 1},
+        "captured_at": {"type": ["string", "null"], "format": "date-time"}, "camera_type": {"enum": ["perspective", "equirectangular"]},
+        "position": {"$ref": "#/$defs/position"}, "provider_heading_degrees": {"type": ["number", "null"], "minimum": 0, "exclusiveMaximum": 360},
+        "heading_reliability": {"const": "unknown"}, "source": {"$ref": "#/$defs/source"}, "download": {"$ref": "#/$defs/download"},
+        "role": {"const": "reference_only_not_vlm_input"}
+      }
+    },
+    "verificationAsset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["image_id", "sequence_id", "distance_to_reference_m", "source", "download", "role", "independence_status"],
+      "properties": {
+        "image_id": {"type": "string", "pattern": "^[0-9]+$"}, "sequence_id": {"type": "string", "minLength": 1},
+        "distance_to_reference_m": {"type": "number", "minimum": 0, "maximum": 50}, "source": {"$ref": "#/$defs/source"},
+        "download": {"$ref": "#/$defs/download"}, "role": {"const": "vlm_verification_only"},
+        "independence_status": {"enum": ["metadata_distinct_pending_pixel_checks", "independent_verified", "rejected_duplicate_or_overlap"]}
+      }
+    },
+    "aiProvenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["used", "model", "model_revision", "prompt_sha256", "proposal_sha256"],
+      "properties": {
+        "used": {"type": "boolean"}, "model": {"type": ["string", "null"]}, "model_revision": {"type": ["string", "null"]},
+        "prompt_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}, "proposal_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

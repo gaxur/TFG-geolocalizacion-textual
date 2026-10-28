@@ -1,0 +1,13 @@
+{
+  "plan_id": "h16-h23-acquisition-sha256-c5fabcc68d2066024c8058837d01e7401e473c957173caa53c206c713a331a4d",
+  "approved": false,
+  "approved_by": null,
+  "approved_at_utc": null,
+  "terms_reviewed": false,
+  "retention_deadline_utc": null,
+  "maximum_resolution_px": 1024,
+  "allow_fixed_2b_8b_inference": true,
+  "allow_training": false,
+  "allow_public_dataset": false,
+  "notes": "Template only. Setting approved=true requires an explicit user authorization for this exact plan."
+}

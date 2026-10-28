@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "h16-h23-mapillary-authorization-request-v1",
+  "plan_id": "h16-h23-acquisition-sha256-3dcd3187331be9ee8461ba6f5112e5b9ccc86f516d65579f87a45eeb81ed8a2b",
+  "plan_sha256": "ccf76ac1e456230a22a43952e70c6de964983d1bac994c3293ddd669726504e0",
+  "approved": false,
+  "approved_by": null,
+  "approved_at_utc": null,
+  "terms_reviewed": false,
+  "retention_deadline_utc": null,
+  "scope": {
+    "provider": "Mapillary",
+    "new_unique_images_maximum": 391,
+    "planned_unique_images_total": 432,
+    "maximum_resolution_px": 1024,
+    "cache_dir": "data/cache/mapillary",
+    "hard_maximum_bytes": 3128000000,
+    "phases": ["top10", "top20", "top50"],
+    "fixed_models": ["Qwen/Qwen3-VL-2B-Instruct", "Qwen/Qwen3-VL-8B-Instruct"],
+    "allow_training": false,
+    "allow_fine_tuning": false,
+    "allow_public_dataset": false,
+    "private_academic_inference_only": true
+  },
+  "operator_confirmations": {
+    "reviewed_terms_for_the_exact_application": false,
+    "individual_image_download_and_private_storage_permitted": false,
+    "fixed_model_inference_permitted": false,
+    "retention_period_accepted": false,
+    "attribution_and_privacy_conditions_accepted": false,
+    "quotas_or_additional_application_limits_recorded": false
+  },
+  "notes": "Solicitud preparada. No constituye autorización y no debe usarse para abrir red hasta completar todos los campos y confirmaciones."
+}

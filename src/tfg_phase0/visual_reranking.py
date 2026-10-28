@@ -20,34 +20,38 @@ LIMITATIONS = {
 }
 GENERIC_OBJECTS = {"street", "building", "balcony", "tree", "person", "vehicle"}
 OBJECT_PATTERNS = (
-    ("pharmacy", r"\bfarmacia\b"), ("church", r"\biglesia\b"),
-    ("theater", r"\bteatro\b"),
+    ("pharmacy", r"\b(?:farmacia|pharmacy)\b"), ("church", r"\b(?:iglesia|church)\b"),
+    ("theater", r"\b(?:teatro|theat(?:er|re))\b"),
     ("hotel", r"\bhotel\b"), ("station", r"\b(?:metro|estaci[oó]n)\b"),
-    ("square", r"\bplaza\b"), ("intersection", r"\bintersecci[oó]n\b"),
-    ("street", r"\bcalle\b"), ("building", r"\bedificio\b"),
-    ("balcony", r"\bbalcones?\b"), ("tree", r"\b[áa]rbol(?:es)?\b"),
+    ("square", r"\b(?:plaza|square)\b"), ("intersection", r"\b(?:intersecci[oó]n|intersection)\b"),
+    ("street", r"\b(?:calle|street)\b"), ("building", r"\b(?:edificio|buildings?)\b"),
+    ("balcony", r"\b(?:balcones?|balcon(?:y|ies))\b"), ("tree", r"\b(?:[áa]rbol(?:es)?|trees?)\b"),
     ("shop", r"\b(?:tienda|comercio|establecimiento)\b"),
     ("vehicle", r"\b(?:coche|coches|veh[ií]culo|veh[ií]culos|motocicleta|motocicletas)\b"),
     ("person", r"\b(?:persona|personas|gente|peat[oó]n|peatones)\b"),
-    ("stairs", r"\bescaleras?\b"), ("tower", r"\btorre\b"),
-    ("cross", r"\bcruz\b"), ("arch", r"\barco\b"),
-    ("dome", r"\bc[uú]pula\b"), ("flag", r"\bbanderas?\b"),
+    ("stairs", r"\b(?:escaleras?|stairs?)\b"), ("tower", r"\b(?:torre|tower)\b"),
+    ("cross", r"\b(?:cruz|cross)\b"), ("arch", r"\b(?:arco|arch)\b"),
+    ("dome", r"\b(?:c[uú]pula|dome)\b"), ("flag", r"\b(?:banderas?|flags?)\b"),
+    ("altar", r"\baltar\b"), ("column", r"\bcolumns?\b"),
+    ("sculpture", r"\bsculpture\b"), ("wall", r"\bwalls?\b"),
+    ("niche", r"\bniches?\b"), ("painting", r"\bpaintings?\b"),
+    ("window", r"\bwindows?\b"), ("pulpit", r"\bpulpit\b"), ("bench", r"\bbenches\b"),
     ("advertising_sign", r"\bcarteles?(?:\s+publicitarios?)?\b"),
 )
 ATTRIBUTE_PATTERNS = (
     ("surface", "cobblestone", r"\b(?:adoquinad[ao]s?|empedrad[ao]s?|adoquines)\b"),
     ("material", "brick", r"\b(?:ladrillo|ladrillos)\b"),
-    ("material", "stone", r"\bpiedra\b"),
-    ("color", "white", r"\bblanc[oa]s?\b"),
+    ("material", "stone", r"\b(?:piedra|stone)\b"),
+    ("color", "white", r"\b(?:blanc[oa]s?|white)\b"),
     ("color", "green", r"\bverde\b"),
     ("shape", "arched", r"\b(?:arco|arquead[ao])\b"),
-    ("light", "illuminated", r"\b(?:luminosa?|luminoso|iluminad[ao])\b"),
+    ("light", "illuminated", r"\b(?:luminosa?|luminoso|iluminad[ao]|illuminated)\b"),
 )
 RELATION_PATTERNS = (
-    ("right_of_observer", r"\ba mi derecha\b"),
-    ("left_of_observer", r"\ba mi izquierda\b"),
-    ("in_front_of_observer", r"\b(?:enfrente|frente a m[ií])\b"),
-    ("behind_observer", r"\bdetr[aá]s(?: de m[ií])?\b"),
+    ("right_of_observer", r"\b(?:a mi derecha|to my right)\b"),
+    ("left_of_observer", r"\b(?:a mi izquierda|to my left)\b"),
+    ("in_front_of_observer", r"\b(?:enfrente|frente a m[ií]|in front of me|facing)\b"),
+    ("behind_observer", r"\b(?:detr[aá]s(?: de m[ií])?|behind me)\b"),
 )
 
 
@@ -165,6 +169,120 @@ def validate_atomic_claims(document: Mapping[str, Any]) -> None:
         payload = {key: row[key] for key in row if key != "claim_id"}
         if row["claim_id"] != _claim_id(payload):
             raise VisualRerankingError("claim_id no corresponde al contenido")
+
+
+V2_OBJECT_PATTERNS = OBJECT_PATTERNS + (("altarpiece", r"\b(?:retablo|altarpiece)\b"),)
+V2_ATTRIBUTE_PATTERNS = ATTRIBUTE_PATTERNS + (("color", "dark", r"\b(?:oscur[oa]s?|dark)\b"),)
+
+
+def _entity_id(source_sha: str, object_type: str, start: int, end: int) -> str:
+    payload = {"source_text_sha256": source_sha, "object_type": object_type, "span": {"start": start, "end": end}}
+    return "visual-entity-sha256-" + hashlib.sha256(canonical_bytes(payload)).hexdigest()
+
+
+def _local_bounds(text: str, start: int, end: int) -> tuple[int, int]:
+    left = max((text.rfind(mark, 0, start) for mark in ".!?;"), default=-1) + 1
+    right_values = [position for mark in ".!?;" if (position := text.find(mark, end)) >= 0]
+    right = min(right_values) if right_values else len(text)
+    return left, right
+
+
+def _relation_window(text: str, start: int, end: int) -> tuple[int, int]:
+    left, right = _local_bounds(text, start, end)
+    markers = []
+    for _, pattern in RELATION_PATTERNS:
+        markers.extend(re.finditer(pattern, text[left:right], re.IGNORECASE))
+    absolute = sorted((left + match.start(), left + match.end()) for match in markers)
+    previous = [item[0] for item in absolute if item[1] <= start]
+    following = [item[0] for item in absolute if item[0] >= end]
+    return (max(previous) if previous else left, min(following) if following else right)
+
+
+def _nearest_entity(entities: Sequence[Mapping[str, Any]], *, start: int, end: int, text: str, prefer_following: bool) -> Mapping[str, Any] | None:
+    left, right = _local_bounds(text, start, end)
+    local = [entity for entity in entities if entity["evidence"]["span"]["start"] >= left and entity["evidence"]["span"]["end"] <= right]
+    following = [entity for entity in local if entity["evidence"]["span"]["start"] >= end]
+    preceding = [entity for entity in local if entity["evidence"]["span"]["end"] <= start]
+    if prefer_following and following:
+        candidate = min(following, key=lambda entity: (entity["evidence"]["span"]["start"] - end, entity["entity_id"]))
+        between = text[end:candidate["evidence"]["span"]["start"]]
+        if len(between) <= 32 and not re.search(r"[,.;!?]", between):
+            return candidate
+    if preceding:
+        candidate = min(preceding, key=lambda entity: (start - entity["evidence"]["span"]["end"], entity["entity_id"]))
+        between = text[candidate["evidence"]["span"]["end"]:start]
+        if len(between) <= 24 and not re.search(r"[,.;!?]", between):
+            return candidate
+    if following:
+        return min(following, key=lambda entity: (entity["evidence"]["span"]["start"] - end, entity["entity_id"]))
+    return None
+
+
+def compile_atomic_claims_v2(text: str, proper_toponyms: Sequence[str] = ()) -> dict[str, Any]:
+    """Compila claims con entidades por mención y asociaciones sintáctico-locales."""
+    if not isinstance(text, str) or not text.strip():
+        raise VisualRerankingError("texto vacío")
+    source_sha = hashlib.sha256(text.encode()).hexdigest()
+    entities = []
+    for object_type, pattern in V2_OBJECT_PATTERNS:
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            entities.append({"entity_id": _entity_id(source_sha, object_type, match.start(), match.end()), "object_type": object_type, "evidence": {"text": match.group(0), "span": {"start": match.start(), "end": match.end()}}})
+    entities.sort(key=lambda entity: (entity["evidence"]["span"]["start"], entity["evidence"]["span"]["end"], entity["object_type"], entity["entity_id"]))
+    claims = []
+    for entity in entities:
+        span = entity["evidence"]["span"]
+        specificity = "generic" if entity["object_type"] in GENERIC_OBJECTS else "distinctive"
+        claims.append(_claim(source_sha, "object_presence", {"entity_id": entity["entity_id"], "object_type": entity["object_type"]}, text, span["start"], span["end"], specificity=specificity))
+    for key, value, pattern in V2_ATTRIBUTE_PATTERNS:
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            subject = _nearest_entity(entities, start=match.start(), end=match.end(), text=text, prefer_following=True)
+            claim_value = {"subject_entity_id": subject["entity_id"] if subject else None, "subject_type": subject["object_type"] if subject else "scene", "attribute": key, "attribute_value": value}
+            claims.append(_claim(source_sha, "attribute", claim_value, text, match.start(), match.end(), specificity="distinctive"))
+    for relation, pattern in RELATION_PATTERNS:
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            left, right = _relation_window(text, match.start(), match.end())
+            following = [entity for entity in entities if entity["evidence"]["span"]["start"] >= match.end() and entity["evidence"]["span"]["end"] <= right]
+            preceding = [entity for entity in entities if entity["evidence"]["span"]["end"] <= match.start() and entity["evidence"]["span"]["start"] >= left]
+            subject = min(following, key=lambda entity: (entity["evidence"]["span"]["start"], entity["entity_id"])) if following else max(preceding, key=lambda entity: (entity["evidence"]["span"]["end"], entity["entity_id"])) if preceding else None
+            claim_value = {"subject_entity_id": subject["entity_id"] if subject else None, "subject_type": subject["object_type"] if subject else "unknown", "relation": relation}
+            claims.append(_claim(source_sha, "egocentric_relation", claim_value, text, match.start(), match.end(), specificity="distinctive", requires_orientation=True))
+    for name in proper_toponyms:
+        for match in re.finditer(re.escape(name), text, re.IGNORECASE):
+            claims.append(_claim(source_sha, "visible_text", {"text": match.group(0)}, text, match.start(), match.end(), specificity="distinctive", requires_ocr=True))
+    unique = {row["claim_id"]: row for row in claims}
+    ordered = sorted(unique.values(), key=lambda row: (row["evidence"]["span"]["start"], row["evidence"]["span"]["end"], row["kind"], row["claim_id"]))
+    document = {"schema_version": "2.0", "contract_version": "visual-atomic-claims-v2", "source_text": text, "source_text_sha256": source_sha, "entities": entities, "claims": ordered, "extractor": {"kind": "deterministic_rules", "version": "visual-atomic-rules-v2"}}
+    validate_atomic_claims_v2(document)
+    return document
+
+
+def validate_atomic_claims_v2(document: Mapping[str, Any]) -> None:
+    if document.get("contract_version") != "visual-atomic-claims-v2" or hashlib.sha256(document.get("source_text", "").encode()).hexdigest() != document.get("source_text_sha256"):
+        raise VisualRerankingError("contrato v2 o hash textual inválido")
+    entities = {entity["entity_id"]: entity for entity in document.get("entities", [])}
+    if len(entities) != len(document.get("entities", [])):
+        raise VisualRerankingError("entidades duplicadas")
+    for entity_id, entity in entities.items():
+        span = entity["evidence"]["span"]
+        if entity_id != _entity_id(document["source_text_sha256"], entity["object_type"], span["start"], span["end"]) or document["source_text"][span["start"]:span["end"]] != entity["evidence"]["text"]:
+            raise VisualRerankingError("entidad o evidencia inválida")
+    seen = set()
+    for row in document.get("claims", []):
+        if row["claim_id"] in seen or row["source_text_sha256"] != document["source_text_sha256"]:
+            raise VisualRerankingError("claim v2 duplicado o de otro texto")
+        seen.add(row["claim_id"])
+        span = row["evidence"]["span"]
+        if document["source_text"][span["start"]:span["end"]] != row["evidence"]["text"]:
+            raise VisualRerankingError("span v2 inválido")
+        payload = {key: row[key] for key in row if key != "claim_id"}
+        if row["claim_id"] != _claim_id(payload):
+            raise VisualRerankingError("claim_id v2 inválido")
+        entity_id = row["value"].get("entity_id") if row["kind"] == "object_presence" else row["value"].get("subject_entity_id")
+        if entity_id is not None:
+            entity = entities.get(entity_id)
+            expected_type = row["value"].get("object_type") if row["kind"] == "object_presence" else row["value"].get("subject_type")
+            if entity is None or entity["object_type"] != expected_type:
+                raise VisualRerankingError("referencia de entidad v2 inválida")
 
 
 def atomic_verification_prompt(claim: Mapping[str, Any], *, candidate_id: str, image_id: str, orientation_comparable: bool = False) -> str:
@@ -330,7 +448,7 @@ def rerank_experimental(baseline: Mapping[str, Any], aggregate: Mapping[str, Any
         visual = evidence.get(row["candidate_id"], {"positive_evidence": 0.0, "negative_evidence": 0.0})
         modifier = lambda_pos * visual["positive_evidence"] - lambda_neg * visual["negative_evidence"] if enabled else 0.0
         rows.append({"candidate_id": row["candidate_id"], "baseline_rank": row["rank"], "baseline_cosine_similarity": row["cosine_similarity"], "baseline_normalized": normalized, "positive_evidence": visual["positive_evidence"], "negative_evidence": visual["negative_evidence"], "visual_modifier": modifier, "experimental_score": normalized + modifier})
-    ordered = sorted(rows, key=lambda row: (-row["experimental_score"], row["baseline_rank"], row["candidate_id"]))
+    ordered = sorted(rows, key=lambda row: (-row["experimental_score"], row["baseline_rank"], row["candidate_id"])) if enabled else rows
     for rank, row in enumerate(ordered, 1): row["experimental_rank"] = rank
     return {"schema_version": "1.0", "contract_version": "visual-experimental-reranking-v1", "enabled": enabled, "ranking_method": "minmax_baseline_plus_visual_evidence", "parameters": {"lambda_pos": lambda_pos, "lambda_neg": lambda_neg}, "baseline_immutable": True, "results": ordered, "limitations": ["scores_are_not_probabilities", "weights_require_development_calibration", "top_k_set_is_unchanged"]}
 
@@ -344,16 +462,17 @@ def evaluate_topk_transition(baseline: Sequence[Mapping[str, Any]], experimental
     def metrics(ids):
         distances = [haversine_m(reference_latitude, reference_longitude, *coords[candidate_id]) for candidate_id in ids]
         nearest = min(range(len(ids)), key=lambda index: distances[index])
-        return {"top1_candidate_id": ids[0], "top1_distance_m": distances[0], "geo1_50": distances[0] <= 50, "geo1_100": distances[0] <= 100, "minimum_top10_distance_m": distances[nearest], "nearest_candidate_id": ids[nearest], "nearest_rank": nearest + 1, "geo10_50": distances[nearest] <= 50, "geo10_100": distances[nearest] <= 100}
+        min5 = min(distances[:min(5, len(distances))])
+        return {"top1_candidate_id": ids[0], "top1_distance_m": distances[0], "geo1_50": distances[0] <= 50, "geo1_100": distances[0] <= 100, "minimum_top5_distance_m": min5, "geo5_50": min5 <= 50, "geo5_100": min5 <= 100, "minimum_top10_distance_m": distances[nearest], "nearest_candidate_id": ids[nearest], "nearest_rank": nearest + 1, "geo10_50": distances[nearest] <= 50, "geo10_100": distances[nearest] <= 100}
     base, reranked = metrics(base_ids), metrics(exp_ids)
     delta = reranked["top1_distance_m"] - base["top1_distance_m"]
-    return {"baseline": base, "experimental": reranked, "transition": {"top1_distance_delta_m": delta, "top1": "improved" if delta < 0 else "regressed" if delta > 0 else "tied", "geo10_50_invariant": base["geo10_50"] == reranked["geo10_50"], "geo10_100_invariant": base["geo10_100"] == reranked["geo10_100"], "top10_set_invariant": True, "unrecoverable_by_reranking_50m": not base["geo10_50"]}}
+    return {"baseline": base, "experimental": reranked, "transition": {"top1_distance_delta_m": delta, "top1": "improved" if delta < 0 else "regressed" if delta > 0 else "tied", "geo5_50_change": int(reranked["geo5_50"]) - int(base["geo5_50"]), "geo10_50_invariant": base["geo10_50"] == reranked["geo10_50"], "geo10_100_invariant": base["geo10_100"] == reranked["geo10_100"], "top10_set_invariant": True, "unrecoverable_by_reranking_50m": not base["geo10_50"]}}
 
 
 def plan_multiview_associations(candidates: Sequence[Mapping[str, Any]], images: Sequence[Mapping[str, Any]], *, max_distance_m: float = 100.0, max_images_per_candidate: int = 3) -> dict[str, Any]:
     reject_ground_truth(candidates, path="candidates")
     reject_ground_truth(images, path="images")
-    if not 0 < max_distance_m <= 200 or not 1 <= max_images_per_candidate <= 5:
+    if not 0 < max_distance_m <= 200 or not 1 <= max_images_per_candidate <= 8:
         raise VisualRerankingError("política multivista fuera de rango")
     associations = []
     for candidate in candidates:

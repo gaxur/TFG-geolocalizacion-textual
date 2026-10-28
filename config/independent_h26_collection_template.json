@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "independent-human-observation-collection-v1-legacy",
+  "campaign_id": "madrid-d004-h26-h61-presential-legacy",
+  "status": "superseded_for_h26_h61_by_remote_mapillary_campaign_v2",
+  "region_policy": "D004_ACCEPTED_FOR_TRANSITION_CAMPAIGN",
+  "split_policy": {
+    "group_by_spatial_block": true,
+    "projected_crs": "EPSG:25830",
+    "block_size_m": 150,
+    "maximum_observations_per_block": 2,
+    "guard_row_or_column_required": true,
+    "minimum_development_test_distance_m": 75,
+    "development_target": 12,
+    "test_sealed_target": 24,
+    "seed": null
+  },
+  "exclusions": {
+    "prior_query_ids": "H01-H25",
+    "minimum_distance_to_prior_observations_m": 75,
+    "minimum_distance_between_new_observations_m": 75,
+    "exclude_same_panorama_or_capture": true
+  },
+  "observations": []
+}

@@ -1,0 +1,15 @@
+{
+  "baseline_score_scope": "full_topn_minmax",
+  "contract_version": "topn-promotion-policy-v1",
+  "discard": {"available": false, "enabled": false, "reason": "contradiction_not_independently_validated"},
+  "enabled": false,
+  "ground_truth_allowed": false,
+  "input_top_n": 100,
+  "output_top_k": 10,
+  "policy_id": "topn-promotion-policy-sha256-13e64da26392e90dde21c5ec33073fcdab3e28408fe707da259fc163ab2e82dc",
+  "promotion": {"complete_block_required": true, "max_promotions": 0, "opened_blocks": [], "reserve_blocks": [[11,20],[21,50],[51,100]]},
+  "schema_version": "1.1",
+  "status": "frozen",
+  "tie_break": ["experimental_score_desc", "baseline_rank_asc", "candidate_id_asc"],
+  "visual_policy": {"minimum_positive_evidence": 0.0, "minimum_valid_verdicts": 1, "missing_failed_unverifiable_conflict_neutral": true, "negative_weight": 0.0, "no_coverage_is_neutral": true, "positive_weight": 0.0}
+}

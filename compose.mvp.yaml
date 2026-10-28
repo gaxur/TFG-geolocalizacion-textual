@@ -22,6 +22,9 @@ services:
       ATLAS_QWEN_MODEL_ID: Qwen/Qwen3-8B
       ATLAS_QWEN_MODEL_REVISION: b968826d9c46dd6066d109eabc6255188de91218
       ATLAS_QWEN_REQUIRED: "true"
+      ATLAS_VISUAL_PROMOTION_ENABLED: "false"
+      ATLAS_VISUAL_PROMOTION_FALLBACK: baseline
+      ATLAS_VISUAL_PROMOTION_REQUIRED: "false"
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=1g
     volumes:

@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "adaptive-visual-acquisition-policy-v1-proposal",
+  "status": "proposal_not_authorized",
+  "mode": "coverage_adaptive",
+  "provider_id": "mapillary",
+  "candidate_scope": {
+    "fixture_id": "h16-h23-multicandidate-sha256-ce4ced016309b3b861db5f93151a4843cfdd26f0a776bf195ccf5db908d6b263",
+    "gallery_id": "madrid-50m",
+    "complete_symmetric_block": [1, 50]
+  },
+  "rounds": [
+    {"round": 1, "max_radius_m": 25, "cumulative_images_per_candidate": 2, "cumulative_opportunity_groups_per_candidate": 2},
+    {"round": 2, "max_radius_m": 50, "cumulative_images_per_candidate": 4, "cumulative_opportunity_groups_per_candidate": 4},
+    {"round": 3, "max_radius_m": 100, "cumulative_images_per_candidate": 8, "cumulative_opportunity_groups_per_candidate": 8}
+  ],
+  "limits": {
+    "max_rounds": 3,
+    "max_radius_m": 100,
+    "max_images_per_candidate": 8,
+    "max_opportunity_groups_per_candidate": 8,
+    "max_unique_assets_total": 432,
+    "max_new_assets": 391,
+    "max_jobs_per_model": 11080,
+    "max_storage_bytes": 3128000000,
+    "max_asset_bytes": 8000000
+  },
+  "coverage_hypothesis": {
+    "primary_metric": "independent_opportunity_groups_capped",
+    "candidate_coverage": "min(1, independent_groups / round_target_groups)",
+    "minimum_for_visual_modifier_hypothesis": 0.5,
+    "insufficient_action": "preserve_ct2l_score_and_mark_insufficient",
+    "ground_truth_optimized": false,
+    "validated": false
+  },
+  "selection": {
+    "allocation": "lexicographic_max_min_v1",
+    "sequence_diversity_first": true,
+    "pixels_allowed": false,
+    "vlm_outputs_allowed": false,
+    "ground_truth_allowed": false,
+    "supported_count_allowed": false
+  },
+  "notes": "Radii and coverage threshold are prospective hypotheses. This file does not authorize downloads or replace the frozen Mapillary v2 protocol."
+}

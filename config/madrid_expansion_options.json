@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "madrid-expansion-options-v1",
+  "status": "proposal_not_approved",
+  "current_region": {
+    "region_id": "madrid_pilot",
+    "decision_id": "D004",
+    "bbox_wgs84": {"north": 40.42, "south": 40.412, "east": -3.699, "west": -3.709},
+    "projected_crs": "EPSG:25830",
+    "area_km2": 0.765445,
+    "candidate_counts": {"25m": 1115, "50m": 253}
+  },
+  "options": [
+    {
+      "option_id": "A_compact",
+      "role": "minimum_fallback",
+      "bbox_wgs84": {"north": 40.425, "south": 40.407, "east": -3.694, "west": -3.714},
+      "projected_area_km2": 3.3904,
+      "candidate_counts": {"25m": 5268, "50m": 1275},
+      "estimated_png_bytes": {"25m": 1094000000, "50m": 263000000},
+      "estimated_clean_render_minutes": {"25m": 77.9, "50m": 29.8},
+      "estimated_embedding_minutes": {"25m": 3.69, "50m": 1.39},
+      "estimated_osm_raw_bytes": 37900000
+    },
+    {
+      "option_id": "B_balanced",
+      "role": "recommended_for_quality_and_diversity",
+      "bbox_wgs84": {"north": 40.432, "south": 40.402, "east": -3.688, "west": -3.72},
+      "projected_area_km2": 9.041,
+      "candidate_counts": {"25m": 14204, "50m": 3448},
+      "estimated_png_bytes": {"25m": 2949000000, "50m": 712000000},
+      "estimated_clean_render_minutes": {"25m": 210.1, "50m": 80.7},
+      "estimated_embedding_minutes": {"25m": 9.95, "50m": 3.75},
+      "estimated_osm_raw_bytes": 101000000
+    },
+    {
+      "option_id": "C_broad_stress",
+      "role": "later_scalability_study",
+      "bbox_wgs84": {"north": 40.44, "south": 40.395, "east": -3.68, "west": -3.725},
+      "projected_area_km2": 19.0707,
+      "candidate_counts": {"25m": 30127, "50m": 7431},
+      "estimated_png_bytes": {"25m": 6255000000, "50m": 1534000000},
+      "estimated_clean_render_minutes": {"25m": 445.7, "50m": 174.0},
+      "estimated_embedding_minutes": {"25m": 21.11, "50m": 8.09},
+      "estimated_osm_raw_bytes": 213100000
+    }
+  ],
+  "common_policy": {
+    "source_crs": "EPSG:4326",
+    "projected_crs": "EPSG:25830",
+    "candidate_generation": "projected_square_grid",
+    "border_policy": "full_cell_within_bbox",
+    "counts_computed_with_current_generator": true,
+    "estimates_are_not_measurements": true
+  }
+}

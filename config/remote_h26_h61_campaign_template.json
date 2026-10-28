@@ -1,0 +1,40 @@
+{
+  "schema_version": "2.0",
+  "contract_version": "remote-mapillary-campaign-v2",
+  "campaign_id": "madrid-d004-remote-mapillary-h26-h61-v2",
+  "region_id": "madrid_pilot",
+  "reference_kind": "mapillary_camera_coordinate_unknown_uncertainty",
+  "evaluation_reference": "reported_camera_coordinate_with_unknown_accuracy",
+  "centimetric_ground_truth": false,
+  "split_policy": {
+    "development_query_ids": "H26-H37",
+    "test_query_ids": "H38-H61",
+    "projected_crs": "EPSG:25830",
+    "block_size_m": 150,
+    "guard_block_x": 2934,
+    "development_block_rule": "block_x < 2934",
+    "test_block_rule": "block_x > 2934",
+    "maximum_observations_per_block": 2,
+    "minimum_historical_distance_m": 75,
+    "minimum_new_distance_m": 75,
+    "one_reference_per_sequence": true,
+    "selection_must_not_use": ["ct2l_rankings", "vlm_outputs", "baseline_errors", "gallery_candidate_distance", "verification_pixel_quality"]
+  },
+  "independence_policy": {
+    "reference_and_verification_roles_disjoint": true,
+    "same_image_forbidden": true,
+    "same_reference_sequence_forbidden": true,
+    "exact_hash_check_required": true,
+    "perceptual_similarity_check_required": true,
+    "human_overlap_review_required": true,
+    "sequence_separation_alone_is_sufficient": false
+  },
+  "uncertainty_policy": {
+    "reported_accuracy_m": null,
+    "accuracy_status": "unknown_unless_provider_metadata_states_otherwise",
+    "primary_50m_analysis": "include_with_explicit_unknown_accuracy_flag",
+    "required_sensitivity_analyses_m": [25, 50, 75, 100],
+    "do_not_claim_centimetric_gt": true
+  },
+  "observations": []
+}
