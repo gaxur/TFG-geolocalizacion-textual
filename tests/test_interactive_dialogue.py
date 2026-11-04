@@ -34,6 +34,22 @@ def orchestrator(*, text_adapter=None, evidence=None, retriever=None, radius=75.
 
 
 class InteractiveDialogueTests(unittest.TestCase):
+    def test_resident_token_count_uses_public_clip_tokenize(self):
+        class TensorRow:
+            def count_nonzero(self):
+                class Scalar:
+                    @staticmethod
+                    def item(): return 7
+                return Scalar()
+        class Clip:
+            def __init__(self): self.calls=[]
+            def tokenize(self,text,context_length,truncate): self.calls.append((text,context_length,truncate));return [TensorRow()]
+        runtime=type("Runtime",(),{})();runtime._encoder=type("Encoder",(),{"_clip":Clip(),"checkpoint_sha256":"0"*64,"model_name":"fake"})();runtime._galleries={"g":type("Gallery",(),{"candidate_ids":("a",),"catalog":type("Catalog",(),{"manifest_id":"m","sha256":"0"*64})(),"embedding_manifest":{"embedding_dataset_id":"e","model":{"cvg_utils_sha256":"1"*64}}})()}
+        from src.tfg_phase0.interactive_dialogue import ResidentCT2LAdapter
+        adapter=ResidentCT2LAdapter(runtime,"g")
+        self.assertEqual(adapter.count_tokens("texto"),7)
+        self.assertEqual(runtime._encoder._clip.calls,[('texto',300,False)])
+
     def test_one_turn_preserves_literal_text_and_full_rankings(self):
         engine = orchestrator(text_adapter=FakeTextDialogueAdapter(rewrite="Veo una plaza y Veo una iglesia"))
         session = engine.start(session_label="s1", description="Veo una plaza")

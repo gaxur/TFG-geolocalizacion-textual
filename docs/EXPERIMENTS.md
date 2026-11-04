@@ -1307,3 +1307,56 @@ ejecutado. H38–H61 sigue sellado.
   tests/test_interactive_dialogue_multiturn.py tests/test_crosstext2loc_runtime.py
   tests/test_phase5_text_transform.py`.
 - El resultado describe integridad de software, no precisión geográfica.
+
+## Smoke real del diálogo adaptativo v2
+
+**Fecha:** 2026-11-04
+**Tipo:** integración técnica real, sin GT, VLM, red, descargas o reintentos.
+
+### Protocolo congelado
+
+- Descripción técnica: «Estoy en una calle urbana con varios edificios y
+  comercios».
+- Respuestas ordinales prefijadas: `Sí`, `No`, `No puedo comprobarlo`.
+- Configuración: `interactive_dialogue_multiturn.json`, máximo tres preguntas.
+- Galería exhaustiva `madrid-50m`, 253 candidatos; F3 físico compatible.
+- Una carga compartida CT2L y una carga compartida Qwen3-8B.
+- Qwen3-VL-8B no se cargó.
+
+El preflight encontró una NVIDIA GB10 sin procesos compute. Ollama estaba activo
+como servicio, pero no existía `llama-server` ni modelo residente. La RAM
+disponible era 101.467.189.248 B; NVML no expuso memoria total/libre de la memoria
+unificada. Se ejecutó un único intento en `crosstext2loc-gb10:f511`, imagen
+`sha256:0775ff6757f13f28c9950eff2d2ee6a2bf9f8f6bb465e2946453dce8f1caff72`.
+
+### Resultado
+
+- Estado: `PASS`; tres preguntas; parada `max_questions_reached`.
+- Familias adaptativas: `monument`, `church`, `square`, sin repetición.
+- Recuperaciones CT2L: tres, todas exhaustivas con 253 candidatos. La respuesta
+  desconocida del tercer turno no produjo recuperación.
+- Los hashes prueban que el ranking posterior del turno 1 alimentó el turno 2 y
+  el posterior del turno 2 alimentó el turno 3.
+- Llamadas Qwen: tres redacciones y dos reescrituras; cero llamadas VLM.
+- Las tres redacciones fallaron cerradas: `intent_changed` una vez y
+  `missing_abstention_option` dos veces. Se mostraron plantillas deterministas.
+- Reescrituras: primera rechazada por `clarification_lost`; segunda aceptada,
+  pero ninguna alimentó la política adaptativa.
+- Tokenizer CT2L real verificado post hoc sobre las consultas exactas: 25, 51 y
+  75 tokens. No hubo omisiones ni truncamiento. El registro de sesión conserva el
+  conteo fallback 14/27/43 debido a una limitación de instrumentación corregida
+  después del único intento; la sesión no se reescribió.
+- Carga CT2L: 5.743 ms; F3: 266 ms; Qwen: 91.551 ms; sesión: 11.026 ms; total:
+  108.643 ms.
+- CUDA tras CT2L: 1.712.462.336 B asignados; tras Qwen: 18.093.952.512 B;
+  pico propio: 18.140.423.680 B asignados y 18.196.987.904 B reservados.
+- Tras cerrar, CUDA asignada bajó a 9.568.256 B; el allocator seguía informando
+  16.324.231.168 B reservados dentro del proceso justo antes de terminar el
+  contenedor. Fuera del contenedor no quedaron procesos compute.
+- Schema v2, validador Python, eventos, hashes, rankings, consultas, ausencia de
+  GT y VLM: `PASS`.
+
+Los rankings cambiaron técnicamente, incluido Top-1, pero no se evaluó ni se
+afirma mejora geográfica. Los artefactos locales están en
+`results/generated/interactive-dialogue-multiturn-real-smoke-v1/` y permanecen
+fuera de Git conforme a la política de resultados generados.

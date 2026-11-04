@@ -188,8 +188,17 @@ class ResidentCT2LAdapter:
         }
 
     def count_tokens(self, text: str) -> int | None:
-        tokenizer = getattr(getattr(self.runtime._encoder, "_clip", None), "_tokenizer", None)
-        return len(tokenizer.encode(text)) + 2 if tokenizer is not None else None
+        clip_module = getattr(self.runtime._encoder, "_clip", None)
+        if clip_module is None:
+            return None
+        try:
+            # OpenAI CLIP no exporta siempre su SimpleTokenizer privado, pero
+            # tokenize sí devuelve los IDs reales, incluidos SOT/EOT y padding.
+            context_length = max(300, len(text) + 2)
+            tokens = clip_module.tokenize(text, context_length=context_length, truncate=False)
+            return int(tokens[0].count_nonzero().item())
+        except Exception:
+            return None
 
     def truncate_to_tokens(self, text: str, maximum: int) -> str:
         tokenizer = getattr(getattr(self.runtime._encoder, "_clip", None), "_tokenizer", None)
@@ -199,9 +208,7 @@ class ResidentCT2LAdapter:
 
     def retrieve_full(self, *, query_id: str, text: str, language: str) -> dict[str, Any]:
         count = self.runtime.gallery_count(self.gallery_id)
-        tokenizer = getattr(getattr(self.runtime, "_encoder", None), "_clip", None)
-        tokenizer = getattr(tokenizer, "_tokenizer", None)
-        token_count = len(tokenizer.encode(text)) + 2 if tokenizer is not None else None
+        token_count = self.count_tokens(text)
         started = time.perf_counter()
         response = self.runtime.retrieve(
             gallery_id=self.gallery_id,
