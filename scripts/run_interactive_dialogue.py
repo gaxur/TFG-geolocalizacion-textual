@@ -26,6 +26,11 @@ from src.tfg_phase0.interactive_dialogue import (
     ResidentCT2LAdapter,
     write_session,
 )
+from src.tfg_phase0.interactive_dialogue_multiturn import (
+    MultiTurnConfig,
+    MultiTurnDialogueOrchestrator,
+    write_multiturn_session,
+)
 
 
 class FakeRetriever:
@@ -85,13 +90,15 @@ def fake_evidence() -> F3EvidenceIndex:
 
 def load_policy(path: Path) -> tuple[str, DialoguePolicyConfig]:
     raw = json.loads(path.read_text(encoding="utf-8"))
-    expected = {
+    common = {
         "schema_version", "contract_version", "gallery_id", "reserve_size",
         "cluster_radius_m", "minimum_hypotheses", "minimum_supported_hypotheses",
         "maximum_supported_fraction", "allow_qwen_question",
-        "enable_controlled_rewrite", "turn_limit", "absence_semantics", "vlm_enabled",
+        "enable_controlled_rewrite", "absence_semantics", "vlm_enabled",
     }
-    if set(raw) != expected or raw["schema_version"] != "1.0" or raw["contract_version"] != "interactive-dialogue-policy-config-v1" or raw["turn_limit"] != 1 or raw["vlm_enabled"] is not False or raw["absence_semantics"] != "unknown_not_contradicted":
+    legacy = raw.get("contract_version") == "interactive-dialogue-policy-config-v1" and set(raw) == common | {"turn_limit"} and raw.get("turn_limit") == 1
+    current = raw.get("contract_version") == "interactive-dialogue-policy-config-v2" and set(raw) == common | {"max_questions"} and raw.get("max_questions") in {1, 2, 3}
+    if raw.get("schema_version") != "1.0" or not (legacy or current) or raw["vlm_enabled"] is not False or raw["absence_semantics"] != "unknown_not_contradicted":
         raise ValueError("configuración interactiva incompatible")
     return raw["gallery_id"], DialoguePolicyConfig(
         reserve_size=raw["reserve_size"],
@@ -102,6 +109,13 @@ def load_policy(path: Path) -> tuple[str, DialoguePolicyConfig]:
         allow_qwen_question=raw["allow_qwen_question"],
         enable_controlled_rewrite=raw["enable_controlled_rewrite"],
     )
+
+
+def load_multiturn_policy(path: Path, override: int | None = None) -> tuple[str, MultiTurnConfig]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    gallery_id, policy = load_policy(path)
+    configured = raw.get("max_questions", raw.get("turn_limit", 1))
+    return gallery_id, MultiTurnConfig(max_questions=override if override is not None else configured, policy=policy)
 
 
 def build_real_components(args: argparse.Namespace, gallery_id: str):
@@ -144,10 +158,13 @@ def print_summary(session: Mapping[str, Any]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("fake", "real"), default="fake")
-    parser.add_argument("--policy", type=Path, default=ROOT / "config/interactive_dialogue_mvp.json")
+    parser.add_argument("--policy", type=Path, default=ROOT / "config/interactive_dialogue_multiturn.json")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--description")
     parser.add_argument("--answer")
+    parser.add_argument("--answers", nargs="*", help="Respuestas técnicas en orden; si faltan se solicitan por terminal.")
+    parser.add_argument("--max-questions", type=int, choices=(1, 2, 3))
+    parser.add_argument("--legacy-one-turn", action="store_true", help="Escribe el contrato histórico v1.")
     parser.add_argument("--session-label", default="interactive-cli")
     parser.add_argument("--ct2l-config", type=Path, default=ROOT / "config/madrid_f46_retriever.json")
     parser.add_argument("--f3-bundle", type=Path)
@@ -156,7 +173,12 @@ def main() -> int:
     parser.add_argument("--qwen-model-dir", type=Path, help="Snapshot local exacto; no se descarga nada.")
     args = parser.parse_args()
 
-    gallery_id, config = load_policy(args.policy)
+    if args.legacy_one_turn:
+        gallery_id, config = load_policy(args.policy)
+        multiturn_config = None
+    else:
+        gallery_id, multiturn_config = load_multiturn_policy(args.policy, args.max_questions)
+        config = multiturn_config.policy
     resources = ()
     if args.mode == "fake":
         retriever, evidence = FakeRetriever(), fake_evidence()
@@ -165,16 +187,30 @@ def main() -> int:
         retriever, evidence, text_adapter, resources = build_real_components(args, gallery_id)
     try:
         description = args.description if args.description is not None else input("Descripción inicial: ")
-        orchestrator = OneTurnDialogueOrchestrator(retriever=retriever, evidence=evidence, config=config, text_adapter=text_adapter)
-        session = orchestrator.start(session_label=args.session_label, description=description)
-        if session["status"] == "awaiting_answer":
-            print(f"\nPregunta: {session['selected_question']['question']}")
-            answer = args.answer if args.answer is not None else input("Respuesta: ")
-            session = orchestrator.answer(session, answer)
+        if args.legacy_one_turn:
+            orchestrator = OneTurnDialogueOrchestrator(retriever=retriever, evidence=evidence, config=config, text_adapter=text_adapter)
+            session = orchestrator.start(session_label=args.session_label, description=description)
+            if session["status"] == "awaiting_answer":
+                print(f"\nPregunta: {session['selected_question']['question']}")
+                answer = args.answer if args.answer is not None else input("Respuesta: ")
+                session = orchestrator.answer(session, answer)
+            session_path, events_path = write_session(session, args.output_dir)
+            print_summary(session)
         else:
-            print(f"\nSin pregunta: {session['stop_reason']}")
-        session_path, events_path = write_session(session, args.output_dir)
-        print_summary(session)
+            orchestrator = MultiTurnDialogueOrchestrator(retriever=retriever, evidence=evidence, config=multiturn_config, text_adapter=text_adapter)
+            session = orchestrator.start(session_label=args.session_label, description=description)
+            supplied = list(args.answers if args.answers is not None else ([args.answer] if args.answer is not None else []))
+            while session["status"] == "awaiting_answer":
+                turn = session["turns"][-1]
+                print(f"\nPregunta {turn['index']}/{session['max_questions']}: {turn['question']['final_question']}")
+                answer = supplied.pop(0) if supplied else input("Respuesta (o 'terminar'): ")
+                session = orchestrator.answer(session, answer)
+                ranking = session["current_ranking"]["results"][:5]
+                print("Top-5 técnico actual:")
+                for row in ranking:
+                    print(f"  {row['rank']}. {row['candidate_id']} ({row['cosine_similarity']:.4f})")
+            print(f"\nFin: {session['stop_reason']}. No se ha evaluado mejora geográfica.")
+            session_path, events_path = write_multiturn_session(session, args.output_dir)
         print(f"\nSesión: {session_path}\nEventos: {events_path}")
     finally:
         for resource in reversed(resources):

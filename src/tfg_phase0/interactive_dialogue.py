@@ -187,6 +187,16 @@ class ResidentCT2LAdapter:
             "calls": list(self._calls),
         }
 
+    def count_tokens(self, text: str) -> int | None:
+        tokenizer = getattr(getattr(self.runtime._encoder, "_clip", None), "_tokenizer", None)
+        return len(tokenizer.encode(text)) + 2 if tokenizer is not None else None
+
+    def truncate_to_tokens(self, text: str, maximum: int) -> str:
+        tokenizer = getattr(getattr(self.runtime._encoder, "_clip", None), "_tokenizer", None)
+        if tokenizer is None or not hasattr(tokenizer, "decode"):
+            raise InteractiveDialogueError("tokenizer CT2L no permite truncamiento explícito")
+        return tokenizer.decode(tokenizer.encode(text)[:max(0, maximum - 2)]).strip()
+
     def retrieve_full(self, *, query_id: str, text: str, language: str) -> dict[str, Any]:
         count = self.runtime.gallery_count(self.gallery_id)
         tokenizer = getattr(getattr(self.runtime, "_encoder", None), "_clip", None)
@@ -249,15 +259,20 @@ class QwenDialogueAdapter:
         except TypeError:
             rendered = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         input_tokens = len(tokenizer(rendered)["input_ids"])
-        result = self.runtime.generate_prompt(prompt, GenerationConfig(max_new_tokens=max_new_tokens))
+        generation = GenerationConfig(max_new_tokens=max_new_tokens)
+        result = self.runtime.generate_prompt(prompt, generation)
         self._calls.append({
             "task": task,
+            "task_prompt": prompt,
+            "prompt_effective": rendered,
+            "raw_output": result.raw_output,
             "duration_ms": result.duration_ms,
             "input_tokens": input_tokens,
             "output_tokens": len(tokenizer(result.raw_output)["input_ids"]),
             "max_new_tokens": max_new_tokens,
             "do_sample": False,
             "enable_thinking": False,
+            "seed": generation.seed,
         })
         return result.text
 

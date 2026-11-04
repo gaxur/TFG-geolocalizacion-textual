@@ -1291,3 +1291,19 @@ ejecutado. H38–H61 sigue sellado.
 - **Ejecución:** 0 GPU, red, modelos, VLM, descargas, claims, rerankings o
   evaluación.
 - **Informe:** [NEXT_MULTIMODAL_VALIDATION_PLAN.md](NEXT_MULTIMODAL_VALIDATION_PLAN.md).
+# Validación CPU del diálogo adaptativo v2
+
+**Fecha:** 2026-11-04
+**Tipo:** comprobación técnica con dobles CPU, sin modelos reales ni GT.
+
+- Se implementó `interactive-dialogue-session-v2` con hasta tres preguntas.
+- La selección de cada turno consume el ranking canónico posterior anterior.
+- Las recuperaciones fake cubren siempre el universo completo.
+- Se comprobaron desconocimiento, ambigüedad, negación, corrección, conflicto,
+  finalización voluntaria, familias repetidas, fallos Qwen y 300 tokens.
+- Qwen real, CT2L real y Qwen3-VL no se cargaron; no hubo acceso a GPU, red,
+  fotografías, H26–H37 ni H38–H61.
+- Comando focal: `python -m pytest tests/test_interactive_dialogue.py
+  tests/test_interactive_dialogue_multiturn.py tests/test_crosstext2loc_runtime.py
+  tests/test_phase5_text_transform.py`.
+- El resultado describe integridad de software, no precisión geográfica.

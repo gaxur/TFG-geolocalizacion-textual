@@ -1288,6 +1288,37 @@ demuestran promoción exclusiva, neutralidad y fallback; H16/H23 solo aportan un
 diagnóstico development. La aceptación científica requiere calibración en
 H26–H37 y apertura única posterior de H38–H61.
 
+## D095 — Diálogo adaptativo de hasta tres preguntas
+
+**Estado:** ACEPTADA
+**Componente:** DialogueVPR / orquestación
+**Fecha:** 2026-11-04
+**Origen:** BUILD autorizado para ampliar el MVP de un turno.
+
+### Decisión
+
+El contrato v2 admite `max_questions` entre uno y tres. Después de cada
+aclaración informativa se ejecuta una recuperación CT2L exhaustiva y la siguiente
+intención se selecciona desde ese ranking. El Top-20 solo forma hipótesis F3.
+`literal_concatenation` es el estado canónico; la reescritura Qwen es experimental
+y no interviene en turnos posteriores.
+
+Las familias semánticas deterministas evitan preguntas equivalentes. Una
+respuesta desconocida bloquea su familia, pero permite otra pregunta. Las
+correcciones explícitas conservan procedencia y sustituyen claims; los conflictos
+no resolubles provocan abstención. La consulta CT2L usa una política explícita de
+300 tokens y registra omisiones.
+
+### Compatibilidad y alcance
+
+El contrato v1, su configuración `interactive_dialogue_mvp.json` y sus artefactos
+no se modifican. La configuración v2 vive en
+`interactive_dialogue_multiturn.json`. `max_questions=1` conserva el
+límite funcional anterior. Qwen3-8B se reutiliza mediante el adaptador existente;
+DialogueVPR no carga otro modelo. El punto VLM es solo una interfaz inerte y no
+autoriza inferencia, fotografías ni fusión de scores. La validación de este BUILD
+es CPU con dobles y no demuestra mejora geográfica.
+
 ## D001 — Identidad del candidato
 ## D094 — Resultado del linaje exploratorio posterior
 

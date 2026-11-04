@@ -1,186 +1,244 @@
-# MVP de geolocalización interactiva de un turno
+# MVP de geolocalización interactiva adaptativa
 
 ## Estado y alcance
 
-Esta fase implementa infraestructura para solicitar una aclaración humana y
-repetir una recuperación global CrossText2Loc. Está inspirada en el principio de
-recuperación iterativa de DialogueVPR, pero no reproduce DQ-pilot, CMPL, su
-entrenamiento SFT/GRPO, su testigo sintético ni sus resultados.
+El MVP solicita hasta tres aclaraciones humanas adaptativas y repite una
+recuperación global CrossText2Loc después de cada respuesta informativa. Está
+inspirado en el principio iterativo de DialogueVPR, pero no reproduce DQ-pilot,
+CMPL, su entrenamiento SFT/GRPO, su testigo sintético ni sus resultados.
 
-El MVP no recibe *ground truth*, no abre H38–H61, no evalúa precisión geográfica
-y no integra Qwen3-VL-8B. Una diferencia entre rankings es un resultado técnico,
-no una mejora de localización.
+No recibe *ground truth*, no abre conjuntos reservados, no evalúa precisión
+geográfica y no ejecuta Qwen3-VL-8B. Un cambio entre rankings es un resultado
+técnico, no una mejora demostrada de localización.
+
+El contrato histórico `interactive-dialogue-session-v1` y sus artefactos se
+mantienen legibles y sin cambios. Las sesiones nuevas utilizan
+`interactive-dialogue-session-v2`. Configurar `max_questions=1` conserva el
+límite funcional anterior; `--legacy-one-turn` permite escribir expresamente v1.
 
 ## Arquitectura
 
 ```mermaid
 flowchart TD
-    U[Descripción humana literal] --> O[Orquestador de un turno]
-    O --> C1[CT2L: ranking exhaustivo D004]
-    C1 --> H[Clústeres espaciales EPSG:25830]
+    U[Descripción humana literal] --> C1[CT2L: ranking global]
+    C1 --> H[Clústeres a 75 m en EPSG:25830]
     H --> F[OSM/F3: soporte cartográfico positivo]
-    F --> P[Política determinista]
-    P -->|Sin diferencia fiable| S[Abstención]
-    P -->|Intención seleccionada| Q[Qwen3-8B: redacción opcional]
+    F --> P[Política determinista adaptativa]
+    P -->|Sin diferencia fiable| S[Parada anticipada]
+    P -->|Intención nueva| Q[Qwen3-8B compartido: redacción opcional]
     Q --> V[Validador y plantilla de fallback]
     V --> A[Respuesta humana literal]
-    A --> L[Concatenación literal]
-    A --> R[Qwen3-8B: reescritura opcional validada]
+    A -->|Informativa| L[Consulta literal acumulada]
+    A -->|Desconocida o ambigua| P
     L --> C2[CT2L: nueva recuperación global]
-    R --> C2
-    C2 --> D[Comparación técnica sin GT]
+    C2 --> H
 ```
 
-El código principal está en
-[`interactive_dialogue.py`](../src/tfg_phase0/interactive_dialogue.py). La CLI es
-[`run_interactive_dialogue.py`](../scripts/run_interactive_dialogue.py) y la
-configuración congelable inicial está en
-[`interactive_dialogue_mvp.json`](../config/interactive_dialogue_mvp.json).
-
-## Responsabilidades
+El código histórico está en
+[`interactive_dialogue.py`](../src/tfg_phase0/interactive_dialogue.py) y el
+orquestador v2 en
+[`interactive_dialogue_multiturn.py`](../src/tfg_phase0/interactive_dialogue_multiturn.py).
+La CLI común es
+[`run_interactive_dialogue.py`](../scripts/run_interactive_dialogue.py).
+La configuración v1 permanece en `config/interactive_dialogue_mvp.json`; v2 usa
+`config/interactive_dialogue_multiturn.json`.
 
 | Componente | Responsabilidad | No hace |
 |---|---|---|
-| `OneTurnDialogueOrchestrator` | Estado, transiciones, eventos, fallbacks y límite de un turno | Inferencia CT2L, lectura directa de OSM o selección de ubicación correcta |
-| `ResidentCT2LAdapter` | Invocar `CrossText2LocRetriever` con `k=gallery_count` | Preselección, acceso a GT o fusión de rankings |
-| `F3EvidenceIndex` | Unir objetos y asociaciones F3 y exponer soporte cartográfico positivo | Inferir visibilidad o contradicción por ausencia |
-| Política determinista | Agrupar candidatos y seleccionar una intención respaldada | Tratar scores como probabilidades o entrenar un questioner |
-| `QwenDialogueAdapter` | Redactar la intención y proponer una reescritura | Cambiar la intención, modificar rankings o aportar entidades candidatas |
+| `MultiTurnDialogueOrchestrator` | Turnos, adaptación, parada, eventos y fallbacks | Inferencia directa, selección del candidato correcto o acceso a GT |
+| `OneTurnDialogueOrchestrator` | Compatibilidad de escritura v1 | Evolución multivuelta |
+| `ResidentCT2LAdapter` | Recuperación con `k=gallery_count` y conteo textual | Preselección o fusión de rankings |
+| `F3EvidenceIndex` | Soporte cartográfico positivo por candidato | Inferir visibilidad o contradicción por ausencia |
+| Política determinista | Intención respaldada y familia semántica | Tratar scores como probabilidades |
+| `QwenDialogueAdapter` | Redactar y proponer reescrituras auditables | Cambiar intención o ranking |
+
+## Máquina de estados
+
+```mermaid
+stateDiagram-v2
+    [*] --> RecuperacionInicial
+    RecuperacionInicial --> Completada: sin pregunta discriminativa
+    RecuperacionInicial --> EsperandoRespuesta: intención respaldada
+    EsperandoRespuesta --> Completada: finalizar o contradicción irresoluble
+    EsperandoRespuesta --> SeleccionAdaptativa: desconocida, ambigua o no observable
+    EsperandoRespuesta --> RecuperacionGlobal: respuesta informativa
+    RecuperacionGlobal --> SeleccionAdaptativa
+    SeleccionAdaptativa --> EsperandoRespuesta: intención nueva y límite disponible
+    SeleccionAdaptativa --> Completada: abstención, repetición o máximo
+    Completada --> [*]
+```
+
+Una respuesta desconocida bloquea su familia semántica, pero no finaliza por sí
+sola. El sistema intenta otra pregunta independiente. `terminar`, `finalizar`,
+`parar` y equivalentes producen `human_requested_stop`.
+
+## Secuencia
+
+```mermaid
+sequenceDiagram
+    actor U as Usuario
+    participant O as Orquestador
+    participant C as CT2L global
+    participant F as OSM/F3
+    participant Q as Qwen3-8B compartido
+    U->>O: descripción literal
+    O->>C: consulta inicial, K = galería completa
+    C-->>O: ranking global
+    loop Hasta 3 preguntas mientras exista información útil
+        O->>F: Top-20 del ranking actual
+        F-->>O: soporte positivo por hipótesis
+        O->>Q: redactar intención determinista
+        Q-->>O: propuesta auditada o fallo
+        O->>U: pregunta validada o plantilla
+        U->>O: respuesta literal
+        alt aclaración informativa
+            O->>C: consulta acumulada, K = galería completa
+            C-->>O: nuevo ranking canónico
+        else desconocida o ambigua
+            O->>O: no ejecutar CT2L; probar otra familia
+        end
+    end
+```
+
+## Contrato por turno
+
+Cada elemento de `turns` conserva:
+
+- índice y ranking de entrada inmutable;
+- hash del ranking y clústeres espaciales;
+- referencias F3 consideradas;
+- intención y familia semántica;
+- pregunta determinista y pregunta final;
+- auditoría Qwen y fallback;
+- respuesta humana literal e interpretación;
+- corrección o conflicto, cuando exista;
+- consulta canónica y fragmentos omitidos;
+- variantes textuales y ranking posterior global;
+- comparación técnica y razón de continuación o parada.
+
+Las familias `square`, `church`, `monument`, `intersection`, `park` y
+`commercial` son identificadores deterministas. Dos redacciones sobre una
+iglesia pertenecen a `church` y no pueden preguntarse dos veces. No se delega en
+Qwen la detección de equivalencia.
+
+## Política adaptativa OSM/F3
+
+En cada turno se toma exclusivamente el ranking canónico vigente, se reserva su
+Top-20 para formar hipótesis conectadas a 75 m y se buscan diferencias con
+soporte positivo F3. La recuperación CT2L siempre cubre la galería completa.
+
+Una pregunta exige al menos dos hipótesis y separa hipótesis con soporte de
+otras en estado desconocido. La falta de asociación nunca se convierte en
+evidencia negativa y una asociación no demuestra visibilidad. Se excluyen las
+familias mencionadas, preguntadas o declaradas no observables.
+
+## Respuestas y contradicciones
+
+Se conservan todas las respuestas literales. La interpretación determinista
+distingue afirmación, negación, desconocimiento, imposibilidad de observar,
+respuesta parcial, ambigüedad, corrección y finalización. Una negación aporta
+texto a CT2L, pero no descarta candidatos por ausencia OSM.
+
+Una corrección explícita conserva ambos claims, desactiva el anterior y enlaza
+el nuevo con `supersedes`. Si no se puede identificar de manera determinista qué
+claim se corrige, la sesión se abstiene con `unresolvable_contradiction`; Qwen no
+inventa la resolución.
+
+Las razones de parada son:
+
+- `max_questions_reached`;
+- `no_discriminative_question`;
+- `repeated_question`;
+- `human_requested_stop`;
+- `unresolvable_contradiction`;
+- `insufficient_supported_evidence`;
+- `runtime_failure`.
+
+## Consulta canónica y 300 tokens
+
+La política `literal-clarifications-newest-first-300-v1` coloca primero las
+aclaraciones activas, de más nueva a más antigua, y después la descripción
+original. Usa el tokenizer CT2L real cuando el adaptador lo expone. Nunca envía
+más de 300 tokens y registra cada omisión. Una consulta reducida declara
+`is_complete_transcript=false`; la descripción y respuestas completas siguen
+intactas en la sesión.
+
+`literal_concatenation` es la única variante que alimenta el turno siguiente.
+`controlled_rewrite` es experimental: se audita, pero no genera el ranking
+canónico, no se mezcla con otras variantes y no selecciona preguntas.
 
 ## Qwen3-8B
 
-El adaptador real exige exactamente:
+Se reutiliza una única instancia de `Qwen/Qwen3-8B`, revisión
+`b968826d9c46dd6066d109eabc6255188de91218`, en modo no-thinking y sin muestreo.
+El diálogo no carga un modelo adicional.
 
-- modelo `Qwen/Qwen3-8B`;
-- revisión `b968826d9c46dd6066d109eabc6255188de91218`;
-- runtime existente `QwenTransformersAdapter`;
-- decodificación no-thinking y sin muestreo.
+Cada llamada conserva prompt efectivo, salida bruta, salida validada, motivo de
+rechazo, fallback, tokens, semilla e identidad del runtime. No se almacena
+razonamiento interno. Una redacción inválida usa la plantilla determinista; una
+reescritura inválida se omite sin afectar a la consulta canónica.
 
-Se reutiliza una única instancia para dos prompts diferenciados:
+## Extensión VLM inerte
 
-1. `redact_question`: verbaliza una intención ya seleccionada;
-2. `rewrite_query`: propone una consulta que combina descripción y respuesta.
+El contrato reserva un `VisualEvidenceProvider` independiente para una futura
+integración de `Qwen/Qwen3-VL-8B-Instruct`, revisión
+`0c351dd01ed87e9c1b53cbc748cba10e6187ff3b`. Este BUILD exige `enabled=false` y
+`calls=0`; intentar inyectar un proveedor produce error.
 
-La redacción se rechaza si cambia la intención, introduce vocabulario no
-autorizado, resulta sugestiva o elimina la opción «no puedo comprobarlo». La
-reescritura se rechaza salvo que conserve literalmente la descripción y la
-aclaración validadas, permitiendo solo conectores mínimos. Un fallo activa una plantilla determinista
-o elimina solo la variante reescrita; nunca se repara silenciosamente.
+El punto futuro deberá recibir procedencia fotográfica, claims y presupuesto, y
+devolver `supported`, `contradicted` o `unverifiable`. No habrá fusión implícita
+de scores ni equivalencia entre una cámara Mapillary y el observador.
 
-Estas validaciones son deliberadamente conservadoras y se han probado con un
-adaptador falso. No se ha autorizado ni ejecutado inferencia real en esta fase.
+## Contratos e integridad
 
-## CrossText2Loc y límite textual
+Los schemas son:
 
-Cada consulta usa la galería completa configurada. La reserva `Top-20` se emplea
-solo para seleccionar preguntas. El ranking inicial permanece inmutable y cada
-consulta aceptada genera otro ranking global independiente.
+- [`interactive_dialogue_session.schema.json`](../schemas/interactive_dialogue_session.schema.json), v1;
+- [`interactive_dialogue_session_v2.schema.json`](../schemas/interactive_dialogue_session_v2.schema.json), v2.
 
-El runtime CT2L usa contexto de 300 tokens con truncamiento a la derecha. La
-sesión registra esta política. La concatenación literal coloca primero la nueva
-aclaración para reducir el riesgo de perderla, pero conserva separadamente e
-íntegra la descripción original. Esta protección no demuestra que CT2L aproveche
-la aclaración; eso requiere evaluación humana posterior.
+Ambos rechazan GT. El validador v2 comprueba además universo global, continuidad
+entre ranking posterior y turno siguiente, familias únicas, presupuesto textual,
+variante canónica, VLM inactivo y cadena SHA-256 de eventos.
 
-No se fusionan similitudes de consultas distintas y no se interpretan como
-probabilidades.
-
-## OSM/F3 y preguntas
-
-La política inicial reconoce únicamente categorías cartográficas acotadas:
-
-- plaza;
-- iglesia o lugar de culto;
-- monumento;
-- parque o jardín;
-- comercio o equipamiento;
-- intersección aproximada por dos o más vías asociadas.
-
-Las asociaciones exclusivamente de borde no generan soporte. Familias con más
-de cuatro objetos quedan ambiguas y no originan preguntas. Los candidatos se
-agrupan por conectividad a un radio configurable de 75 m en EPSG:25830 para no
-tratar celdas vecinas como hipótesis independientes.
-
-Una pregunta requiere al menos dos hipótesis y debe separar hipótesis con soporte
-de otras cuyo estado es desconocido. El segundo grupo no se etiqueta como
-contradicción. F3 nunca se presenta como prueba de visibilidad.
-
-## Contratos y procedencia
-
-El schema externo es
-[`interactive_dialogue_session.schema.json`](../schemas/interactive_dialogue_session.schema.json).
-El validador Python añade invariantes entre campos y rechaza en cualquier nivel:
-
-- `ground_truth`;
-- `ground_truth_candidate`;
-- `target_candidate_id`;
-- `reference_coordinate`;
-- `correct_candidate`.
-
-La sesión conserva literalmente descripción, pregunta y respuesta. Las salidas
-Qwen se guardan como propuestas separadas. Los eventos se escriben como un log
-append-only de aplicación, están ordenados y encadenan el SHA-256 del evento
-anterior, incluido el timestamp. Esta cadena detecta alteraciones accidentales,
-pero no es una firma frente a quien pueda recalcular el fichero completo. Se escriben:
-
-- `session.json`: estado materializado;
-- `events.jsonl`: decisiones y transiciones auditables.
-
-Los estados de evidencia reservados para evolución son `supported`,
-`contradicted`, `unknown`, `unobservable` y `low_confidence`. En este MVP F3 solo
-emite `supported`; la falta de soporte conserva `unknown`. No se cambia la
-semántica de contratos visuales históricos.
-
-## Ejecución CPU
-
-El modo predeterminado usa una galería y F3 sintéticos sin modelos ni GPU:
+## CLI CPU
 
 ```bash
 python scripts/run_interactive_dialogue.py \
   --mode fake \
-  --output-dir /tmp/dialogue-smoke \
+  --output-dir /tmp/dialogue-smoke-v2 \
   --description "Estoy en una calle urbana" \
-  --answer "Veo una iglesia"
+  --answers "Sí" "No puedo comprobarlo" "No"
 ```
 
-El modo real está implementado como integración, pero no debe ejecutarse sin una
-autorización posterior. Requiere los recursos locales ya existentes:
+La CLI solicita respuestas que falten y muestra el Top-5 técnico después de cada
+turno. `--max-questions 1` prueba compatibilidad funcional. El modo real reutiliza
+los adaptadores actuales, pero no se ejecutó en este BUILD.
 
-```bash
-python scripts/run_interactive_dialogue.py \
-  --mode real \
-  --output-dir results/local/dialogue-session \
-  --f3-bundle /ruta/al/bundle-f3 \
-  --cvg-utils-sha256 HASH \
-  --clip-weights /ruta/ViT-L-14-336px.pt \
-  --qwen-model-dir /ruta/Qwen3-8B-b968826d9c46
-```
-
-Omitir `--qwen-model-dir` mantiene preguntas y concatenación deterministas. La
-CLI no descarga recursos ni activa un VLM.
+| Preguntas usadas | Secuencia ilustrativa | Parada posible |
+|---:|---|---|
+| 1 | afirmación, sin otra diferencia respaldada | `no_discriminative_question` |
+| 2 | desconocida, nueva familia, finalización voluntaria | `human_requested_stop` |
+| 3 | tres aclaraciones y rankings globales sucesivos | `max_questions_reached` |
 
 ## Pruebas
 
-Las pruebas CPU están en `tests/test_interactive_dialogue.py`:
-
 ```bash
-python -m unittest tests.test_interactive_dialogue
+python -m pytest \
+  tests/test_interactive_dialogue.py \
+  tests/test_interactive_dialogue_multiturn.py
 ```
 
-Cubren un turno, transiciones inválidas, abstención, respuestas desconocidas o
-contradictorias, fallos y alucinaciones del fake Qwen, reescritura inválida,
-ranking global, entrada desde fuera del orden inicial, asociaciones F3 positivas,
-ausencias desconocidas, bordes, ambigüedad, clústeres, eventos, schema y rechazo
-de GT.
+Cubren cero a tres preguntas, selección desde el ranking posterior, respuestas
+positivas, negativas, desconocidas y ambiguas, correcciones, contradicciones,
+familias repetidas, recuperación global, inmutabilidad, fallos Qwen, presupuesto
+de 300 tokens, schemas, hashes, rechazo de GT y ausencia de VLM/GPU.
 
-## Limitaciones y trabajo pendiente
+## Limitaciones científicas
 
-- No se ha cargado Qwen3-8B ni CrossText2Loc real.
-- No se ha validado un bundle F3 físico mediante esta CLI.
-- No se ha medido latencia, memoria o calidad de redacción real.
-- No existe evaluación geográfica ni diálogo humano nuevo.
-- No se interpretan respuestas complejas como claims estructurados.
-- No se admiten correcciones posteriores porque el límite es un turno.
-- Qwen3-VL-8B y evidencia fotográfica quedan fuera del alcance.
-- La política y sus umbrales necesitan congelarse antes de cualquier evaluación
-  científica nueva, sin reajustarlos sobre H26–H37.
+- La implementación multivuelta se validó con dobles CPU, no con modelos reales.
+- No demuestra mejora geográfica ni usa referencias correctas.
+- Las respuestas complejas solo tienen interpretación conservadora por reglas.
+- El recorte explícito de textos largos necesita un smoke con tokenizer CT2L real.
+- F3 no representa visibilidad y sus ausencias no son contradicciones.
+- Qwen3-VL-8B y las fotografías quedan fuera de este BUILD.
+- Los umbrales de la política no se ajustaron con conjuntos reservados.
