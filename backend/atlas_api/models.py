@@ -72,11 +72,12 @@ class ResponseTimings(StrictModel):
 
 class RetrievalResponse(StrictModel):
     schema_version: Literal["1.0"]
-    contract_version: Literal["atlas-experimental-retrieval-response-v2"]
+    contract_version: Literal["atlas-experimental-retrieval-response-v3"]
     query: QueryModel
     processing: "ProcessingMetadata"
     model: ModelIdentity
     retrievals: list[GalleryRetrieval] = Field(min_length=1, max_length=1)
+    visual_postprocessing: "VisualPostprocessing"
     timings_ms: ResponseTimings
 
 
@@ -91,6 +92,23 @@ class ProcessingMetadata(StrictModel):
     variant: Literal["es_original", "en_cartographic"]
     effective_query: QueryModel
     transformer: TransformerIdentity | None
+
+
+class VisualEvidence(StrictModel):
+    candidate_id: NonEmpty
+    reason: NonEmpty
+
+
+class VisualPostprocessing(StrictModel):
+    status: Literal["applied", "fallback_baseline", "disabled"]
+    source: Literal["precomputed", "none"]
+    request_id: NonEmpty | None
+    reason: NonEmpty | None
+    model: dict | None
+    policy_id: NonEmpty | None
+    baseline_results: list[CandidateResult]
+    final_results: list[CandidateResult]
+    evidence: list[VisualEvidence]
 
 
 class ErrorDetail(StrictModel):

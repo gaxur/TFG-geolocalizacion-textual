@@ -1,0 +1,43 @@
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+
+const chromePath=process.env.CHROME_PATH||'/usr/bin/chromium';
+const sceneUrl=process.env.I20_SCENE_URL||'http://127.0.0.1:8766/review-scenes.html';
+const annotationUrl=process.env.I20_ANNOTATION_URL||'http://127.0.0.1:8765/annotate.html';
+const profile=fs.mkdtempSync(path.join(os.tmpdir(),'i20-browser-'));
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const browser=spawn(chromePath,['--headless=new','--disable-gpu','--no-sandbox','--no-first-run','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'],{stdio:'ignore'});
+let ws;
+try{
+  for(let i=0;i<100&&!fs.existsSync(path.join(profile,'DevToolsActivePort'));i++)await delay(100);
+  const port=fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0];
+  const pages=await(await fetch(`http://127.0.0.1:${port}/json`)).json();
+  ws=new WebSocket(pages.find(page=>page.type==='page').webSocketDebuggerUrl);await new Promise(resolve=>ws.addEventListener('open',resolve,{once:true}));
+  let id=0;const pending=new Map(),errors=[];
+  ws.addEventListener('message',event=>{const data=JSON.parse(event.data);if(data.method==='Runtime.exceptionThrown')errors.push(data.params.exceptionDetails.exception?.description||data.params.exceptionDetails.text);const item=pending.get(data.id);if(item){pending.delete(data.id);data.error?item.reject(new Error(JSON.stringify(data.error))):item.resolve(data.result)}});
+  const send=(method,params={})=>new Promise((resolve,reject)=>{pending.set(++id,{resolve,reject});ws.send(JSON.stringify({id,method,params}))});
+  const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw new Error(JSON.stringify(result.exceptionDetails));return result.result.value};
+  const waitFor=async expression=>{for(let i=0;i<80;i++){if(await evaluate(expression))return;await delay(100)}throw new Error(`Timeout: ${expression}`)};
+  await send('Runtime.enable');await send('Page.enable');
+  await send('Page.navigate',{url:sceneUrl});
+  await waitFor(`document.documentElement.dataset.ready==='true' && document.querySelectorAll('.card').length===12`);
+  assert.equal(await evaluate(`document.querySelectorAll('.card').length`),12);
+  assert.equal(await evaluate(`document.querySelectorAll('.card img').length`),24);
+  await evaluate(`window.scrollTo(0,document.body.scrollHeight)`);
+  await waitFor(`[...document.querySelectorAll('.card img')].every(img=>img.complete&&img.naturalWidth>0)`);
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('#init-error')).display`),'none');
+  const exported=await evaluate(`new Promise(async resolve=>{const old=URL.createObjectURL;URL.createObjectURL=blob=>{blob.text().then(resolve);return 'blob:test'};document.querySelector('#who').value='browser-reviewer';document.querySelectorAll('[data-k]').forEach(x=>x.value='no');document.querySelectorAll('.decision').forEach(x=>x.value='CLEAR');document.querySelectorAll('.notes').forEach(x=>x.value='');document.querySelector('#export').click();await new Promise(r=>setTimeout(r,50));URL.createObjectURL=old})`);
+  const document=JSON.parse(exported);assert.equal(document.records.length,12);assert.ok(document.records.every(row=>row.decision==='CLEAR'));
+  await send('Page.navigate',{url:annotationUrl});
+  await waitFor(`document.documentElement.dataset.ready==='true' && document.querySelectorAll('.card').length===20`);
+  assert.equal(await evaluate(`document.querySelectorAll('.card').length`),20);
+  assert.equal(await evaluate(`document.querySelectorAll('.card img').length`),20);
+  await evaluate(`window.scrollTo(0,document.body.scrollHeight)`);
+  await waitFor(`[...document.querySelectorAll('.card img')].every(img=>img.complete&&img.naturalWidth>0)`);
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('#init-error')).display`),'none');
+  assert.deepEqual(errors,[]);
+  console.log(JSON.stringify({scene_pairs:12,scene_images:24,export_records:12,annotation_cards:20,annotation_images:20,errors:0}));
+}finally{ws?.close();browser.kill()}

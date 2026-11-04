@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+"""CLI de un turno para el MVP interactivo; modo fake por defecto y sin GPU."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import sys
+from typing import Any, Mapping
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from src.tfg_phase0.crosstext2loc_runtime import CrossText2LocRetriever, load_runtime_config
+from src.tfg_phase0.f5_text_transform import QwenTransformersAdapter
+from src.tfg_phase0.interactive_dialogue import (
+    DialoguePolicyConfig,
+    F3EvidenceIndex,
+    FakeTextDialogueAdapter,
+    OneTurnDialogueOrchestrator,
+    QWEN_MODEL_ID,
+    QWEN_REVISION,
+    QwenDialogueAdapter,
+    ResidentCT2LAdapter,
+    write_session,
+)
+
+
+class FakeRetriever:
+    """Galería CPU pequeña para validar el flujo, no la calidad geográfica."""
+
+    gallery_id = "fake-d004"
+
+    def __init__(self):
+        self.calls: list[str] = []
+        self._rows = [
+            ("fake-a", 40.41600, -3.70600),
+            ("fake-b", 40.41605, -3.70595),
+            ("fake-c", 40.41750, -3.70400),
+            ("fake-d", 40.41900, -3.70200),
+        ]
+
+    @property
+    def metadata(self) -> Mapping[str, Any]:
+        ids = sorted(row[0] for row in self._rows)
+        universe = hashlib.sha256(json.dumps(ids, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        return {"adapter": "fake-ct2l-cpu-v1", "ranking_method": "exhaustive_cosine", "tie_break": "candidate_id_ascending", "text_context_tokens": 300, "truncate": True, "truncation_side": "right", "real_model_inference": False, "expected_gallery_count": len(ids), "candidate_universe_sha256": universe, "catalog_manifest_id": "fake-catalog", "catalog_manifest_sha256": "0" * 64, "embedding_dataset_id": "fake-embeddings", "checkpoint_sha256": "0" * 64, "model_name": "fake-ct2l", "cvg_utils_sha256": "0" * 64}
+
+    def retrieve_full(self, *, query_id: str, text: str, language: str) -> dict[str, Any]:
+        self.calls.append(text)
+        scores = {"fake-a": .92, "fake-b": .90, "fake-c": .81, "fake-d": .70}
+        if "iglesia" in text.casefold():
+            scores["fake-c"] = .97
+        ordered = sorted(self._rows, key=lambda row: (-scores[row[0]], row[0]))
+        return {
+            "gallery_id": self.gallery_id,
+            "visual_dataset_id": "fake-visual",
+            "embedding_dataset_id": "fake-embeddings",
+            "gallery_count": len(ordered),
+            "requested_k": len(ordered),
+            "effective_k": len(ordered),
+            "ranking_method": "exhaustive_cosine",
+            "tie_break": "candidate_id_ascending",
+            "results": [
+                {"rank": index, "candidate_id": candidate_id, "latitude": latitude, "longitude": longitude, "cosine_similarity": scores[candidate_id]}
+                for index, (candidate_id, latitude, longitude) in enumerate(ordered, start=1)
+            ],
+        }
+
+
+def fake_evidence() -> F3EvidenceIndex:
+    objects = [
+        {"osm_ref": "node/1", "osm_type": "node", "osm_id": 1, "geometry_status": "valid", "geometry_role": "point", "tags": {"amenity": "place_of_worship"}},
+        {"osm_ref": "node/2", "osm_type": "node", "osm_id": 2, "geometry_status": "valid", "geometry_role": "point", "tags": {"historic": "monument"}},
+    ]
+    base = {"contains": False, "within": True, "crosses": False, "touches": False, "overlaps": False, "intersects": True, "boundary_contact_only": False, "center_distance_m": 5.0}
+    associations = [
+        {"candidate_id": "fake-c", "osm_ref": "node/1", **base},
+        {"candidate_id": "fake-d", "osm_ref": "node/2", **base},
+    ]
+    return F3EvidenceIndex.from_documents(dataset_id="fake-f3-cpu", objects=objects, associations=associations)
+
+
+def load_policy(path: Path) -> tuple[str, DialoguePolicyConfig]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    expected = {
+        "schema_version", "contract_version", "gallery_id", "reserve_size",
+        "cluster_radius_m", "minimum_hypotheses", "minimum_supported_hypotheses",
+        "maximum_supported_fraction", "allow_qwen_question",
+        "enable_controlled_rewrite", "turn_limit", "absence_semantics", "vlm_enabled",
+    }
+    if set(raw) != expected or raw["schema_version"] != "1.0" or raw["contract_version"] != "interactive-dialogue-policy-config-v1" or raw["turn_limit"] != 1 or raw["vlm_enabled"] is not False or raw["absence_semantics"] != "unknown_not_contradicted":
+        raise ValueError("configuración interactiva incompatible")
+    return raw["gallery_id"], DialoguePolicyConfig(
+        reserve_size=raw["reserve_size"],
+        cluster_radius_m=raw["cluster_radius_m"],
+        minimum_hypotheses=raw["minimum_hypotheses"],
+        minimum_supported_hypotheses=raw["minimum_supported_hypotheses"],
+        maximum_supported_fraction=raw["maximum_supported_fraction"],
+        allow_qwen_question=raw["allow_qwen_question"],
+        enable_controlled_rewrite=raw["enable_controlled_rewrite"],
+    )
+
+
+def build_real_components(args: argparse.Namespace, gallery_id: str):
+    if args.f3_bundle is None or args.cvg_utils_sha256 is None or args.clip_weights is None:
+        raise ValueError("modo real requiere --f3-bundle, --cvg-utils-sha256 y --clip-weights")
+    model, galleries = load_runtime_config(args.ct2l_config, project_root=ROOT, cvg_utils_sha256=args.cvg_utils_sha256, clip_weights_path=args.clip_weights)
+    selected = [value for value in galleries if value.gallery_id == gallery_id]
+    if len(selected) != 1:
+        raise ValueError(f"galería no configurada: {gallery_id}")
+    runtime = CrossText2LocRetriever.load(model_config=model, gallery_configs=selected, region_config=ROOT / "config/madrid.yaml")
+    evidence = F3EvidenceIndex.load_bundle(args.f3_bundle)
+    runtime_catalog_id = json.loads(selected[0].catalog_manifest.read_text(encoding="utf-8"))["manifest_id"]
+    runtime_catalog_sha256 = runtime._galleries[gallery_id].catalog.sha256
+    catalog_candidate_ids = {candidate.candidate_id for candidate in runtime._galleries[gallery_id].catalog.candidates}
+    if evidence.catalog_manifest_id != runtime_catalog_id or evidence.catalog_manifest_sha256 != runtime_catalog_sha256 or not set(evidence.features_by_candidate) <= catalog_candidate_ids:
+        runtime.close()
+        raise ValueError("el bundle F3 no corresponde al catálogo CT2L configurado")
+    qwen_runtime = None
+    text_adapter = None
+    if args.qwen_model_dir is not None:
+        qwen_runtime = QwenTransformersAdapter(args.qwen_model_dir, model_id=QWEN_MODEL_ID, revision=QWEN_REVISION)
+        text_adapter = QwenDialogueAdapter(qwen_runtime)
+    return ResidentCT2LAdapter(runtime, gallery_id), evidence, text_adapter, (runtime, qwen_runtime)
+
+
+def print_summary(session: Mapping[str, Any]) -> None:
+    initial = session["initial_ranking"]["results"][:5]
+    print("\nTop-5 inicial:")
+    for row in initial:
+        print(f"  {row['rank']}. {row['candidate_id']} ({row['cosine_similarity']:.4f})")
+    for value in session["updated_rankings"]:
+        print(f"\nTop-5 posterior [{value['variant']}]:")
+        for row in value["ranking"]["results"][:5]:
+            print(f"  {row['rank']}. {row['candidate_id']} ({row['cosine_similarity']:.4f})")
+    for comparison in session["comparisons"]:
+        print(f"\nCambio técnico [{comparison['variant']}]: top1_changed={comparison['top1_changed']}, entradas Top-10={comparison['top10_entered']}, candidatos con cambio de rango={comparison['changed_candidate_count']}")
+    print("No se ha evaluado mejora geográfica: el pipeline no recibe ground truth.")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--mode", choices=("fake", "real"), default="fake")
+    parser.add_argument("--policy", type=Path, default=ROOT / "config/interactive_dialogue_mvp.json")
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--description")
+    parser.add_argument("--answer")
+    parser.add_argument("--session-label", default="interactive-cli")
+    parser.add_argument("--ct2l-config", type=Path, default=ROOT / "config/madrid_f46_retriever.json")
+    parser.add_argument("--f3-bundle", type=Path)
+    parser.add_argument("--cvg-utils-sha256")
+    parser.add_argument("--clip-weights", type=Path)
+    parser.add_argument("--qwen-model-dir", type=Path, help="Snapshot local exacto; no se descarga nada.")
+    args = parser.parse_args()
+
+    gallery_id, config = load_policy(args.policy)
+    resources = ()
+    if args.mode == "fake":
+        retriever, evidence = FakeRetriever(), fake_evidence()
+        text_adapter = FakeTextDialogueAdapter()
+    else:
+        retriever, evidence, text_adapter, resources = build_real_components(args, gallery_id)
+    try:
+        description = args.description if args.description is not None else input("Descripción inicial: ")
+        orchestrator = OneTurnDialogueOrchestrator(retriever=retriever, evidence=evidence, config=config, text_adapter=text_adapter)
+        session = orchestrator.start(session_label=args.session_label, description=description)
+        if session["status"] == "awaiting_answer":
+            print(f"\nPregunta: {session['selected_question']['question']}")
+            answer = args.answer if args.answer is not None else input("Respuesta: ")
+            session = orchestrator.answer(session, answer)
+        else:
+            print(f"\nSin pregunta: {session['stop_reason']}")
+        session_path, events_path = write_session(session, args.output_dir)
+        print_summary(session)
+        print(f"\nSesión: {session_path}\nEventos: {events_path}")
+    finally:
+        for resource in reversed(resources):
+            if resource is not None:
+                resource.close()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "i20_assisted_human_decisions.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "artifact_id", "plan_id", "decisions"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "i20-assisted-human-decisions-v1"},
+    "artifact_id": {"type": "string", "pattern": "^i20-assist-human-decisions-sha256-[0-9a-f]{64}$"},
+    "plan_id": {"type": "string", "pattern": "^i20-assist-plan-sha256-[0-9a-f]{64}$"},
+    "decisions": {
+      "type": "array", "maxItems": 32,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["decision_id", "target_kind", "target_id", "proposal_id", "status", "reviewer_pseudonym", "reviewed_at_utc", "human_revision", "reason_codes", "notes_es"],
+        "properties": {
+          "decision_id": {"type": "string", "pattern": "^i20-assist-human-decision-sha256-[0-9a-f]{64}$"},
+          "target_kind": {"enum": ["scene_pair", "annotation"]},
+          "target_id": {"type": "string", "minLength": 1},
+          "proposal_id": {"type": "string", "pattern": "^i20-assist-(?:scene|annotation)-proposal-sha256-[0-9a-f]{64}$"},
+          "status": {"enum": ["pending", "reviewed", "corrected", "rejected", "unresolved"]},
+          "reviewer_pseudonym": {"type": ["string", "null"], "minLength": 1},
+          "reviewed_at_utc": {"type": ["string", "null"], "format": "date-time"},
+          "human_revision": {"type": ["object", "null"]},
+          "reason_codes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "notes_es": {"type": ["string", "null"], "maxLength": 600}
+        }
+      }
+    }
+  }
+}

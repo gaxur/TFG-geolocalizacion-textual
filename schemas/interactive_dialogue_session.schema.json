@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "interactive_dialogue_session.schema.json",
+  "title": "One-turn interactive geolocation session without ground truth",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "session_id", "status", "turn_limit", "turns_used", "gallery_id", "policy", "models", "inputs", "f3", "initial_ranking", "hypotheses", "selected_question", "human_answer", "query_updates", "updated_rankings", "comparisons", "stop_reason", "events", "limitations"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "interactive-dialogue-session-v1"},
+    "session_id": {"type": "string", "pattern": "^dialogue-session-sha256-[0-9a-f]{64}$"},
+    "status": {"enum": ["awaiting_answer", "completed"]},
+    "turn_limit": {"const": 1},
+    "turns_used": {"type": "integer", "minimum": 0, "maximum": 1},
+    "gallery_id": {"type": "string", "minLength": 1},
+    "policy": {"$ref": "#/$defs/safeObject"},
+    "models": {"$ref": "#/$defs/safeObject"},
+    "inputs": {"$ref": "#/$defs/safeObject"},
+    "f3": {"$ref": "#/$defs/safeObject"},
+    "initial_ranking": {"$ref": "#/$defs/safeObject"},
+    "hypotheses": {"type": "array", "items": {"$ref": "#/$defs/safeObject"}},
+    "selected_question": {"anyOf": [{"$ref": "#/$defs/safeObject"}, {"type": "null"}]},
+    "human_answer": {"anyOf": [{"$ref": "#/$defs/safeObject"}, {"type": "null"}]},
+    "query_updates": {"type": "array", "items": {"$ref": "#/$defs/safeObject"}},
+    "updated_rankings": {"type": "array", "items": {"$ref": "#/$defs/safeObject"}},
+    "comparisons": {"type": "array", "items": {"$ref": "#/$defs/safeObject"}},
+    "stop_reason": {"type": ["string", "null"]},
+    "events": {"type": "array", "minItems": 4, "items": {"$ref": "#/$defs/safeObject"}},
+    "limitations": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+  },
+  "$defs": {
+    "safeObject": {
+      "type": "object",
+      "propertyNames": {"not": {"enum": ["ground_truth", "ground_truth_candidate", "target_candidate_id", "reference_coordinate", "correct_candidate", "gt"]}},
+      "additionalProperties": {"$ref": "#/$defs/safeValue"}
+    },
+    "safeValue": {
+      "anyOf": [
+        {"type": ["string", "number", "integer", "boolean", "null"]},
+        {"$ref": "#/$defs/safeObject"},
+        {"type": "array", "items": {"$ref": "#/$defs/safeValue"}}
+      ]
+    }
+  },
+  "allOf": [
+    {"not": {"required": ["ground_truth"]}},
+    {"not": {"required": ["target_candidate_id"]}},
+    {"not": {"required": ["reference_coordinate"]}}
+  ]
+}

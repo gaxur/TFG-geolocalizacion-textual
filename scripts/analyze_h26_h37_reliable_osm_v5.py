@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+"""Sensibilidad y comparación pareada v5 sin modificar rankings congelados."""
+from __future__ import annotations
+import argparse,hashlib,json,statistics
+from pathlib import Path
+def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+def main():
+ p=argparse.ArgumentParser();p.add_argument("--evaluation",type=Path,required=True);p.add_argument("--confidence",type=Path,required=True);p.add_argument("--output",type=Path,required=True);a=p.parse_args();evaluation=json.loads(a.evaluation.read_text());confidence=json.loads(a.confidence.read_text());atlas={row["query_id"]:row for row in evaluation["variants"]["atlas_v3"]["rows"]};reports={}
+ for name,report in evaluation["variants"].items():
+  rows=[]
+  for row in report["rows"]:
+   base=atlas[row["query_id"]];rows.append({"query_id":row["query_id"],"top1_delta_m_vs_atlas":row["top1_distance_m"]-base["top1_distance_m"],"promotion_applied":row["promotion_applied"],"promotion_source_rank":row["promotion_source_rank"],"promotion_final_rank":row["promotion_final_rank"],"geo_recall_delta":{threshold:{k:int(row["geo_recall"][threshold][k])-int(base["geo_recall"][threshold][k]) for k in ("1","5","10")} for threshold in ("50","100")}})
+  loo=[]
+  for omitted in rows:
+   kept=[row for row in rows if row["query_id"]!=omitted["query_id"]];loo.append({"omitted_query_id":omitted["query_id"],"mean_top1_delta_m_vs_atlas":statistics.fmean(row["top1_delta_m_vs_atlas"] for row in kept),"geo50_at1_delta":sum(row["geo_recall_delta"]["50"]["1"] for row in kept),"geo50_at5_delta":sum(row["geo_recall_delta"]["50"]["5"] for row in kept)})
+  dependence={qid:{"mean_top1_delta_without_query_m":statistics.fmean(row["top1_delta_m_vs_atlas"] for row in rows if row["query_id"]!=qid),"geo50_at1_delta_without_query":sum(row["geo_recall_delta"]["50"]["1"] for row in rows if row["query_id"]!=qid),"geo50_at5_delta_without_query":sum(row["geo_recall_delta"]["50"]["5"] for row in rows if row["query_id"]!=qid)} for qid in ("H28","H31","H32","H36","H37")}
+  reports[name]={"rows":rows,"leave_one_out":{"folds":loo,"top1_mean_improves_all_folds":all(row["mean_top1_delta_m_vs_atlas"]<0 for row in loo),"geo50_at1_improves_all_folds":all(row["geo50_at1_delta"]>0 for row in loo)},"focus_query_dependence":dependence}
+ selected={qid:row["selected"] for qid,row in confidence["queries"].items()};doc={"schema_version":"1.0","contract_version":"h26-h37-reliable-osm-analysis-v5","inputs":{"evaluation_sha256":digest(a.evaluation),"confidence_sha256":digest(a.confidence)},"protocol":{"posthoc_ground_truth_analysis":True,"rankings_modified":False,"leave_one_out_is_sensitivity_not_independent_evaluation":True,"no_threshold_selected_from_results":True},"promotion_coverage":{"queries":len(selected),"abstentions":sum(row["abstained"] for row in selected.values()),"high":sum(row["selected_confidence"]=="high" for row in selected.values()),"medium":sum(row["selected_confidence"]=="medium" for row in selected.values())},"variants":reports,"decision":{"policy_replacement":False,"future_independent_evaluation_justified":False,"reason":"only_h36_creates_new_top1_or_top5_geographic_hit","keep_atlas_v3":True,"stop_current_reranking_line":True,"hybrid_retriever_implementation_justified":False,"minimal_next_step":"new_independent_development_evidence_or_source_aligned_osm_raster_ablation_before_more_policy_iteration"},"limitations":["same_twelve_queries_reused_across_iterations","confidence_is_heuristic_not_probability","leave_one_out_does_not_restore_independence"]};a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(json.dumps(doc,ensure_ascii=False,sort_keys=True,indent=2)+"\n",encoding="utf-8");print(json.dumps({"coverage":doc["promotion_coverage"],"decision":doc["decision"]},sort_keys=True));return 0
+if __name__=="__main__":raise SystemExit(main())

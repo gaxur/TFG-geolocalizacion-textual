@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "h26-h37-commons-metadata-authorization-request-v1",
+  "approved": true,
+  "approved_by": "responsable_tfg",
+  "approved_at_utc": "2026-11-03T08:32:05Z",
+  "plan_sha256": "a2190cb0d6b1fdcd329018f301871dd86d08765bcd90dfce4683dda2499aac0e",
+  "scope": {
+    "partition": "development",
+    "plan_id": "h26-h37-commons-plan-sha256-c5defcba9dc6c60319875fe17d670204ac74b67c69466ba8bb82e517b360ce29",
+    "targets": 33,
+    "maximum_records_per_target": 10,
+    "maximum_api_queries": 33,
+    "api": "https://commons.wikimedia.org/w/api.php",
+    "metadata_only": true,
+    "download_images": false,
+    "store_thumbnails": false,
+    "test_partition_excluded": true
+  },
+  "operator_confirmations": {
+    "official_api_metadata_queries_permitted": true,
+    "query_budget_accepted": true,
+    "no_image_download_confirmed": true,
+    "file_specific_license_and_location_kind_review_required": true,
+    "development_only_no_gt_selection_confirmed": true
+  },
+  "confirmation_provenance": {"kind":"responsible_statement_in_project_session","confirmed_by":"responsable_tfg","confirmed_at_utc":"2026-11-03T08:32:05Z"},
+  "notes": "Primero mide disponibilidad y licencias. No autoriza descargar imágenes ni inferencia VLM."
+}

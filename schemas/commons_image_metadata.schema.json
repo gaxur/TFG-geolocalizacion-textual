@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "commons_image_metadata.schema.json",
+  "title": "Wikimedia Commons image metadata for visual evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["provider", "file_title", "page_id", "canonical_url", "description_url", "author", "license_identifier", "license_url", "attribution", "consulted_at_utc", "location", "depicted_objects", "osm_links", "media", "provenance"],
+  "properties": {
+    "provider": {"const": "wikimedia_commons"},
+    "file_title": {"type": "string", "pattern": "^File:.+"},
+    "page_id": {"type": "integer", "minimum": 1},
+    "canonical_url": {"type": "string", "format": "uri"},
+    "description_url": {"type": "string", "format": "uri"},
+    "author": {"type": ["string", "null"]},
+    "license_identifier": {"type": ["string", "null"]},
+    "license_url": {"type": ["string", "null"], "format": "uri"},
+    "attribution": {"type": ["string", "null"]},
+    "consulted_at_utc": {"type": "string", "format": "date-time"},
+    "location": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "latitude", "longitude", "source", "uncertainty", "camera_position_verified"],
+      "properties": {
+        "kind": {"enum": ["camera", "object", "unknown"]},
+        "latitude": {"type": ["number", "null"], "minimum": -90, "maximum": 90},
+        "longitude": {"type": ["number", "null"], "minimum": -180, "maximum": 180},
+        "source": {"enum": ["commons_geolocation", "structured_data", "description", "absent"]},
+        "uncertainty": {"enum": ["provider_reported", "unknown", "not_applicable"]},
+        "camera_position_verified": {"type": "boolean"}
+      }
+    },
+    "depicted_objects": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["label", "wikidata_id", "source"], "properties": {"label": {"type": "string"}, "wikidata_id": {"type": ["string", "null"], "pattern": "^Q[1-9][0-9]*$"}, "source": {"enum": ["structured_data", "categories", "description", "manual"]}}}},
+    "osm_links": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["osm_ref", "link_method", "confidence", "review_status"], "properties": {"osm_ref": {"type": "string", "pattern": "^(node|way|relation)/[1-9][0-9]*$"}, "link_method": {"enum": ["wikidata_exact", "name_and_geometry", "manual"]}, "confidence": {"enum": ["high", "medium", "low"]}, "review_status": {"enum": ["pending", "accepted", "rejected"]}}}},
+    "media": {"type": "object", "additionalProperties": false, "required": ["mime", "width_px", "height_px", "bytes", "sha256", "local_path"], "properties": {"mime": {"type": ["string", "null"]}, "width_px": {"type": ["integer", "null"], "minimum": 1}, "height_px": {"type": ["integer", "null"], "minimum": 1}, "bytes": {"type": ["integer", "null"], "minimum": 1}, "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}, "local_path": {"type": ["string", "null"]}}},
+    "provenance": {"type": "object", "additionalProperties": false, "required": ["api_endpoint", "api_revision", "raw_record_sha256", "inventory_id"], "properties": {"api_endpoint": {"type": "string", "format": "uri"}, "api_revision": {"type": ["string", "null"]}, "raw_record_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "inventory_id": {"type": "string", "minLength": 1}}}
+  }
+}

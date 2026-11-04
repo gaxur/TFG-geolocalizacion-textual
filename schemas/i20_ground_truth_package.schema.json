@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "i20_ground_truth_package.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "package_id", "status", "annotation_content_seen", "predictions_seen", "references"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "i20-ground-truth-package-v1"},
+    "package_id": {"pattern": "^i20-ground-truth-package-sha256-[0-9a-f]{64}$"},
+    "status": {"enum": ["template_not_collected", "review_open", "frozen"]},
+    "annotation_content_seen": {"const": false},
+    "predictions_seen": {"const": false},
+    "references": {
+      "type": "array", "maxItems": 20,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["observation_id", "status", "position_role", "latitude", "longitude", "crs", "capture_method", "reported_accuracy_m", "uncertainty_status", "validation_method", "source_record_sha256", "reviewer_pseudonym", "validated_at_utc", "limitations"],
+        "properties": {
+          "observation_id": {"pattern": "^I(?:0[1-9]|1[0-9]|20)$"},
+          "status": {"enum": ["pending", "validated", "rejected"]},
+          "position_role": {"const": "camera_or_observer_reference_position"},
+          "latitude": {"type": ["number", "null"], "minimum": -90, "maximum": 90},
+          "longitude": {"type": ["number", "null"], "minimum": -180, "maximum": 180},
+          "crs": {"enum": ["EPSG:4326", null]},
+          "capture_method": {"enum": ["device_gnss_multi_sample", "surveyed", "provider_camera_metadata", "other_documented", null]},
+          "reported_accuracy_m": {"type": ["number", "null"], "exclusiveMinimum": 0},
+          "uncertainty_status": {"enum": ["reported", "estimated_documented", "unknown"]},
+          "validation_method": {"type": ["string", "null"]},
+          "source_record_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+          "reviewer_pseudonym": {"type": ["string", "null"]},
+          "validated_at_utc": {"type": ["string", "null"], "format": "date-time"},
+          "limitations": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+        }
+      }
+    }
+  }
+}

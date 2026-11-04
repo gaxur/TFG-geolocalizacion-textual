@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "h26-h37-pairwise-8b-authorization-request-v1",
+  "approved": true,
+  "approved_by": "responsable_tfg",
+  "approved_at_utc": "2026-11-02T13:03:16Z",
+  "scope": {
+    "partition": "development",
+    "model": "Qwen/Qwen3-VL-8B-Instruct",
+    "model_revision": "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b",
+    "new_downloads": 0,
+    "pairwise_calls_maximum": 355,
+    "strategies": ["rank10_vs_ranks11_30", "rank10_vs_visual_shortlist_from_ranks11_100"],
+    "maximum_promotions_per_query": 2,
+    "ground_truth_as_input": false,
+    "test_partition_excluded": true,
+    "training": false,
+    "fine_tuning": false
+  },
+  "plans": {
+    "rank10_vs_ranks11_30": {"plan_id": "h26-h37-pairwise-plan-sha256-21adcd970f8f0da9a9c753fe2d2194bf78be1a44012ddf43ed529c9544956a55", "sha256": "885adae57cda7b6ef5f92e202ab6cbc4efdeb93ce69d2c4b73dabe5e17c841fe", "ready_calls": 235},
+    "deep_visual_shortlist": {"plan_id": "h26-h37-pairwise-visual-shortlist-sha256-e80df7dab215e42e1376e0e01ffc2ebedc30711e5bec7a6301320d68e6aca279", "sha256": "432fee8c1093c260236925388dc4bccc79d2a737c08e396d7fd5dd7769679216", "ready_calls": 120, "rank_gt50_challengers": 55}
+  },
+  "operator_confirmations": {
+    "pairwise_prompt_and_fixed_8b_inference_permitted": true,
+    "existing_authorized_images_only": true,
+    "development_only_and_no_gt_input_confirmed": true,
+    "compute_budget_accepted": true
+  },
+  "confirmation_provenance": {"kind": "responsible_statement_in_project_session", "confirmed_by": "responsable_tfg", "confirmed_at_utc": "2026-11-02T13:03:16Z"},
+  "notes": "Solicitud exacta de 355 comparaciones pairwise 8B con imágenes ya autorizadas. Estimación 887,5 s más carga y menos de 10 MB. No cubre H38-H61 ni nuevas descargas."
+}

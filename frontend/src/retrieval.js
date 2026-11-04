@@ -1,6 +1,6 @@
 const REQUEST_VERSION = '1.0';
 const REQUEST_CONTRACT = 'atlas-experimental-retrieval-request-v2';
-const RESPONSE_CONTRACT = 'atlas-experimental-retrieval-response-v2';
+const RESPONSE_CONTRACT = 'atlas-experimental-retrieval-response-v3';
 
 export function createQueryId() {
   const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -35,7 +35,7 @@ function validCandidate(row, expectedRank) {
 export function adaptRetrievalResponse(document, request) {
   const processing = document?.processing;
   const expectedVariant = request.processing_mode === 'with_llm' ? 'en_cartographic' : 'es_original';
-  if (document?.schema_version !== '1.0' || document?.contract_version !== RESPONSE_CONTRACT || !document.query || document.query.query_id !== request.query.query_id || document.query.text !== request.query.text || document.query.language !== request.query.language || processing?.mode !== request.processing_mode || processing?.variant !== expectedVariant || processing?.effective_query?.query_id !== request.query.query_id || typeof processing.effective_query.text !== 'string' || !processing.effective_query.text || (request.processing_mode === 'no_llm' && (processing.effective_query.text !== request.query.text || processing.effective_query.language !== request.query.language || processing.transformer !== null)) || (request.processing_mode === 'with_llm' && (processing.effective_query.language !== 'en' || processing.transformer?.model_id !== 'Qwen/Qwen3-8B' || processing.transformer?.prompt_version !== 'f53b-text-transform-v2')) || document.model?.name !== 'CLIP-L/14@336' || !/^[0-9a-f]{64}$/.test(document.model.checkpoint_sha256 || '') || !document.timings_ms || !Array.isArray(document.retrievals) || document.retrievals.length !== 1) throw new TypeError('Respuesta de recuperación incompatible.');
+  if (document?.schema_version !== '1.0' || document?.contract_version !== RESPONSE_CONTRACT || !document.query || document.query.query_id !== request.query.query_id || document.query.text !== request.query.text || document.query.language !== request.query.language || processing?.mode !== request.processing_mode || processing?.variant !== expectedVariant || processing?.effective_query?.query_id !== request.query.query_id || typeof processing.effective_query.text !== 'string' || !processing.effective_query.text || (request.processing_mode === 'no_llm' && (processing.effective_query.text !== request.query.text || processing.effective_query.language !== request.query.language || processing.transformer !== null)) || (request.processing_mode === 'with_llm' && (processing.effective_query.language !== 'en' || processing.transformer?.model_id !== 'Qwen/Qwen3-8B' || processing.transformer?.prompt_version !== 'f53b-text-transform-v2')) || document.model?.name !== 'CLIP-L/14@336' || !/^[0-9a-f]{64}$/.test(document.model.checkpoint_sha256 || '') || !document.timings_ms || !Array.isArray(document.retrievals) || document.retrievals.length !== 1 || !document.visual_postprocessing) throw new TypeError('Respuesta de recuperación incompatible.');
   const requested = new Set([request.gallery_id]);
   const seen = new Set();
   const retrievals = document.retrievals.map(retrieval => {
@@ -48,8 +48,16 @@ export function adaptRetrievalResponse(document, request) {
     return { galleryId: retrieval.gallery_id, galleryCount: retrieval.gallery_count, requestedK: retrieval.requested_k, effectiveK: retrieval.effective_k, visualDatasetId: retrieval.visual_dataset_id, embeddingDatasetId: retrieval.embedding_dataset_id, results };
   });
   if (seen.size !== 1) throw new TypeError('Falta la galería solicitada en la respuesta.');
+  const visual = document.visual_postprocessing;
+  if (!['applied','fallback_baseline','disabled'].includes(visual.status) || !Array.isArray(visual.baseline_results) || !Array.isArray(visual.final_results) || visual.baseline_results.length !== retrievals[0].results.length || visual.final_results.length !== retrievals[0].results.length) throw new TypeError('Postprocesamiento visual incompatible.');
+  const baselineIds = visual.baseline_results.map((row,index) => { if (!validCandidate(row,index+1)) throw new TypeError('Baseline visual inválido.'); return row.candidate_id; });
+  if (baselineIds.join('|') !== retrievals[0].results.map(row => row.id).join('|')) throw new TypeError('Baseline visual no coincide con CT2L.');
+  const finalResults = visual.final_results.map((row,index) => { if (!validCandidate(row,index+1)) throw new TypeError('Ranking visual inválido.'); return { key: `${request.gallery_id}:${row.candidate_id}`, id: row.candidate_id, rank: row.rank, lat: row.latitude, lon: row.longitude, similarity: row.cosine_similarity, galleryId: request.gallery_id }; });
+  if (new Set(finalResults.map(row => row.id)).size !== finalResults.length) throw new TypeError('Ranking visual contiene candidatos duplicados.');
+  retrievals[0].baselineResults = retrievals[0].results;
+  retrievals[0].results = finalResults;
   if (!Number.isFinite(document.timings_ms.transformation) || document.timings_ms.transformation < 0 || !Number.isFinite(document.timings_ms.text_encoding) || document.timings_ms.text_encoding < 0 || !Number.isFinite(document.timings_ms.total) || document.timings_ms.total < 0 || !document.timings_ms.ranking_by_gallery || Object.keys(document.timings_ms.ranking_by_gallery).length !== 1 || !Number.isFinite(document.timings_ms.ranking_by_gallery[request.gallery_id]) || document.timings_ms.ranking_by_gallery[request.gallery_id] < 0) throw new TypeError('Tiempos inválidos en la respuesta.');
-  return { query: document.query, processing, model: document.model, retrievals, timingsMs: document.timings_ms, raw: document };
+  return { query: document.query, processing, model: document.model, visualPostprocessing: visual, retrievals, timingsMs: document.timings_ms, raw: document };
 }
 
 export function processingLabel(mode) { return mode === 'with_llm' ? 'Con LLM · en_cartographic' : 'Sin LLM · texto original'; }

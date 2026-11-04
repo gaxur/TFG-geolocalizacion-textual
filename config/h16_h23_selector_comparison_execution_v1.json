@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "h16-h23-selector-comparison-execution-v1",
+  "status": "prepared_blocked_pending_authorization",
+  "arms": {
+    "coverage_adaptive": {"manifest_id": "h16-h23-coverage_adaptive-manifest-sha256-0b458ee23eb5924671853f07c4c98e989ba1e0a528c4680faeb43db147ceab57", "manifest_sha256": "e02ca2f33772f70dee602d8c58628a8712490f7a3aa2056b956e1bda81003f1d"},
+    "geometric_adaptive": {"manifest_id": "h16-h23-geometric_adaptive-manifest-sha256-532fa43ab7e16426063d0e51740a86a3f876e5d7a4ea1a5146811345e6d51e53", "manifest_sha256": "831c2bc52df35e4cf0bc6401aeef4e5ac2557b1cee7711b42dd57860269b90af"}
+  },
+  "paired_reuse_plan_sha256": "036f23821f4333eb62846f6a019bb2e61e79305fa92004d51f7be34138639abb",
+  "physical_budget": {"unique_assets_union": 511, "already_available_assets": 37, "pending_unique_assets": 474, "estimated_pending_bytes": 57670476, "hard_maximum_bytes": 3792000000},
+  "inference_budget_per_model": {"physical_tasks_union": 9613, "physical_tasks_shared_between_arms": 2453, "physical_tasks_reusable": 845, "physical_tasks_new": 8768, "generate_calls_union": 7625, "generate_calls_reusable": 669, "generate_calls_new": 6956, "automatic_abstentions_union": 1988},
+  "models": {
+    "qwen3-vl-2b": {"model_id": "Qwen/Qwen3-VL-2B-Instruct", "revision": "89644892e4d85e24eaac8bacfd4f463576704203"},
+    "qwen3-vl-8b": {"model_id": "Qwen/Qwen3-VL-8B-Instruct", "revision": "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b"}
+  },
+  "generation": {"do_sample": false, "max_new_tokens": 24, "batch_size": 1, "prompt": "visual-verdict-only-v4"},
+  "checkpoint_storage": {"qwen3-vl-2b_safety_bytes": 10140186, "qwen3-vl-8b_safety_bytes": 10161309},
+  "execution_order": ["validate_authorization", "validate_manifests", "download_union_once", "freeze_asset_manifest", "materialize_physical_task_union", "reuse_exact_tasks", "run_new_2b_tasks", "run_new_8b_tasks", "project_to_arms", "aggregate", "symmetric_reranking", "freeze_rankings", "evaluate_gt_separately"],
+  "gates": {"authorization": false, "terms_reviewed": false, "assets_complete": false, "inference_ready": false, "gt_access": false}
+}

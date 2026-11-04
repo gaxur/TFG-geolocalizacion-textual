@@ -32,6 +32,27 @@ superan el arranque.
 
 ## Funcionalidad implementada
 
+La respuesta Atlas v3 incorpora un postprocesador Qwen3-VL posterior a
+CrossText2Loc. El modo operativo inicial es *precomputed-first*: valida un bundle
+montado en solo lectura contra el texto efectivo, galería, datasets visuales y
+ranking CT2L. Si existe una entrada compatible, devuelve ranking final y evidencia
+estructurada; si no existe, declara `fallback_baseline` y conserva CT2L. La
+inferencia Qwen3-VL online continúa experimental y no comparte residencia GPU con
+los dos modelos actuales.
+
+El contrato de bundle v2 fija una reserva interna Top-50. La API conserva y
+devuelve el baseline CT2L Top-10, pero el postprocesador puede promover al ranking
+final candidatos de ranks 11–50. Si texto efectivo, variante, galería, datasets o
+reserva no coinciden exactamente con el bundle, devuelve `fallback_baseline`.
+
+Configuración opcional:
+
+```text
+ATLAS_VISUAL_PROMOTION_ENABLED=true
+MVP_VISUAL_BUNDLE_DIR=/ruta/host/a/bundles
+ATLAS_VISUAL_PRECOMPUTED_BUNDLE_CONTAINER=/visual-bundles/atlas-visual-bundle.json
+```
+
 - descripción textual en español;
 - selección de las galerías Madrid 25 m y 50 m;
 - selección exclusiva de galería 25 m o 50 m;

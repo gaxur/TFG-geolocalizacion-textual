@@ -34,6 +34,16 @@ class AtomicClaimTests(unittest.TestCase):
         base.update({"verdict":"contradicted","limitations":["out_of_frame"]})
         with self.assertRaises(VisualRerankingError): parse_atomic_verdict(json.dumps(base,separators=(",",":")),claim,candidate_id="c",image_id="i")
 
+    def test_trivalent_verdict_contract_accepts_visible_support_contradiction_and_ambiguity(self):
+        claim=compile_atomic_claims("Veo una iglesia.")["claims"][0]
+        common={"claim_id":claim["claim_id"],"candidate_id":"c","image_id":"i","ocr_text":None,"orientation_comparable":False}
+        supported={**common,"verdict":"supported","observed_evidence":"fachada de iglesia visible","limitations":["none"]}
+        contradicted={**common,"verdict":"contradicted","observed_evidence":"el edificio visible es una nave industrial incompatible","limitations":["none"]}
+        ambiguous={**common,"verdict":"unverifiable","observed_evidence":None,"limitations":["occluded"]}
+        self.assertEqual(parse_atomic_verdict(json.dumps(supported,separators=(",",":")),claim,candidate_id="c",image_id="i")["verdict"],"supported")
+        self.assertEqual(parse_atomic_verdict(json.dumps(contradicted,separators=(",",":")),claim,candidate_id="c",image_id="i")["verdict"],"contradicted")
+        self.assertEqual(parse_atomic_verdict(json.dumps(ambiguous,separators=(",",":")),claim,candidate_id="c",image_id="i")["verdict"],"unverifiable")
+
     def test_atomic_prompt_is_small_and_orientation_is_external(self):
         claim = compile_atomic_claims("A mi derecha hay una iglesia.")["claims"][0]
         prompt = atomic_verification_prompt(claim,candidate_id="c",image_id="i")

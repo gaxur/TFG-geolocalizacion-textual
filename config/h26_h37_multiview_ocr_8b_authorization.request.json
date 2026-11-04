@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "h26-h37-multiview-ocr-8b-authorization-request-v1",
+  "approved": true,
+  "approved_by": "responsable_tfg",
+  "approved_at_utc": "2026-11-02T13:52:58Z",
+  "terms_reviewed": true,
+  "retention_deadline_utc": "2027-01-31T23:59:59Z",
+  "plan_id": "h26-h37-multiview-ocr-plan-sha256-1ac27c15d302e44ab06acca0a81ab037c37d04e886a810dd32e2e740a10336a7",
+  "plan_sha256": "62000f5bbe2ed8c1e0d131f4b56f3febb0ae8c2fd6a212d9cc62cbb268b42e84",
+  "scope": {"partition":"development","candidate_rank_block":[1,20],"additional_views_per_slot":2,"additional_unique_assets":117,"cached_assets":14,"new_downloads_maximum":103,"maximum_resolution_px":1024,"maximum_bytes_per_asset":8000000,"hard_maximum_new_bytes":824000000,"model":"Qwen/Qwen3-VL-8B-Instruct","model_revision":"0c351dd01ed87e9c1b53cbc748cba10e6187ff3b","structured_claim_image_calls_maximum":7112,"pairwise_calls_maximum":240,"estimated_8b_seconds":13671,"new_claim_contract":"atomic_object_attribute_visible_text_spatial_relation_with_evidence_and_ocr","training":false,"fine_tuning":false,"public_dataset":false,"ground_truth_as_input":false,"test_partition_excluded":true},
+  "operator_confirmations": {"new_downloads_and_private_storage_permitted":true,"structured_ocr_and_pairwise_8b_inference_permitted":true,"development_only_no_gt_input_confirmed":true,"compute_and_storage_budget_accepted":true,"retention_attribution_privacy_and_quotas_recorded":true},
+  "confirmation_provenance": {"kind":"responsible_statement_in_project_session","confirmed_by":"responsable_tfg","confirmed_at_utc":"2026-11-02T13:52:58Z"},
+  "notes": "Propuesta posterior a resultados negativos de reponderación, Top-100 y pairwise. No modifica Atlas v3 congelado ni cubre H38-H61."
+}

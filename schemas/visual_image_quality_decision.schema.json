@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "visual_image_quality_decision.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision", "reason_codes"],
+  "properties": {
+    "decision": {"enum": ["ACCEPT", "REVIEW", "REJECT"]},
+    "reason_codes": {
+      "type": "array",
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {"enum": ["USABLE_SCENE", "BLUR", "UNDEREXPOSED", "OVEREXPOSED", "LOW_CONTRAST", "OCCLUDED", "OBSTRUCTED_LENS", "SEVERE_ARTIFACTS", "SCENE_NOT_OBSERVABLE", "PARTIAL_SCENE", "AMBIGUOUS_QUALITY"]}
+    }
+  }
+}

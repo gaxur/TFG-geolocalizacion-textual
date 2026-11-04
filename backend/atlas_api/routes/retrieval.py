@@ -49,10 +49,20 @@ async def retrieve(payload: RetrievalRequest, request: Request, retriever: Cross
                     raise ApiServiceUnavailable("TRANSFORMATION_REJECTED", "La transformación no superó los controles automáticos.")
                 effective_text, effective_language, transformation_ms = transformed.text, "en", transformed.duration_ms
                 transformer_metadata = {"model_id": transformer.metadata.model_id, "revision": transformer.metadata.revision, "prompt_version": "f53b-text-transform-v2"}
-            call = partial(retriever.retrieve_many, gallery_ids=(gallery_id,), query_id=query["query_id"], text=effective_text, language=effective_language, k=document["top_k"])
+            visual = getattr(request.app.state, "visual_promoter", None)
+            reserve_k = max(document["top_k"], int(getattr(visual, "reserve_k", document["top_k"])))
+            call = partial(retriever.retrieve_many, gallery_ids=(gallery_id,), query_id=query["query_id"], text=effective_text, language=effective_language, k=reserve_k)
             result = await anyio.to_thread.run_sync(call)
             retrieval_timings = result["timings_ms"]
-            return {"schema_version": "1.0", "contract_version": "atlas-experimental-retrieval-response-v2", "query": query, "processing": {"mode": document["processing_mode"], "variant": "en_cartographic" if document["processing_mode"] == "with_llm" else "es_original", "effective_query": {"query_id": query["query_id"], "text": effective_text, "language": effective_language}, "transformer": transformer_metadata}, "model": result["model"], "retrievals": result["retrievals"], "timings_ms": {"transformation": transformation_ms, "text_encoding": retrieval_timings["text_encoding"], "ranking_by_gallery": retrieval_timings["ranking_by_gallery"], "total": transformation_ms + retrieval_timings["total"]}}
+            variant = "en_cartographic" if document["processing_mode"] == "with_llm" else "es_original"
+            if visual is None:
+                baseline = result["retrievals"][0]["results"]
+                visual_result = {"status": "disabled", "source": "none", "request_id": None, "reason": "visual_postprocessor_not_configured", "model": None, "policy_id": None, "baseline_results": baseline, "final_results": baseline, "evidence": []}
+            else:
+                visual_call = partial(visual.apply, query_text=effective_text, processing_variant=variant, retrieval=result["retrievals"][0])
+                visual_result = await anyio.to_thread.run_sync(visual_call)
+            public_retrieval = {**result["retrievals"][0], "requested_k": document["top_k"], "effective_k": document["top_k"], "results": result["retrievals"][0]["results"][:document["top_k"]]}
+            return {"schema_version": "1.0", "contract_version": "atlas-experimental-retrieval-response-v3", "query": query, "processing": {"mode": document["processing_mode"], "variant": variant, "effective_query": {"query_id": query["query_id"], "text": effective_text, "language": effective_language}, "transformer": transformer_metadata}, "model": result["model"], "retrievals": [public_retrieval], "visual_postprocessing": visual_result, "timings_ms": {"transformation": transformation_ms, "text_encoding": retrieval_timings["text_encoding"], "ranking_by_gallery": retrieval_timings["ranking_by_gallery"], "total": transformation_ms + retrieval_timings["total"]}}
         except (RetrievalInputError, CrossText2LocRuntimeError):
             raise
         except ApiServiceUnavailable:

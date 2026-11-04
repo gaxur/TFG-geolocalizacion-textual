@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "h26-h37-top50-visual-authorization-request-v1",
+  "approved": true,
+  "approved_by": "responsable_tfg",
+  "approved_at_utc": "2026-10-30T09:13:36Z",
+  "terms_reviewed": true,
+  "retention_deadline_utc": "2027-01-31T23:59:59Z",
+  "scope": {
+    "partition": "development",
+    "query_ids": ["H26", "H27", "H28", "H29", "H30", "H31", "H32", "H33", "H34", "H35", "H36", "H37"],
+    "candidate_depth": 50,
+    "views_per_candidate_slot": 1,
+    "provider": "Mapillary",
+    "unique_assets": 105,
+    "cached_assets": 49,
+    "new_downloads_maximum": 56,
+    "maximum_resolution_px": 1024,
+    "maximum_bytes_per_asset": 8000000,
+    "hard_maximum_new_bytes": 448000000,
+    "fixed_model": "Qwen/Qwen3-VL-8B-Instruct",
+    "allow_training": false,
+    "allow_fine_tuning": false,
+    "allow_public_dataset": false,
+    "private_academic_calibration_only": true,
+    "reference_images_excluded": true,
+    "reference_sequences_excluded": true,
+    "test_partition_excluded": true
+  },
+  "frozen_inputs": {
+    "annotations_sha256": "da6ffbd65297fe36812fcd4d9826c836124a5d6998ece2f29e2a7091fdb351ed",
+    "rankings_sha256": "f4afafec2e1820da0d6bb3ba4cb695de9be86802252eeeda4f2cf433f9f771c9",
+    "visual_plan_sha256": "ef5417b75eac4cf68f2d214f5d9b0da74223252edad63179b2d97bc2b5a25748",
+    "visual_plan_id": "h26-h37-candidate-visual-plan-sha256-3bc8b64c0adac494dc7d0578b4ab145e26e81f568fa49ce4d1cc950012221e87"
+  },
+  "operator_confirmations": {
+    "reviewed_terms_for_exact_top50_calibration_scope": true,
+    "reuse_of_cached_assets_for_fixed_model_calibration_permitted": true,
+    "new_downloads_and_private_storage_permitted": true,
+    "fixed_qwen3_vl_8b_inference_permitted": true,
+    "retention_attribution_privacy_and_quotas_recorded": true
+  },
+  "confirmation_provenance": {"kind": "responsible_statement_in_project_session", "confirmed_by": "responsable_tfg", "confirmed_at_utc": "2026-10-30T09:13:36Z"},
+  "architecture_update": {"decided_by": "responsable_tfg", "decision": "use_qwen3_vl_8b_exclusively_for_overlap_and_claim_verification", "abandoned_campaign": "qwen3_vl_2b_overlap_after_276_checkpoint_frames", "model_comparison_requested": false},
+  "notes": "Autorización incremental Top-50 development ligada al plan exacto y actualizada por decisión expresa a Qwen3-VL-8B exclusivo. No cubre Top-100 ni H38-H61."
+}

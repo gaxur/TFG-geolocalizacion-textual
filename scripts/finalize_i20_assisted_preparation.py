@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+"""Cierra preparación assisted sin declarar propuestas reales."""
+from __future__ import annotations
+import argparse,hashlib,json
+from datetime import datetime,timezone
+from pathlib import Path
+def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();paths=[a.root/'plan.json',a.root/'authorization.request.json',a.root/'budget.json',a.root/'interfaces/interfaces-manifest.json',Path('schemas/i20_assisted_scene_proposals.schema.json'),Path('schemas/i20_assisted_annotation_proposals.schema.json'),Path('schemas/i20_assisted_human_decisions.schema.json'),Path('src/tfg_phase0/i20_assisted_annotation.py'),Path('scripts/run_i20_assisted_annotation.py'),Path('scripts/build_i20_assisted_interfaces.py'),Path('scripts/finalize_i20_assisted_human_decisions.py'),Path('scripts/materialize_i20_assisted_outputs.py')];document={'schema_version':'1.0','contract_version':'i20-assisted-preparation-manifest-v1','status':'prepared_no_vlm_proposals','generated_at_utc':datetime.now(timezone.utc).isoformat().replace('+00:00','Z'),'artifacts':{str(path):{'sha256':digest(path),'size_bytes':path.stat().st_size} for path in paths},'execution':{'gpu_used':False,'models_loaded':False,'vlm_calls':0,'scene_proposals':0,'annotation_proposals':0,'human_decisions':0,'downloads':0,'network_used':False,'ct2l_runs':0,'rerankings':0},'protocol':{'original_human_workflow_modified':False,'ai_drafts_human_independent':False,'human_review_required':True,'no_change_is_acceptance':False,'holdout_opened':False,'gt_used':False,'rankings_used':False,'osm_used':False},'eligibility':{'eligible':0,'unchanged':True}};a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(json.dumps(document,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8');print(json.dumps({'status':document['status'],'execution':document['execution'],'eligible':0},sort_keys=True));return 0
+if __name__=='__main__':raise SystemExit(main())

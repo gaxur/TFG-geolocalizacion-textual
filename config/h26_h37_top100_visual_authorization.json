@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "h26-h37-top100-visual-authorization-v1",
+  "approved": true,
+  "approved_by": "responsable_tfg",
+  "approved_at_utc": "2026-10-30T16:50:02Z",
+  "terms_reviewed": true,
+  "retention_deadline_utc": "2027-01-31T23:59:59Z",
+  "plan_id": "h26-h37-candidate-visual-plan-sha256-a20e74cce6b17950fadd00b75c27ba7f64e9adfec9dbf4c4ebb6995a290c0401",
+  "plan_sha256": "085ee9a8c21d79a60e1a9b5cecfde45a194a12bf00ab666f2a7b921e9a5b40dd",
+  "scope": {"partition":"development","candidate_depth":100,"model":"Qwen/Qwen3-VL-8B-Instruct","unique_assets":134,"cached_assets":105,"new_downloads_maximum":29,"maximum_bytes_per_asset":8000000,"hard_maximum_new_bytes":232000000,"new_overlap_calls":597,"reusable_overlap_calls":337,"maximum_additional_physical_tasks":9991,"reusable_top50_physical_tasks":5479,"allow_training":false,"allow_fine_tuning":false,"allow_public_dataset":false,"test_partition_excluded":true},
+  "operator_confirmations": {"reviewed_terms_for_exact_top100_scope":true,"cached_asset_reuse_permitted":true,"new_downloads_permitted":true,"fixed_qwen3_vl_8b_inference_permitted":true,"retention_attribution_privacy_and_quotas_recorded":true},
+  "confirmation_provenance": {"kind":"responsible_statement_in_project_session","confirmed_by":"responsable_tfg","confirmed_at_utc":"2026-10-30T16:50:02Z"},
+  "notes": "No cubre H38-H61. Variante de recuperación separada justificada por techo oracle development."
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "interactive-dialogue-policy-config-v1",
+  "gallery_id": "madrid-50m",
+  "reserve_size": 20,
+  "cluster_radius_m": 75.0,
+  "minimum_hypotheses": 2,
+  "minimum_supported_hypotheses": 1,
+  "maximum_supported_fraction": 0.75,
+  "allow_qwen_question": true,
+  "enable_controlled_rewrite": true,
+  "turn_limit": 1,
+  "absence_semantics": "unknown_not_contradicted",
+  "vlm_enabled": false
+}

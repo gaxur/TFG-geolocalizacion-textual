@@ -7,8 +7,14 @@ import argparse
 import hashlib
 from html import escape
 import json
+import os
 from pathlib import Path
 import shutil
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from src.tfg_phase0.remote_mapillary_campaign import EXPECTED_DEVELOPMENT_IDS, EXPECTED_TEST_IDS
 
 
 def canonical_bytes(value):
@@ -56,22 +62,31 @@ def main() -> int:
     parser.add_argument("--photo-manifest", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--mode", choices=("human", "codex", "blind-test"), default="human")
+    parser.add_argument("--partition", choices=("development", "test_sealed"), required=True)
     args = parser.parse_args()
     selection = json.loads(args.selection.read_text(encoding="utf-8"))
     photos = {}
     if args.photo_manifest:
         manifest = json.loads(args.photo_manifest.read_text(encoding="utf-8"))
-        photos = {row["image_id"]: row for row in manifest.get("photos", []) if row.get("status") == "downloaded"}
+        photo_rows = manifest.get("photos", manifest.get("assets", []))
+        photos = {row["image_id"]: row for row in photo_rows if row.get("status") == "downloaded"}
+    expected_ids = EXPECTED_DEVELOPMENT_IDS if args.partition == "development" else EXPECTED_TEST_IDS
+    selected_rows = [row for row in selection["references"] if row.get("partition") == args.partition]
+    if tuple(row.get("query_id") for row in selected_rows) != expected_ids:
+        raise ValueError(f"partición {args.partition} incompleta o desordenada")
     observations = []
-    for row in selection["references"]:
+    for row in selected_rows:
         reference = row["reference"]
         photo = photos.get(reference["image_id"], {})
+        if photo:
+            source_path = (args.photo_manifest.parent / photo["logical_path"]).resolve()
+            photo = {**photo, "logical_path": os.path.relpath(source_path, args.output.resolve())}
         source = {"provider": "Mapillary", "inventory_id": selection["inputs"]["inventory_id"], "inventory_sha256": selection["inputs"]["inventory_sha256"], "license": "CC-BY-SA-4.0", "source_page_url": photo.get("source_page_url"), "creator": (photo.get("creator") or {}).get("username"), "attribution": photo.get("attribution"), "conditions_review_status": "authorized_for_campaign" if photo else "pending_new_authorization"}
         download = {"status": "downloaded", "logical_path": photo["logical_path"], "sha256": photo["sha256"], "perceptual_hash": photo.get("perceptual_hash")} if photo and photo.get("perceptual_hash") else {"status": "not_authorized", "logical_path": None, "sha256": None, "perceptual_hash": None}
         verification_assets = [{"image_id": asset["image_id"], "sequence_id": asset["sequence_id"], "distance_to_reference_m": asset["distance_to_reference_m"], "source": source, "download": {"status": "not_authorized", "logical_path": None, "sha256": None, "perceptual_hash": None}, "role": "vlm_verification_only", "independence_status": "metadata_distinct_pending_pixel_checks"} for asset in row["verification_plan"]]
         stub = {"query_id": row["query_id"], "partition": row["partition"], "location_id": f"MAPILLARY-{reference['image_id']}", "spatial_block_id": row["spatial_block_id"], "reference_asset": {"image_id": reference["image_id"], "sequence_id": reference["sequence_id"], "captured_at": None, "camera_type": reference["camera_type"], "position": {"reported_latitude": reference["latitude"], "reported_longitude": reference["longitude"], "crs": "EPSG:4326", "coordinate_source": reference["coordinate_source"], "reported_accuracy_m": None, "accuracy_status": "unknown", "observer_position_estimate": "reference_camera_coordinate", "evaluation_policy": "approximate_reference_with_sensitivity_analysis"}, "provider_heading_degrees": reference["orientation_degrees"], "heading_reliability": "unknown", "source": source, "download": download, "role": "reference_only_not_vlm_input"}, "verification_assets": verification_assets, "freeze": {"selected_at_utc": "2026-10-27T00:00:00Z", "frozen_at_utc": None, "canonical_sha256": None, "rankings_executed_at_utc": None, "edited_after_freeze": False}, "independence": {"same_image_excluded": True, "same_reference_sequence_excluded": True, "exact_hash_checked": False, "perceptual_similarity_checked": False, "human_overlap_reviewed": False, "status": "metadata_only_pending_pixel_checks"}, "limitations": ["remote_provider_image", "not_human_in_situ", "camera_coordinate_unknown_accuracy", "heading_reliability_unknown", "not_centimetric_ground_truth", "mapillary_coverage_bias", "verification_views_pending", "independence_pending"]}
         observations.append({"query_id": row["query_id"], "partition": row["partition"], "spatial_block_id": row["spatial_block_id"], "reference": {**reference, "logical_path": photo.get("logical_path")}, "canonical_stub": stub})
-    fixture = {"contract_version": "remote-annotation-fixture-v1", "campaign_id": "madrid-d004-remote-mapillary-h26-h61-v2", "selection_id": selection["selection_id"], "mode": args.mode, "forbidden_content": ["ct2l_rankings", "2b_outputs", "8b_outputs", "evaluation_metrics", "candidate_distances"], "observations": observations}
+    fixture = {"contract_version": "remote-annotation-fixture-v1", "campaign_id": "madrid-d004-remote-mapillary-h26-h61-v2", "selection_id": selection["selection_id"], "partition": args.partition, "query_ids": list(expected_ids), "mode": args.mode, "forbidden_content": ["other_partition_records", "ct2l_rankings", "2b_outputs", "8b_outputs", "evaluation_metrics", "candidate_distances"], "observations": observations}
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output / "fixture.json").write_bytes(canonical_bytes(fixture) + b"\n")
     (args.output / "annotate.html").write_text(render_html(fixture, blind=args.mode == "blind-test"), encoding="utf-8")

@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "visual-quality-gate-policy-v1",
+  "status": "proposed_not_authorized_for_real_execution",
+  "enabled": false,
+  "quality_model": {
+    "model_id": "Qwen/Qwen3-VL-8B-Instruct",
+    "revision": "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b",
+    "weight_sha256": [
+      "d5d0aef0eb170fc7453a296c43c0849a56f510555d3588e4fd662bb35490aefa",
+      "8be88fb5501e4d5719a6d4cc212e6a13480330e74f3e8c77daa1a68f199106b5",
+      "83de00eafe6e0d57ccd009dbcf71c9974d74df2f016c27afb7e95aafd16b2192",
+      "0a88b98e9f96270973f567e6a2c103ede6ccdf915ca3075e21c755604d0377a5"
+    ],
+    "dtype": "bfloat16",
+    "attention": "sdpa",
+    "prompt_version": "visual-image-quality-v1",
+    "preprocessing_policy": "qwen3-vl-auto-processor-local-files-only-v1",
+    "generation": {"do_sample": false, "max_new_tokens": 48, "batch_size": 1}
+  },
+  "limits": {
+    "target_accepted_images_per_candidate": 2,
+    "maximum_images_inspected_per_candidate": 6,
+    "maximum_images_downloaded_per_query": 100,
+    "maximum_quality_vlm_calls": 100,
+    "maximum_claim_vlm_calls": 1200,
+    "maximum_replacements_per_candidate": 5,
+    "maximum_sequences_per_candidate": 6,
+    "maximum_wall_seconds": 600,
+    "maximum_asset_bytes": 8000000,
+    "maximum_downloaded_bytes": 800000000
+  },
+  "selection": {
+    "reserve_order_frozen_before_pixels": true,
+    "sequence_diversity_first": true,
+    "candidate_allocation": "round_robin_candidate_id_v1",
+    "review_is_accepted_automatically": false,
+    "invalid_or_failed_quality_becomes": "REVIEW",
+    "rerank_feedback_allowed": false,
+    "ground_truth_allowed": false,
+    "query_text_allowed_in_quality_gate": false,
+    "claims_allowed_in_quality_gate": false
+  },
+  "cache": {
+    "identity": "image_sha256_model_revision_weights_prompt_schema_generation_preprocessing",
+    "reuse_exact_only": true
+  },
+  "downstream": {
+    "claims_receive_accept_only": true,
+    "review_blocks_claims": true,
+    "reject_blocks_claims": true,
+    "missing_quality_blocks_claims": true,
+    "abstention_is_neutral": true,
+    "reranking_policy_unchanged": true
+  }
+}

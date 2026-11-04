@@ -106,6 +106,10 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D088 | Evaluar reranking visual simétrico y cobertura multifuente como variantes separadas | PROPUESTA | VLM / reranking y fuentes visuales |
 | D089 | Estudiar adquisición adaptativa por oportunidad con límites duros y sin chase-supported | PROPUESTA | VLM / adquisición adaptativa |
 | D090 | Priorizar asociaciones cámara-celda explicables en una variante geométrica separada | PROPUESTA | VLM / asociación espacial |
+| D091 | Integrar Qwen3-VL como postprocesador real del MVP con fallback CrossText2Loc explícito | ACEPTADA | MVP / VLM |
+| D092 | Evaluar reranking discriminativo con descuento de soporte compartido y compatibilidad espacial | PROPUESTA | VLM / reranking |
+| D093 | Seleccionar Qwen3-VL-8B con Top-50 y β=0,1 como política previa al test | ACEPTADA | VLM / calibración H26-H37 |
+| D094 | Mantener Atlas v3 tras ablaciones v2 y proponer nueva fuente/selección visual | PROPUESTA | VLM / mejora posterior |
 
 ## D053 — API HTTP interna del MVP
 
@@ -1233,6 +1237,111 @@ ni modifica D086/D089.
 - `docs/PHASE_H16_H23_MULTICANDIDATE_PROMOTION.md`
 - `scripts/prepare_h16_h23_multicandidate.py`
 - `results/generated/mapillary/h16-h23-multicandidate-top20-v1/` (local)
+
+## D091 — Qwen3-VL integrado con fallback explícito
+
+**Estado:** ACEPTADA
+**Componente:** MVP / VLM
+**Fecha:** 2026-10-30
+**Origen:** Decisión expresa del responsable del TFG tras el cierre H16–H23.
+
+### Decisión
+
+Qwen3-VL permanece como componente obligatorio de la arquitectura. El MVP
+incorpora un postprocesador posterior a CrossText2Loc que consume resultados VLM
+precalculados con identidad de consulta, galería y ranking. La respuesta Atlas v3
+separa el baseline CT2L del ranking final, el modelo, la política, la evidencia y
+el motivo de fallback.
+
+La ausencia de un artefacto compatible no fuerza cambios: produce
+`fallback_baseline` y conserva el orden CT2L. La inferencia online queda detrás de
+la misma interfaz y no se activa todavía por coste, residencia GPU y latencia. El
+modo precalculado es funcional y evita presentar como aplicada una etapa visual
+que no dispone de evidencia.
+
+### Consecuencias
+
+- Qwen3-VL participa realmente cuando existe un artefacto compatible.
+- CT2L sigue siendo recuperador y fallback auditable.
+- El contrato HTTP no presenta el score coseno como score visual ni probabilidad.
+- Activar bundles en producción requiere montaje de solo lectura y validación de
+  identidad; H16/H23 no se reutiliza para consultas arbitrarias.
+
+## D092 — Reranking visual discriminativo
+
+**Estado:** PROPUESTA
+**Componente:** VLM / reranking
+**Fecha:** 2026-10-30
+
+### Propuesta
+
+Mantener `minmax(CT2L)` y el peso positivo 0,2 como control, pero sustituir el
+conteo binario bruto por evidencia trazable que descuente soporte compartido,
+pondere compatibilidad espacial, anule orientación incompatible, reduzca
+ambigüedad según candidatos competidores y combine secuencias independientes
+mediante *noisy-or* acotado. `Unverifiable`, conflicto y falta de cobertura siguen
+siendo neutrales.
+
+La contradicción existe en el contrato, pero su peso por defecto permanece cero
+hasta disponer de validación humana independiente. Las pruebas sintéticas
+demuestran promoción exclusiva, neutralidad y fallback; H16/H23 solo aportan un
+diagnóstico development. La aceptación científica requiere calibración en
+H26–H37 y apertura única posterior de H38–H61.
+
+## D001 — Identidad del candidato
+## D094 — Resultado del linaje exploratorio posterior
+
+**Estado:** PROPUESTA
+**Componente:** VLM / mejora posterior
+**Fecha:** 2026-11-02
+
+### Evidencia
+
+Sobre H26–H37 se probaron, sin modificar Atlas v3: reponderación semántica/IDF,
+contradicciones, comparación pairwise 8B, prior OSM/F3, fusión visual-OSM,
+promociones OSM categóricas y multivista con claims estructurados/OCR. Ninguna
+política mejora conjuntamente GeoRecall y distancia frente a Atlas v3.
+
+El prior OSM aislado demuestra señal geográfica, pero pierde un hit GeoRecall@10
+a 50 m. El pairwise tuvo 80,3 % de outputs inválidos y no mejoró. El multivista
+ejecutó 7.064 jobs durante 26.127 s y tampoco añadió ganancias.
+
+### Propuesta
+
+Conservar Atlas v3 como política congelada. La siguiente hipótesis debe aportar
+información nueva: inventario metadata-only de Commons con separación estricta
+entre coordenada de cámara y objeto, o una selección Mapillary multivista de
+mayor calidad/encuadre. Ambas requieren protocolo y autorización nuevos. No abrir
+H38–H61 hasta una decisión expresa.
+
+## D001 — Identidad del candidato
+## D093 — Política VLM congelada tras H26–H37
+
+**Estado:** ACEPTADA
+**Componente:** VLM / calibración H26–H37
+**Fecha:** 2026-10-30
+
+### Decisión
+
+Usar Qwen3-VL-8B como único VLM. La política previa a evaluación independiente
+es reserva CT2L Top-50, agregación positiva original, β=0,1, sin penalización por
+contradicción y fallback exacto al Top-10 CT2L. El gate de solapamiento es la
+variante automática conservadora y se documenta como no equivalente a revisión
+humana.
+
+### Fundamento
+
+En H26–H37 reduce la distancia Top-1 media de 382,76 m a 382,39 m, mejora una
+consulta y no degrada ninguna, pero no gana GeoRecall. Top-100 ofrece mayor techo
+oracle, pero tras 8.600 inferencias nuevas reproduce las mismas métricas y no
+introduce ningún candidato de ranks 51–100 en Top-10. Se descarta por coste sin
+beneficio observado.
+
+### Condición de interpretación
+
+La mejora es pequeña y pertenece a development. No se afirma mejora general
+hasta evaluar una sola vez H38–H61. El test permanece sellado y requiere
+autorización expresa de apertura.
 
 ## D001 — Identidad del candidato
 

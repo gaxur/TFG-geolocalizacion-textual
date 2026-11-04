@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import contextmanager
+import fcntl
 import hashlib
 import json
 import os
@@ -14,6 +16,27 @@ from typing import Any, Callable, Mapping, Sequence
 
 class CheckpointError(ValueError):
     pass
+
+
+@contextmanager
+def checkpoint_writer_lock(path: Path):
+    """Impide escritores concurrentes y deja identidad del propietario visible."""
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as stream:
+        try:
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            stream.seek(0)
+            owner = stream.read().strip() or "propietario desconocido"
+            raise CheckpointError(f"checkpoint ya tiene un escritor activo: {owner}") from error
+        owner = {"pid": os.getpid(), "started_at_unix": time.time(), "checkpoint": str(path)}
+        stream.seek(0);stream.truncate();stream.write(json.dumps(owner, sort_keys=True) + "\n");stream.flush();os.fsync(stream.fileno())
+        try:
+            yield owner
+        finally:
+            stream.seek(0);stream.truncate();stream.write(json.dumps({**owner, "released_at_unix": time.time()}, sort_keys=True) + "\n");stream.flush();os.fsync(stream.fileno())
+            fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -89,22 +112,23 @@ def _read_checkpoint(path: Path, header: Mapping[str, Any], jobs: Sequence[Plann
 
 
 def run_resumable(*, checkpoint_path: Path, provenance: Mapping[str, Any], jobs: Sequence[PlannedJob], execute: Callable[[PlannedJob], Mapping[str, Any]], policy_result: Callable[[PlannedJob], Mapping[str, Any]], on_progress: Callable[[Progress], None] | None = None, clock: Callable[[], float] = time.monotonic) -> list[Mapping[str, Any]]:
-    _validate_jobs(jobs)
-    header = {"type": "header", "checkpoint_version": "append-jsonl-checkpoint-v1", "provenance": {**provenance, "job_count": len(jobs), "ordered_job_plan_sha256": ordered_plan_sha256(jobs)}}
-    recovered_records = _read_checkpoint(checkpoint_path, header, jobs)
-    recovered = len(recovered_records);records=list(recovered_records);started=clock();execution_times=[];executed=0
-    def emit(last_key=None):
-        completed=len(records);remaining=len(jobs)-completed;pending=sum(job.requires_execution for job in jobs[completed:]);mean=sum(execution_times)/len(execution_times) if execution_times else None;eta=0.0 if pending==0 else mean*pending if mean is not None else None
-        if on_progress:on_progress(Progress(len(jobs),recovered,completed,executed,remaining,pending,clock()-started,mean,eta,last_key))
-    emit()
-    with checkpoint_path.open("ab") as stream:
-        for index in range(recovered,len(jobs)):
-            job=jobs[index];before=clock();record=execute(job) if job.requires_execution else policy_result(job);after=clock()
-            if job.requires_execution:execution_times.append(after-before);executed+=1
-            expected=_key_object(job.key)
-            if any(record.get(key)!=value for key,value in expected.items()):raise CheckpointError("callback devolvió identidad incorrecta")
-            frame={"type":"result","index":index,"job_key":expected,"record":dict(record)};stream.write(canonical_bytes(frame)+b"\n");stream.flush();os.fsync(stream.fileno());records.append(dict(record));emit(job.key)
-    return records
+    with checkpoint_writer_lock(checkpoint_path):
+        _validate_jobs(jobs)
+        header = {"type": "header", "checkpoint_version": "append-jsonl-checkpoint-v1", "provenance": {**provenance, "job_count": len(jobs), "ordered_job_plan_sha256": ordered_plan_sha256(jobs)}}
+        recovered_records = _read_checkpoint(checkpoint_path, header, jobs)
+        recovered = len(recovered_records);records=list(recovered_records);started=clock();execution_times=[];executed=0
+        def emit(last_key=None):
+            completed=len(records);remaining=len(jobs)-completed;pending=sum(job.requires_execution for job in jobs[completed:]);mean=sum(execution_times)/len(execution_times) if execution_times else None;eta=0.0 if pending==0 else mean*pending if mean is not None else None
+            if on_progress:on_progress(Progress(len(jobs),recovered,completed,executed,remaining,pending,clock()-started,mean,eta,last_key))
+        emit()
+        with checkpoint_path.open("ab") as stream:
+            for index in range(recovered,len(jobs)):
+                job=jobs[index];before=clock();record=execute(job) if job.requires_execution else policy_result(job);after=clock()
+                if job.requires_execution:execution_times.append(after-before);executed+=1
+                expected=_key_object(job.key)
+                if any(record.get(key)!=value for key,value in expected.items()):raise CheckpointError("callback devolvió identidad incorrecta")
+                frame={"type":"result","index":index,"job_key":expected,"record":dict(record)};stream.write(canonical_bytes(frame)+b"\n");stream.flush();os.fsync(stream.fileno());records.append(dict(record));emit(job.key)
+        return records
 
 
 def finalize_json_atomic(*, output_path: Path, document: Mapping[str, Any]) -> None:

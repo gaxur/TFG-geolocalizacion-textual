@@ -103,6 +103,9 @@ class MvpApiTests(unittest.TestCase):
             document = response.json()
             self.assertEqual([row["gallery_id"] for row in document["retrievals"]], ["madrid-25m"])
             self.assertEqual(document["processing"]["variant"],"es_original"); self.assertIsNone(document["processing"]["transformer"]); self.assertEqual(transformer.calls,[])
+            self.assertEqual(document["contract_version"],"atlas-experimental-retrieval-response-v3")
+            self.assertEqual(document["visual_postprocessing"]["status"],"disabled")
+            self.assertEqual(document["visual_postprocessing"]["final_results"],document["retrievals"][0]["results"])
             self.assertNotIn("ground_truth", document)
             self.assertIn("X-Request-ID", response.headers)
 
@@ -188,6 +191,27 @@ class MvpApiTests(unittest.TestCase):
         self.assertIsNone(SETTINGS.visual_promotion_policy_path)
         self.assertEqual(SETTINGS.visual_promotion_fallback, "baseline")
         self.assertFalse(SETTINGS.visual_promotion_required)
+
+    def test_visual_postprocessor_is_invoked_and_can_reorder_final_results(self):
+        class FakeVisual:
+            metadata={"provider":"fake"}
+            reserve_k=50
+            def __init__(self):self.calls=[];self.close_calls=0
+            def apply(self,*,query_text,processing_variant,retrieval):
+                self.calls.append((query_text,processing_variant,retrieval))
+                baseline=retrieval["results"][:10];selected=[retrieval["results"][10],*retrieval["results"][:9]];final=[{**row,"rank":rank} for rank,row in enumerate(selected,1)]
+                return {"status":"applied","source":"precomputed","request_id":"visual-request-test","reason":None,"model":{"model_id":"Qwen/Qwen3-VL-8B-Instruct"},"policy_id":"policy-test","baseline_results":baseline,"final_results":final,"evidence":[{"candidate_id":final[0]["candidate_id"],"reason":"exclusive_support"}]}
+            def close(self):self.close_calls+=1
+        visual=FakeVisual();fake=FakeRetriever();app=create_app(settings=SETTINGS,retriever_factory=lambda s:fake,transformer_factory=lambda s:None,visual_factory=lambda s:visual)
+        with TestClient(app) as client:
+            document=client.post("/api/v1/retrievals",json=request()).json()
+            self.assertEqual(document["visual_postprocessing"]["status"],"applied")
+            self.assertEqual(document["visual_postprocessing"]["baseline_results"][0]["candidate_id"],"madrid-50m-1")
+            self.assertEqual(document["visual_postprocessing"]["final_results"][0]["candidate_id"],"madrid-50m-11")
+            self.assertEqual(document["retrievals"][0]["effective_k"],10);self.assertEqual(visual.calls[0][2]["effective_k"],50)
+            capability=next(row for row in client.get("/api/v1/capabilities").json()["postprocessing_capabilities"] if row["id"]=="topn_visual_promotion")
+            self.assertTrue(capability["available"]);self.assertTrue(capability["enabled"])
+        self.assertEqual(len(visual.calls),1);self.assertEqual(visual.close_calls,1)
 
 
 if __name__ == "__main__":

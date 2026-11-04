@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""Shortlist visual profunda sin GT para comparación pairwise contra rank 10."""
+from __future__ import annotations
+import argparse,hashlib,json
+from pathlib import Path
+def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+def main():
+ p=argparse.ArgumentParser();p.add_argument("--rankings",type=Path,required=True);p.add_argument("--ct2l",type=Path,required=True);p.add_argument("--plan",type=Path,required=True);p.add_argument("--assets",type=Path,required=True);p.add_argument("--output",type=Path,required=True);a=p.parse_args();frozen=json.load(open(a.rankings));ct2l=json.load(open(a.ct2l));plan=json.load(open(a.plan));assets=json.load(open(a.assets));asset_ids={r["image_id"] for r in assets["assets"]};assoc={(r["query_id"],r["candidate_id"]):r for r in plan["associations"]};rank_by={q["query_id"]:r for q,r in zip(ct2l["queries"],ct2l["rankings"],strict=True)};pairs=[]
+ for qid,query in sorted(frozen["queries"].items()):
+  baseline=rank_by[qid]["results"][:100];by_rank={r["rank"]:r for r in baseline};incumbent=by_rank[10];incumbent_view=assoc.get((qid,incumbent["candidate_id"]));evidence={r["candidate_id"]:r for r in query["original_aggregate"]["candidates"]};eligible=[]
+  for row in baseline[10:]:
+   view=assoc.get((qid,row["candidate_id"]));ev=evidence[row["candidate_id"]];eligible.append((-(ev["positive_evidence"]-ev["negative_evidence"]),-ev["positive_evidence"],row["rank"],row,view,ev))
+  # Top-10 challengers por evidencia neta; desempate por rank CT2L. Sin GT ni distancias.
+  for _,_,_,challenger,view,ev in sorted(eligible)[:10]:
+   status="ready" if incumbent_view and view and incumbent_view["image_id"] in asset_ids and view["image_id"] in asset_ids else "missing_view";pairs.append({"query_id":qid,"description":next(q["text"] for q in plan["queries"] if q["query_id"]==qid),"incumbent":{"candidate_id":incumbent["candidate_id"],"baseline_rank":10,"image_id":incumbent_view["image_id"] if incumbent_view else None},"challenger":{"candidate_id":challenger["candidate_id"],"baseline_rank":challenger["rank"],"image_id":view["image_id"] if view else None,"selection_positive_evidence":ev["positive_evidence"],"selection_negative_evidence":ev["negative_evidence"]},"status":status})
+ document={"schema_version":"1.0","contract_version":"h26-h37-pairwise-visual-shortlist-v1","plan_id":"","inputs":{"rankings_sha256":digest(a.rankings),"ct2l_sha256":digest(a.ct2l),"visual_plan_sha256":digest(a.plan),"assets_sha256":digest(a.assets)},"policy":{"selection":"top10_net_visual_evidence_from_baseline_ranks_11_100","ground_truth_used":False,"geographic_distances_used":False,"ct2l_score_used_only_for_tie_break_via_rank":True,"incumbent_rank":10,"maximum_promotions_per_query":2},"pairs":pairs,"summary":{"pairs":len(pairs),"ready":sum(r["status"]=="ready" for r in pairs),"missing_view":sum(r["status"]!="ready" for r in pairs),"deep_challengers_rank_gt50":sum(r["challenger"]["baseline_rank"]>50 for r in pairs)}};document["plan_id"]="h26-h37-pairwise-visual-shortlist-sha256-"+hashlib.sha256(json.dumps({k:v for k,v in document.items() if k!="plan_id"},ensure_ascii=False,sort_keys=True,separators=(",",":")).encode()).hexdigest();a.output.write_text(json.dumps(document,ensure_ascii=False,sort_keys=True,indent=2)+"\n");print(json.dumps({"plan_id":document["plan_id"],"summary":document["summary"],"estimated_8b_seconds":document["summary"]["ready"]*2.5},sort_keys=True));return 0
+if __name__=="__main__":raise SystemExit(main())

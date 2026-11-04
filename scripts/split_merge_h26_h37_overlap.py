@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+"""Separa pares Top-100 nuevos y fusiona auditorías compatibles sin recomputar."""
+from __future__ import annotations
+import argparse,hashlib,json
+from pathlib import Path
+def key(row):return (row["query_id"],row["reference_image_id"],row["candidate_image_id"])
+def main():
+ p=argparse.ArgumentParser();p.add_argument("mode",choices=("split","merge"));p.add_argument("--top100-review",type=Path,required=True);p.add_argument("--old-ai",type=Path,required=True);p.add_argument("--old-vlm",type=Path,required=True);p.add_argument("--new-ai",type=Path);p.add_argument("--new-vlm",type=Path);p.add_argument("--output-review",type=Path,required=True);p.add_argument("--output-vlm",type=Path);a=p.parse_args();top=json.loads(a.top100_review.read_text());old_ai=json.loads(a.old_ai.read_text());old_vlm=json.loads(a.old_vlm.read_text());old_keys={key(row) for row in old_vlm["records"]};new_pairs=[row for row in top["pairs"] if key(row) not in old_keys]
+ if a.mode=="split":
+  document={**top,"contract_version":"h26-h37-overlap-review-top100-delta-v1","summary":{**top["summary"],"pairs":len(new_pairs),"reused_pairs":len(top["pairs"])-len(new_pairs)},"pairs":new_pairs};a.output_review.write_text(json.dumps(document,ensure_ascii=False,sort_keys=True,indent=2)+"\n");print(json.dumps(document["summary"],sort_keys=True));return 0
+ if not a.new_ai or not a.new_vlm or not a.output_vlm:raise ValueError("merge requiere nuevos outputs")
+ new_ai=json.loads(a.new_ai.read_text());new_vlm=json.loads(a.new_vlm.read_text());expected={key(row) for row in top["pairs"]};ai_all={key(row):row for row in old_ai["pairs"]}|{key(row):row for row in new_ai["pairs"]};vlm_all={key(row):row for row in old_vlm["records"]}|{key(row):row for row in new_vlm["records"]};ai_index={k:v for k,v in ai_all.items() if k in expected};vlm_index={k:v for k,v in vlm_all.items() if k in expected}
+ if set(ai_index)!=expected or set(vlm_index)!=expected:raise ValueError("fusión overlap Top-100 incompleta")
+ merged_ai={**top,"contract_version":"h26-h37-overlap-ai-audit-top100-v1","pairs":[ai_index[key(row)] for row in top["pairs"]],"merge":{"reused_top50":len(old_ai["pairs"]),"new_top100_delta":len(new_ai["pairs"]),"human_review":False}};merged_vlm={**new_vlm,"contract_version":"h26-h37-overlap-vlm-8b-top100-v1","records":[vlm_index[key(row)] for row in top["pairs"]],"summary":{"pairs":len(expected),"verdicts":{value:sum(row["verdict"]==value for row in vlm_index.values()) for value in ("same_scene","different_scene","uncertain")}},"reuse":{"top50_records":len(old_vlm["records"]),"new_delta_records":len(new_vlm["records"])}};a.output_review.write_text(json.dumps(merged_ai,ensure_ascii=False,sort_keys=True,indent=2)+"\n");a.output_vlm.write_text(json.dumps(merged_vlm,ensure_ascii=False,sort_keys=True,indent=2)+"\n");print(json.dumps({"pairs":len(expected),"reused":len(old_vlm["records"]),"new":len(new_vlm["records"]),"ai_sha256":hashlib.sha256(a.output_review.read_bytes()).hexdigest(),"vlm_sha256":hashlib.sha256(a.output_vlm.read_bytes()).hexdigest()},sort_keys=True));return 0
+if __name__=="__main__":raise SystemExit(main())

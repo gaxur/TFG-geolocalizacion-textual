@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "automated-conservative-overlap-gate-v1",
+  "policy_id": "automated-conservative-overlap-gate-v1",
+  "status": "frozen_experimental_authorized",
+  "authorized_by": "responsable_tfg",
+  "authorization_origin": "explicit_phase_d_instruction_in_project_session",
+  "scope": "H26-H37 development Top-50 candidate images only",
+  "human_review_replaced": false,
+  "original_gate_preserved": true,
+  "signals": {
+    "perceptual": ["dhash_64", "rgb_histogram_cosine"],
+    "embedding": "CLIP-L/14@336px cosine",
+    "paired_vlm": {
+      "model_id": "Qwen/Qwen3-VL-8B-Instruct",
+      "revision": "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b",
+      "task": "overlap_detection_only",
+      "output": ["verdict", "facade_match", "geometry_match", "distinctive_elements_match", "viewpoint_relation"],
+      "do_sample": false,
+      "max_new_tokens": 80
+    }
+  },
+  "retain_rule": "paired_vlm=different_scene AND facade_match=no AND geometry_match=no AND distinctive_elements_match=no AND no exact duplicate AND dhash>12 AND NOT(clip>=0.96 AND rgb_histogram>=0.97)",
+  "exclude_rule": "all remaining pairs, including same_scene, uncertain, disagreement or insufficient evidence",
+  "candidate_image_rule": "an image is usable for a query only if every reference-image pair for that query is retained",
+  "forbidden_inputs": ["ct2l_scores", "ct2l_ranks", "ground_truth_coordinates", "claim_verdicts", "geographic_metrics", "H38-H61"],
+  "limitations": ["automatic_gate_not_human_review", "vlm_overlap_errors_possible", "conservative_exclusion_reduces_coverage"]
+}

@@ -25,6 +25,7 @@ class Settings:
     qwen_required: bool = False
     visual_promotion_enabled: bool = False
     visual_promotion_policy_path: Path | None = None
+    visual_precomputed_bundle_path: Path | None = None
     visual_promotion_fallback: str = "baseline"
     visual_promotion_required: bool = False
 
@@ -56,9 +57,10 @@ class Settings:
         visual_enabled = os.environ.get("ATLAS_VISUAL_PROMOTION_ENABLED", "false").casefold() in {"1", "true", "yes"}
         visual_required = os.environ.get("ATLAS_VISUAL_PROMOTION_REQUIRED", "false").casefold() in {"1", "true", "yes"}
         visual_policy = os.environ.get("ATLAS_VISUAL_PROMOTION_POLICY")
+        visual_bundle = os.environ.get("ATLAS_VISUAL_PRECOMPUTED_BUNDLE")
         visual_fallback = os.environ.get("ATLAS_VISUAL_PROMOTION_FALLBACK", "baseline")
         if visual_fallback not in {"baseline", "error"}:
             raise ValueError("ATLAS_VISUAL_PROMOTION_FALLBACK inválido")
-        if visual_enabled and not visual_policy:
-            raise ValueError("ATLAS_VISUAL_PROMOTION_POLICY es obligatorio al habilitar promoción")
-        return cls(runtime_config, region_config, cvg_utils_sha256, clip_weights_path, origins, True, Path(qwen_path) if qwen_path else None, os.environ.get("ATLAS_QWEN_MODEL_ID", "Qwen/Qwen3-8B"), os.environ.get("ATLAS_QWEN_MODEL_REVISION", "b968826d9c46dd6066d109eabc6255188de91218"), qwen_required, visual_enabled, Path(visual_policy) if visual_policy else None, visual_fallback, visual_required)
+        if visual_enabled and not visual_bundle:
+            raise ValueError("ATLAS_VISUAL_PRECOMPUTED_BUNDLE es obligatorio al habilitar promoción")
+        return cls(runtime_config, region_config, cvg_utils_sha256, clip_weights_path, origins, True, Path(qwen_path) if qwen_path else None, os.environ.get("ATLAS_QWEN_MODEL_ID", "Qwen/Qwen3-8B"), os.environ.get("ATLAS_QWEN_MODEL_REVISION", "b968826d9c46dd6066d109eabc6255188de91218"), qwen_required, visual_enabled, Path(visual_policy) if visual_policy else None, Path(visual_bundle) if visual_bundle else None, visual_fallback, visual_required)

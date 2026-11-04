@@ -16,11 +16,12 @@ from .routes.retrieval import router as retrieval_router
 from .settings import Settings
 
 
-def create_app(*, settings: Settings | None = None, retriever_factory: Callable | None = None, transformer_factory: Callable | None = None) -> FastAPI:
+def create_app(*, settings: Settings | None = None, retriever_factory: Callable | None = None, transformer_factory: Callable | None = None, visual_factory: Callable | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     factory = retriever_factory or default_retriever_factory
     qwen_factory = transformer_factory or default_transformer_factory
-    app = FastAPI(title="Geolocalización textual", version="2.0-experimental", lifespan=build_lifespan(settings, factory, qwen_factory))
+    from .lifespan import default_visual_factory
+    app = FastAPI(title="Geolocalización textual", version="3.0-experimental", lifespan=build_lifespan(settings, factory, qwen_factory, visual_factory or default_visual_factory))
     app.state.inference_gate = asyncio.Lock()
     app.state.reject_when_busy = settings.reject_when_busy
     app.state.search_area = {"region_id": "madrid_pilot", "crs": "EPSG:4326", "bbox": settings.region_bbox()}

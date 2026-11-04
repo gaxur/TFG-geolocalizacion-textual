@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "i20_annotation_package.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "package_id", "status", "expected_observation_ids", "reference_policy", "language_policy", "blinding", "source_ledger", "instructions_sha256", "observations"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "i20-annotation-package-v1"},
+    "package_id": {"pattern": "^i20-annotation-package-sha256-[0-9a-f]{64}$"},
+    "status": {"enum": ["template_not_collected", "annotation_open", "frozen"]},
+    "expected_observation_ids": {"type": "array", "minItems": 20, "maxItems": 20, "uniqueItems": true, "items": {"pattern": "^I(?:0[1-9]|1[0-9]|20)$"}},
+    "reference_policy": {"const": "single_designated_reference_visual_only"},
+    "language_policy": {"const": "original_spanish"},
+    "blinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rankings_present", "predictions_present", "ground_truth_present", "candidate_information_present"],
+      "properties": {
+        "rankings_present": {"const": false}, "predictions_present": {"const": false},
+        "ground_truth_present": {"const": false}, "candidate_information_present": {"const": false}
+      }
+    },
+    "source_ledger": {"type": ["object", "null"]},
+    "instructions_sha256": {"pattern": "^[0-9a-f]{64}$"},
+    "observations": {
+      "type": "array", "maxItems": 20,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["observation_id", "reference_asset_id", "reference_asset_sha256", "reference_asset_path", "descriptor_pseudonym", "described_at_utc", "description_es", "description_sha256", "description_status", "uses_external_context", "mentions_inferred_location", "claims", "visual_uncertainty", "orientation"],
+        "properties": {
+          "observation_id": {"pattern": "^I(?:0[1-9]|1[0-9]|20)$"},
+          "reference_asset_id": {"type": "string", "pattern": "^ref-[0-9a-f]{16}$"},
+          "reference_asset_sha256": {"pattern": "^[0-9a-f]{64}$"},
+          "reference_asset_path": {"type": "string", "pattern": "^references/[^/]+\\.(?:jpg|png)$"},
+          "descriptor_pseudonym": {"type": "string", "minLength": 1},
+          "described_at_utc": {"type": "string", "format": "date-time"},
+          "description_es": {"type": "string", "minLength": 20, "maxLength": 2000},
+          "description_sha256": {"pattern": "^[0-9a-f]{64}$"},
+          "description_status": {"enum": ["draft", "submitted", "frozen"]},
+          "uses_external_context": {"const": false},
+          "mentions_inferred_location": {"const": false},
+          "claims": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["claim_id", "kind", "text_es", "span", "observability", "certainty", "requires_ocr", "requires_orientation", "orientation_frame", "limitations"],
+              "properties": {
+                "claim_id": {"pattern": "^i20-claim-sha256-[0-9a-f]{64}$"},
+                "kind": {"enum": ["object_presence", "attribute", "visible_text", "scene_structure", "camera_frame_relation", "egocentric_relation", "other_observable"]},
+                "text_es": {"type": "string", "minLength": 1},
+                "span": {"type": "object", "additionalProperties": false, "required": ["start", "end"], "properties": {"start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 1}}},
+                "observability": {"enum": ["direct", "partially_observable", "uncertain"]},
+                "certainty": {"enum": ["certain", "probable", "uncertain"]},
+                "requires_ocr": {"type": "boolean"}, "requires_orientation": {"type": "boolean"},
+                "orientation_frame": {"enum": ["camera_frame", "observer_frame_reported", "cardinal_verified", "unknown"]},
+                "limitations": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+              }
+            }
+          },
+          "visual_uncertainty": {"type": "object", "additionalProperties": false, "required": ["overall_status", "limitations", "notes_es"], "properties": {"overall_status": {"enum": ["adequate", "limited", "insufficient"]}, "limitations": {"type": "array", "uniqueItems": true, "items": {"enum": ["partial_view", "out_of_frame", "occluded", "too_far", "low_resolution", "unreadable_text", "ambiguous_object", "ambiguous_attribute", "orientation_not_comparable", "other_documented"]}}, "notes_es": {"type": ["string", "null"], "maxLength": 500}}},
+          "orientation": {"type": "object", "additionalProperties": false, "required": ["status", "bearing_degrees", "uncertainty_degrees", "meaning", "source", "evidence_ids", "cardinal_conversion_allowed"], "properties": {"status": {"enum": ["unknown", "camera_heading_reported", "camera_heading_verified", "observer_heading_reported", "observer_heading_verified"]}, "bearing_degrees": {"type": ["number", "null"], "minimum": 0, "exclusiveMaximum": 360}, "uncertainty_degrees": {"type": ["number", "null"], "minimum": 0, "maximum": 180}, "meaning": {"enum": ["camera_heading", "observer_heading", "unknown"]}, "source": {"enum": ["not_available", "provider_metadata", "independent_measurement", "documented_other"]}, "evidence_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}, "cardinal_conversion_allowed": {"type": "boolean"}}}
+        }
+      }
+    }
+  }
+}

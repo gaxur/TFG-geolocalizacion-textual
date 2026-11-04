@@ -1,9 +1,11 @@
 import json
+import multiprocessing
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
-from src.tfg_phase0.append_jsonl_checkpoint import CheckpointError, PlannedJob, finalize_json_atomic, run_resumable
+from src.tfg_phase0.append_jsonl_checkpoint import CheckpointError, PlannedJob, checkpoint_writer_lock, finalize_json_atomic, run_resumable
 
 
 def job(index,execute=True):
@@ -13,6 +15,11 @@ def job(index,execute=True):
 
 def record(j,verdict="supported"):
     return {"query_id":j.key[0],"candidate_id":j.key[1],"image_id":j.key[2],"claim_id":j.key[3],"status":"valid","verdict":verdict}
+
+
+def hold_lock(path, ready, release):
+    with checkpoint_writer_lock(Path(path)):
+        ready.set();release.wait(timeout=5)
 
 
 class AppendCheckpointTests(unittest.TestCase):
@@ -59,6 +66,22 @@ class AppendCheckpointTests(unittest.TestCase):
             def execute(j):current[0]+=2;return record(j)
             rows=run_resumable(checkpoint_path=path,provenance={},jobs=jobs,execute=execute,policy_result=lambda j:record(j,"unverifiable"),on_progress=snapshots.append,clock=lambda:current[0])
             self.assertEqual(len(rows),3);self.assertIsNone(snapshots[0].eta_seconds);self.assertEqual(snapshots[-1].remaining,0);self.assertEqual(snapshots[-1].eta_seconds,0.0)
+
+    def test_second_process_cannot_write_same_checkpoint(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path=Path(temporary)/"run.jsonl";ready=multiprocessing.Event();release=multiprocessing.Event();process=multiprocessing.Process(target=hold_lock,args=(str(path),ready,release));process.start()
+            self.assertTrue(ready.wait(timeout=2))
+            with self.assertRaisesRegex(CheckpointError,"escritor activo"):
+                run_resumable(checkpoint_path=path,provenance={},jobs=[job(0)],execute=lambda j:record(j),policy_result=lambda j:record(j))
+            release.set();process.join(timeout=2);self.assertEqual(process.exitcode,0)
+
+    def test_lock_releases_after_exception(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path=Path(temporary)/"run.jsonl"
+            with self.assertRaises(RuntimeError):
+                run_resumable(checkpoint_path=path,provenance={},jobs=[job(0)],execute=lambda j:(_ for _ in ()).throw(RuntimeError("stop")),policy_result=lambda j:record(j))
+            rows=run_resumable(checkpoint_path=path,provenance={},jobs=[job(0)],execute=lambda j:record(j),policy_result=lambda j:record(j))
+            self.assertEqual(len(rows),1)
 
 
 if __name__=="__main__":unittest.main()

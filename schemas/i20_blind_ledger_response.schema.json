@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "i20_blind_ledger_response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "protocol", "submission_id", "manifest_commitment", "policy_id", "decision_epoch", "candidate_count", "decisions", "issued_at_utc", "custodian_key_id", "response_commitment", "custodian_signature"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "i20-blind-ledger-response-v1"},
+    "protocol": {"const": "blind-exclusion-ledger/v1"},
+    "submission_id": {"type": "string", "format": "uuid"},
+    "manifest_commitment": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "policy_id": {"const": "i20-exclusion-policy-v1"},
+    "decision_epoch": {"type": "string", "pattern": "^[0-9]{4}-Q[1-4]$"},
+    "candidate_count": {"type": "integer", "minimum": 12, "maximum": 40},
+    "decisions": {
+      "type": "array", "minItems": 12, "maxItems": 40,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["candidate_ref", "state"],
+        "properties": {
+          "candidate_ref": {"type": "string", "format": "uuid"},
+          "state": {"enum": ["CLEAR", "EXCLUDE", "REVIEW"]}
+        }
+      }
+    },
+    "issued_at_utc": {"type": "string", "format": "date-time"},
+    "custodian_key_id": {"type": "string", "minLength": 1, "maxLength": 80},
+    "response_commitment": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "custodian_signature": {"pattern": "^ed25519:[A-Za-z0-9+/=]+$"}
+  }
+}

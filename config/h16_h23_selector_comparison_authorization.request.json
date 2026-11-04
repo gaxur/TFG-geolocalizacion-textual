@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "h16-h23-selector-comparison-authorization-request-v1",
+  "approved": true,
+  "approved_by": "responsable_tfg",
+  "approved_at_utc": "2026-10-29T08:56:45Z",
+  "terms_reviewed": true,
+  "retention_deadline_utc": "2027-01-31T23:59:59Z",
+  "documentary_basis": {
+    "basis_type": "public_license_and_platform_terms",
+    "individual_provider_authorization_reference": null,
+    "individual_provider_authorization_required_by_reviewed_public_sources": false,
+    "reviewed_at_utc": "2026-10-29T08:53:17Z",
+    "sources": [
+      {
+        "url": "https://help.mapillary.com/hc/en-us/articles/115001770409-CC-BY-SA-license-for-open-data",
+        "source_updated_at": "2025-05-12T11:34:00Z",
+        "supports": ["imagery_shared_under_cc_by_sa_4_0", "attribution_example"]
+      },
+      {
+        "url": "https://creativecommons.org/licenses/by-sa/4.0/legalcode.en",
+        "version": "4.0",
+        "supports": ["reproduction", "adaptation", "attribution", "share_alike_if_shared", "privacy_rights_not_licensed"]
+      },
+      {
+        "url": "https://help.mapillary.com/hc/en-us/articles/360010234680-Accessing-imagery-and-data-through-the-Mapillary-API",
+        "source_updated_at": "2024-12-10T21:02:00Z",
+        "supports": ["official_api_available"]
+      },
+      {
+        "url": "https://www.mapillary.com/developer/api-documentation/",
+        "retrieved_at_utc": "2026-10-29T08:53:17Z",
+        "supports": ["image_entity_api", "thumb_1024_url", "rate_limits"]
+      },
+      {
+        "url": "https://help.mapillary.com/hc/en-us/articles/115001770349-Privacy",
+        "source_updated_at": "2024-12-09T21:29:00Z",
+        "supports": ["automatic_face_and_license_plate_blurring", "privacy_reporting"]
+      },
+      {
+        "url": "https://help.mapillary.com/hc/en-us/articles/115001663705-Blurring-images-on-Mapillary",
+        "source_updated_at": "2024-12-10T20:41:00Z",
+        "supports": ["faces_and_license_plates_should_be_blurred", "blur_reporting"]
+      },
+      {
+        "url": "https://www.mapillary.com/terms",
+        "retrieved_at_utc": "2026-10-29T08:53:17Z",
+        "supports": [],
+        "review_status": "page_retrieved_but_terms_not_machine_extractable; application_holder_review_still_required"
+      }
+    ],
+    "public_source_findings": {
+      "individual_authorization_requirement_found": false,
+      "automated_fixed_model_inference_expressly_addressed": false,
+      "provider_retention_limit_found": false,
+      "published_rate_limits": {
+        "entity_api_requests_per_minute_per_app": 60000,
+        "search_api_requests_per_minute_per_app": 10000,
+        "tile_requests_per_day": 50000
+      }
+    }
+  },
+  "scope": {
+    "arms": ["coverage_adaptive", "geometric_adaptive"],
+    "provider": "Mapillary",
+    "frozen_manifest_ids": [
+      "h16-h23-coverage_adaptive-manifest-sha256-0b458ee23eb5924671853f07c4c98e989ba1e0a528c4680faeb43db147ceab57",
+      "h16-h23-geometric_adaptive-manifest-sha256-532fa43ab7e16426063d0e51740a86a3f876e5d7a4ea1a5146811345e6d51e53"
+    ],
+    "frozen_manifest_sha256": {
+      "coverage_adaptive": "e02ca2f33772f70dee602d8c58628a8712490f7a3aa2056b956e1bda81003f1d",
+      "geometric_adaptive": "831c2bc52df35e4cf0bc6401aeef4e5ac2557b1cee7711b42dd57860269b90af",
+      "paired_reuse_plan": "036f23821f4333eb62846f6a019bb2e61e79305fa92004d51f7be34138639abb"
+    },
+    "unique_assets_union": 511,
+    "already_available_assets": 37,
+    "new_unique_images_maximum": 474,
+    "maximum_resolution_px": 1024,
+    "hard_maximum_bytes": 3792000000,
+    "estimated_pending_bytes": 57670476,
+    "cache_dir": "data/cache/mapillary",
+    "fixed_models": ["Qwen/Qwen3-VL-2B-Instruct", "Qwen/Qwen3-VL-8B-Instruct"],
+    "allow_training": false,
+    "allow_fine_tuning": false,
+    "allow_public_dataset": false,
+    "private_academic_inference_only": true
+  },
+  "operator_confirmations": {
+    "reviewed_terms_for_exact_application_and_manifests": true,
+    "individual_download_and_private_storage_permitted": true,
+    "fixed_model_inference_permitted": true,
+    "retention_period_accepted": true,
+    "attribution_privacy_and_quotas_recorded": true
+  },
+  "operational_conditions": {
+    "billing": "none_identified_by_application_holder",
+    "additional_restrictions": "none_identified_by_application_holder",
+    "retention_action": "delete_cached_image_bytes_by_deadline_unless_a_new_review_documents_a_lawful_need",
+    "attribution": "retain_image_link_creator_profile_and_cc_by_sa_4_0_license_per_asset",
+    "privacy": "use_provider_blurred_derivatives_only; no_deblurring; no_reidentification; no_license_plate_exploitation; report_obvious_blurring_failures",
+    "rate_limit_policy": "respect_published_limits_and_stop_on_throttling_or_application_specific_errors"
+  },
+  "confirmation_provenance": {
+    "kind": "responsible_statement_in_project_session",
+    "confirmed_by": "responsable_tfg",
+    "confirmed_at_utc": "2026-10-29T08:56:45Z",
+    "statement_scope": "terms reviewed for the Mapillary account/application; no incompatible application-specific restrictions, billing, or stricter limits identified; frozen A/B scope, fixed-model inference, retention, attribution, privacy, and published quotas accepted"
+  },
+  "notes": "Aprobación interna específica para la comparación pareada, basada en CC BY-SA 4.0, documentación y términos públicos, y revisión de los términos aplicables a la cuenta por responsable_tfg. No representa una aprobación individual emitida por Mapillary. Cuotas públicas registradas en documentary_basis; detener ante throttling o condiciones específicas sobrevenidas."
+}

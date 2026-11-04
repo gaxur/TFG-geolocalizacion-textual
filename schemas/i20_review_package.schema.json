@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "i20_review_package.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "package_id", "status", "annotation_package_id", "reviewer_count", "reviews", "adjudication"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "i20-review-package-v1"},
+    "package_id": {"pattern": "^i20-review-package-sha256-[0-9a-f]{64}$"},
+    "status": {"enum": ["template_not_collected", "review_open", "frozen"]},
+    "annotation_package_id": {"type": ["string", "null"], "pattern": "^i20-annotation-package-sha256-[0-9a-f]{64}$"},
+    "reviewer_count": {"const": 2},
+    "reviews": {
+      "type": "array", "maxItems": 40,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["observation_id", "reviewer_pseudonym", "review_round", "predictions_available", "ground_truth_available", "other_reviewer_output_available", "decision", "description_faithfulness", "observable_only", "orientation_handling", "uncertainty_handling", "claim_reviews", "exclusion_reasons", "reviewed_at_utc"],
+        "properties": {
+          "observation_id": {"pattern": "^I(?:0[1-9]|1[0-9]|20)$"},
+          "reviewer_pseudonym": {"type": "string", "minLength": 1},
+          "review_round": {"const": "independent"},
+          "predictions_available": {"const": false},
+          "ground_truth_available": {"const": false},
+          "other_reviewer_output_available": {"const": false},
+          "decision": {"enum": ["accept", "revise", "exclude"]},
+          "description_faithfulness": {"enum": ["pass", "fail"]},
+          "observable_only": {"enum": ["pass", "fail"]},
+          "orientation_handling": {"enum": ["pass", "fail", "not_applicable"]},
+          "uncertainty_handling": {"enum": ["pass", "fail"]},
+          "claim_reviews": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["claim_id", "verdict", "atomicity", "evidence_span_valid", "orientation_frame_valid"], "properties": {"claim_id": {"pattern": "^i20-claim-sha256-[0-9a-f]{64}$"}, "verdict": {"enum": ["supported", "unsupported", "unverifiable"]}, "atomicity": {"enum": ["pass", "fail"]}, "evidence_span_valid": {"type": "boolean"}, "orientation_frame_valid": {"type": "boolean"}}}},
+          "exclusion_reasons": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "reviewed_at_utc": {"type": "string", "format": "date-time"}
+        }
+      }
+    },
+    "adjudication": {
+      "type": "array", "maxItems": 20,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["observation_id", "adjudicator_pseudonym", "predictions_available", "ground_truth_available", "disagreement_ids", "final_status", "final_description_es", "final_description_sha256", "final_claim_ids", "exclusion_reasons", "adjudicated_at_utc"],
+        "properties": {
+          "observation_id": {"pattern": "^I(?:0[1-9]|1[0-9]|20)$"},
+          "adjudicator_pseudonym": {"type": "string", "minLength": 1},
+          "predictions_available": {"const": false}, "ground_truth_available": {"const": false},
+          "disagreement_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+          "final_status": {"enum": ["include", "exclude"]},
+          "final_description_es": {"type": ["string", "null"], "maxLength": 2000},
+          "final_description_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+          "final_claim_ids": {"type": "array", "uniqueItems": true, "items": {"pattern": "^i20-claim-sha256-[0-9a-f]{64}$"}},
+          "exclusion_reasons": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "adjudicated_at_utc": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}

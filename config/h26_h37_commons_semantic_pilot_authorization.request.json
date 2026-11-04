@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "h26-h37-commons-semantic-pilot-authorization-request-v1",
+  "approved": true,
+  "approved_by": "responsable_tfg",
+  "approved_at_utc": "2026-11-03T08:38:47Z",
+  "terms_reviewed": true,
+  "retention_deadline_utc": "2027-01-31T23:59:59Z",
+  "plan_id": "h26-h37-commons-semantic-pilot-sha256-93823d92f14c5d13c126bc4b9f9b89b6fa5b40585160b80982b4847237d24225",
+  "plan_sha256": "b0b80284e4cdd49c2ed3318661fa765dbde17fe23489ade1f20c3f8c2f864530",
+  "scope": {
+    "partition": "development",
+    "query_ids": ["H27", "H28", "H29", "H34"],
+    "provider": "Wikimedia Commons",
+    "location_kind": "object",
+    "camera_position_claimed": false,
+    "assets_maximum": 8,
+    "maximum_bytes_per_asset": 8000000,
+    "hard_maximum_bytes": 64000000,
+    "qwen3_vl_8b_calls_maximum": 16,
+    "model_revision": "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b",
+    "semantic_object_evidence_only": true,
+    "ground_truth_as_input": false,
+    "training": false,
+    "fine_tuning": false,
+    "public_dataset": false,
+    "test_partition_excluded": true
+  },
+  "operator_confirmations": {
+    "file_specific_licenses_and_attribution_reviewed": true,
+    "eight_image_download_budget_accepted": true,
+    "semantic_object_not_camera_use_confirmed": true,
+    "fixed_8b_inference_permitted": true,
+    "retention_privacy_and_no_redistribution_confirmed": true
+  },
+  "confirmation_provenance": {"kind":"responsible_statement_in_project_session","confirmed_by":"responsable_tfg","confirmed_at_utc":"2026-11-03T08:38:47Z"},
+  "notes": "No autoriza asociación geométrica de cámara, más de ocho imágenes, otros targets, H38-H61 ni publicación. Requiere revisión final de las ocho licencias antes de descarga."
+}

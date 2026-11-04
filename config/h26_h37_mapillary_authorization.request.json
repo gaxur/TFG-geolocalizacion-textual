@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "h26-h37-mapillary-authorization-request-v1",
+  "approved": true,
+  "approved_by": "responsable_tfg",
+  "approved_at_utc": "2026-10-30T08:34:14Z",
+  "terms_reviewed": true,
+  "retention_deadline_utc": "2027-01-31T23:59:59Z",
+  "selection": {
+    "selection_id": "h26-h37-isolated-selection-sha256-d0b310816bece295eff96605503f23a10a94849dd590ab260265155c6dbdc0fa",
+    "selection_sha256": "6118ce8b014657eb50c14f631ac34d8df25927e33589ea3a938749707b004f2e",
+    "supersedes_equivalent_selection_sha256": "9d62ffc040b0898b8de91ba05f043f1e32103afb7719d972eb9559484d3aad06",
+    "equivalence_check": "same_reference_records_and_same_24_asset_ids; corrected_inventory_provenance_only",
+    "reserved_container_seal_sha256": "f6b51f12f7a22c8d9c18e30e6e00f259b88dbdfb0375587b67e556dde63210fd"
+  },
+  "scope": {
+    "partition": "development",
+    "query_ids": ["H26", "H27", "H28", "H29", "H30", "H31", "H32", "H33", "H34", "H35", "H36", "H37"],
+    "provider": "Mapillary",
+    "planned_unique_assets": 24,
+    "reference_assets": 12,
+    "verification_assets": 12,
+    "maximum_resolution_px": 1024,
+    "maximum_bytes_per_asset": 8000000,
+    "hard_maximum_bytes": 192000000,
+    "allow_reference_annotation": true,
+    "allow_fixed_qwen3_vl_2b_inference": true,
+    "allow_fixed_qwen3_vl_8b_inference": false,
+    "allow_training": false,
+    "allow_fine_tuning": false,
+    "allow_public_dataset": false,
+    "private_academic_use_only": true
+  },
+  "operator_confirmations": {
+    "reviewed_terms_for_exact_application_and_development_partition": true,
+    "reference_download_and_private_annotation_permitted": true,
+    "verification_download_and_fixed_model_inference_permitted": true,
+    "retention_period_accepted": true,
+    "attribution_privacy_and_quotas_recorded": true
+  },
+  "confirmation_provenance": {"kind": "responsible_statement_in_project_session", "confirmed_by": "responsable_tfg", "confirmed_at_utc": "2026-10-30T08:34:14Z"},
+  "notes": "Aprobación interna development H26-H37 ligada al manifest aislado exacto. No cubre H38-H61 ni Qwen3-VL-8B."
+}

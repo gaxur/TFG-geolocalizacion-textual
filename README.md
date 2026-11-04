@@ -17,7 +17,9 @@ contexto original se conserva sin cambios en [BASELINE.md](BASELINE.md).
 Ya existen contratos propios de Fase 0 (`src/tfg_phase0/`, `schemas/`,
 `config/madrid.yaml`), documentación, una memoria LaTeX y un
 [frontend Vite](frontend/README.md) conectado a la API interna. La interfaz
-ejecuta exclusivamente CrossText2Loc y no incluye resultados sintéticos.
+ejecuta CrossText2Loc y admite postprocesamiento Qwen3-VL precalculado con
+identidad verificable; cuando no existe evidencia compatible declara el fallback
+y conserva exactamente el ranking CrossText2Loc.
 F1, F2 y F3 proporcionan el catálogo geométrico, el snapshot OSM y los
 bundles de asociaciones de Madrid; su cierre está en
 [PHASE3_CLOSURE.md](docs/PHASE3_CLOSURE.md). La reproducción oficial

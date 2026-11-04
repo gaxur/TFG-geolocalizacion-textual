@@ -970,3 +970,324 @@ versión, capturados antes de cargar los inputs. El pico RSS es acumulado para e
 proceso y no una medición independiente por etapa. Las verificaciones de cache
 hit de 50 m y 25 m realizadas después de la publicación se solaparon
 temporalmente; esto no alteró los bundles ni sus locks independientes por ID.
+
+## Comparación real A/B H16–H23
+
+El 29 de octubre de 2026 se completó la adquisición e inferencia de la
+comparación pareada entre selección adaptativa por cobertura y selección
+adaptativa geométrica. Se conservaron los manifests, claims, prompts, pesos,
+generación determinista y reranking simétrico congelados. El ground truth se
+cargó únicamente después de publicar el ranking final.
+
+- Se descargaron 474 miniaturas Mapillary nuevas y se reutilizaron 37 assets
+  históricos: 511 assets físicos, 65.479.795 B y hashes SHA-256 verificados.
+- La identidad definitiva por bytes detectó alias entre `image_id`: el plan pasó
+  de 9.613 identidades provisionales a 9.594 tareas físicas por modelo. Las
+  llamadas nuevas permanecieron en 6.956 por modelo.
+- Por modelo se reutilizaron 826 tareas históricas, se ejecutaron 6.956 y 1.812
+  se resolvieron como abstenciones de política; no hubo outputs inválidos.
+- 2B registró 3.230,96 s de ejecución del plan y 8B 6.108,42 s en su sesión de
+  cierre. Estos tiempos no representan todo el tiempo de pared acumulado de 8B,
+  porque hubo una sesión anterior interrumpida.
+- El ranking congelado tiene ID
+  `h16-h23-selector-ranking-set-sha256-5c153de633ed8338c9026d7702991e90bd55fcc50a0dc6551fe9b98845d36eb9`
+  y SHA-256
+  `598df3d8a62fc7ee3f6f07c8fa0281bebd3ec9f4b9543ef1ec30bf0573275b3f`.
+- Ninguna combinación modelo/selector cambió Top-1 ni cruzó la frontera Top-10.
+  GeoRecall@1/5/10 fue 0/2 tanto a 50 m como a 100 m antes y después. La
+  distancia Top-1 fue 407,42 m para H16 y 196,80 m para H23; media 302,11 m.
+
+La primera sesión 8B fue terminada por el límite temporal de la herramienta, no
+por un error del modelo. Durante una reanudación posterior coexistieron dos
+procesos sobre el mismo JSONL: el checkpoint conserva 2.616 índices duplicados.
+No existen conflictos semánticos: 708 duplicados son idénticos y 1.908 conservan
+la misma identidad, estado y veredicto con tiempos distintos. El resultado final
+atómico contiene exactamente 9.594 identidades únicas y coincide con la última
+versión de cada índice. El JSONL se conserva sin modificar como evidencia, pero
+no debe reutilizarse para otra reanudación; el pipeline necesita exclusión mutua
+antes de una campaña futura.
+
+Artefactos principales:
+
+| Archivo | SHA-256 |
+|---|---|
+| `physical-assets.json` | `96abfe5582cb261e6b5bc3e424bfdaaa62c44fb55b2add970da10f924a4940ff` |
+| `physical-task-plan.json` | `577f7b5f94e19ea71fa80634fa1d72586a219e8d2da7370441a0d3263202c399` |
+| `qwen3-vl-2b-physical-results.json` | `c3f506ccce757d4e1838d583eac9748bfe86a603ca76d5eb010f94b40f5ff209` |
+| `qwen3-vl-8b-physical-results.json` | `10bbbe9b07b7a0f5f94899876674a8e3c232ea393169f63e39f6b2a53bae9ff4` |
+| `frozen-rankings.json` | `598df3d8a62fc7ee3f6f07c8fa0281bebd3ec9f4b9543ef1ec30bf0573275b3f` |
+| `geographic-evaluation.json` | `1c15c6110a873049d8378cdfac98d98dfe414827477a2edf41a03f8b2f7fd7de` |
+| `final-report.json` | `7c88871e63c52770253f58536049d5a450384eaaf7c41ec15aeecde7e5f964ed` |
+
+El resultado no apoya promover ninguno de los dos selectores como mejora
+geográfica. Solo cubre dos consultas development seleccionadas
+retrospectivamente, con referencias de incertidumbre desconocida y desajuste
+interior/exterior en H16; no permite una conclusión de generalización.
+
+## Diagnóstico causal y piloto sin nuevas inferencias
+
+El 30 de octubre de 2026 se reutilizaron los outputs congelados H16–H23 para
+auditar la fórmula y ejecutar un barrido predefinido de peso positivo
+`0/0,1/0,2/0,5/1/2`, sin ground truth. Los pesos altos producen cruces Top-10 y
+cambios Top-1, pero su comportamiento varía por consulta, modelo y selector; no se
+elige ningún peso con estas consultas development.
+
+Se implementó una variante discriminativa experimental que descuenta soporte
+imagen-claim compartido, pondera compatibilidad espacial y combina secuencias
+independientes. Con peso 0,2 no cambia Top-1; solo H23 geométrico produce una
+entrada Top-10 para 2B y 8B. No se evalúa ese cruce como mejora geográfica ni se
+acepta la política hasta calibrarla en H26–H37.
+
+Artefacto:
+
+- `results/generated/mapillary/h16-h23-reranking-diagnostics-v1/diagnostic.json`;
+- SHA-256: `27f6487090e1d63c9d70baa7a6d53cd59c6f5ec291ac6d6cc9d7f6a3dcf5608e`;
+- inferencias nuevas: 0.
+
+También se añadió exclusión mutua de escritor a los checkpoints JSONL y pruebas
+de concurrencia/recuperación. Los checkpoints históricos no se modificaron.
+
+## Fase C H26–H37: preparación y bloqueo previo a VLM
+
+El 30 de octubre de 2026 se aisló H26–H37 sin deserializar registros H38–H61. El
+contenedor compartido reservado quedó sellado por SHA-256. Se adquirieron 24
+activos de referencia/verificación (13 nuevos, 11 reutilizados), y posteriormente
+105 vistas candidate-neutral Top-50 (56 nuevas, 49 reutilizadas). Las imágenes y
+secuencias de referencia se excluyeron globalmente del plan VLM.
+
+Las 12 anotaciones proporcionadas por `marcos` se importaron sin rankings ni
+salidas VLM: 12 aprobadas y 194 claims aceptados. La fecha humana de revisión se
+conserva `null` porque no fue proporcionada. El freeze técnico posterior tiene
+SHA-256 `da6ffbd65297fe36812fcd4d9826c836124a5d6998ece2f29e2a7091fdb351ed`.
+
+CrossText2Loc Top-100 `es_original` se congeló antes de abrir referencias:
+
+- ranking ID `h26-h37-top100-sha256-36234fdb3ebc533207bfe89d8da4ad62dc4b1398ce7daac51276306c0f7642b5`;
+- SHA-256 `f4afafec2e1820da0d6bb3ba4cb695de9be86802252eeeda4f2cf433f9f771c9`.
+
+Techo de recuperabilidad sobre 12 consultas development:
+
+| Profundidad | Oracle <50 m | Oracle <100 m | Distancia mínima media |
+|---|---:|---:|---:|
+| Top-50 | 6/12 | 10/12 | 60,77 m |
+| Top-100 | 10/12 | 11/12 | 37,35 m |
+
+Top-100 mejora claramente el techo, pero se conserva como variante de
+recuperación separada. H33 no tiene candidato <100 m ni siquiera en Top-100.
+
+El piloto Top-50 candidate-neutral contiene 105 assets y 582/600 slots cubiertos.
+Su presupuesto provisional 2B es 8.151 tareas físicas, 7.073 llamadas reales y
+1.078 abstenciones, unos 3.263 s según la latencia H16–H23. La auditoría IA de
+494 pares referencia-candidato produjo 176 escenas diferentes, 318 ambiguas y
+cero iguales bajo umbrales conservadores. Su SHA-256 es
+`707abd1ffb022db15ce55686c1be4cd6469c26dc66561837720615f6cf07a868`.
+
+El protocolo exige revisión humana de solapamiento. La auditoría IA no la
+sustituye y deja `pilot_2b_unblocked=false`; por ello se ejecutaron cero
+inferencias VLM, no se calibraron pesos, no se seleccionó política y no se abrió
+H38–H61.
+
+## Fase D H26–H37: Qwen3-VL-8B y calibración final
+
+Una directriz posterior fijó Qwen3-VL-8B como único VLM del sistema. La campaña
+2B de solapamiento se detuvo tras 276 frames y no se reutilizó. La auditoría
+automática alternativa `automated_conservative_overlap_gate_v1` se declaró
+explícitamente experimental y no equivalente a revisión humana.
+
+La auditoría de solapamiento Top-50 combinó CLIP, histogramas RGB, dHash y una
+comparación pareada Qwen3-VL-8B cerrada. Sobre 494 pares, el 8B clasificó 493
+como escenas diferentes y uno como la misma escena. El consenso final retuvo 491
+y excluyó tres: una misma escena y dos casos con elementos distintivos
+coincidentes. La cobertura pasó de 582/600 a 579/600 slots.
+
+El piloto Top-50 8B completó 8.103 tareas físicas:
+
+- 7.034 inferencias reales;
+- 1.069 abstenciones de orientación;
+- 0 outputs inválidos;
+- 2.413 `supported`, 332 `contradicted` y 5.358 `unverifiable`;
+- 10.168,32 s y 18.523.566.080 B de pico RSS.
+
+Antes de abrir referencias se congelaron baseline y ocho políticas, combinando
+fórmula original/discriminativa con β `0,1/0,2/0,35/0,5`. La regla global
+predefinida seleccionó `original_beta_0.1`: no perdió ninguna consulta, mejoró
+Top-1 en H26 por 4,49 m y redujo la media de 382,76 m a 382,39 m. No ganó ningún
+hit GeoRecall; la mejora media de 0,37 m es real pero pequeña y solo development.
+
+La variante Top-100 se ejecutó separadamente por su mayor techo oracle. Tras
+adquirir 29 imágenes adicionales y reutilizar 105, la auditoría automática
+retuvo 931/934 pares. El plan físico tuvo 15.420 tareas: 5.479 reutilizadas del
+Top-50, 8.600 inferencias nuevas y 1.341 abstenciones. La ejecución incremental
+duró 12.485,37 s y alcanzó 18.554.589.184 B de pico RSS.
+
+Top-100 seleccionó igualmente β=0,1 original y reprodujo exactamente las métricas
+Top-50. Ningún candidato cuyo rank CT2L inicial fuera mayor que 50 entró en el
+Top-10. Por igual rendimiento y coste superior, Top-100 se descarta como política
+final, aunque permanece como ablación reproducible.
+
+La política congelada es Top-50 `original_beta_0.1`, Qwen3-VL-8B, reserva
+interna Top-50, salida Top-10 y fallback CT2L exacto. ID:
+`h26-h37-selected-policy-sha256-7e533420de0f4629296b3f88e0edeeac483d2904dac52bac0c7066939ebae9b4`.
+El bundle Atlas v3 contiene solo las 12 consultas exactas H26–H37; cualquier
+consulta incompatible activa fallback. H38–H61 continúa sellado y no abierto.
+## Linaje exploratorio posterior a Atlas v3
+
+Se abrió un linaje development nuevo sin modificar la política Atlas v3
+congelada. El diagnóstico Top-100 mostró que el candidato más próximo tiene rank
+medio 50,3 y que el problema no es cobertura nominal, sino evidencia poco
+discriminativa: 66,7 % de veredictos físicos son `unverifiable`, 44,6 % de vistas
+son espacialmente ambiguas, solo existe una vista por candidato, todos los claims
+pesan como distintivos y no hay OCR literal.
+
+Una reponderación offline por rareza IDF, tipo semántico y contradicción no añadió
+GeoRecall y reprodujo la mejora mínima de 0,37 m. Se descartó por criterio de
+parada.
+
+El piloto pairwise Qwen3-VL-8B comparó 355 pares lógicos mediante 294 llamadas
+físicas. El contrato compacto registró 58 salidas válidas y 236 inválidas,
+tratadas como `unverifiable` sin reparación JSON: 27 challengers, 2 incumbentes y
+265 abstenciones. Ninguna política pairwise superó el baseline.
+
+El prior OSM/F3 aislado con γ=0,35 redujo la distancia Top-1 media en 40,17 m y
+mejoró dos consultas sin degradar Top-1, pero perdió un hit GeoRecall@10 a 50 m.
+Una fusión visual-OSM correctamente escalada volvió a seleccionar γ=0,01 y
+reprodujo exactamente la mejora visual histórica, sin ganancias adicionales.
+
+La siguiente hipótesis propuesta es multivista + claims atómicos + OCR sobre
+ranks 1–20. El plan content-neutral requiere hasta 103 descargas nuevas, 7.112
+llamadas estructuradas 8B y unas 3,8 horas. Permanece no autorizado y no se ha
+ejecutado. H38–H61 sigue sellado.
+## H26-H37 exploratory-v4: reranking OSM/F3 estructurado
+
+- **Estado:** completado sin sustitución de política.
+- **Lineage:** `results/generated/mapillary/h26-h37-exploratory-v4/`.
+- **Objetivo:** reordenar el Top-100 CrossText2Loc mediante nombres, categorías,
+  rareza, topología y distancia F3, sin GT durante inferencia.
+- **Recursos:** CPU local; sin GPU, red, descargas, APIs ni nuevas imágenes.
+- **Resultado:** el ranking estructurado mejoró GeoRecall@10 de 3/12 a 6/12 a
+  50 m y de 5/12 a 7/12 a 100 m, pero degradó dos Top-1. RRF degradó una
+  consulta. La promoción Top-5 conservó Top-1 y añadió un hit @5 a 50 m, pero no
+  justifica reemplazar Atlas v3.
+- **Decisión:** conservar Atlas v3; siguiente experimento mínimo propuesto:
+  promoción Top-5 con unicidad global, agrupación de evidencia correlacionada y
+  dos familias independientes.
+- **Informe:** [H26_H37_EXPLORATORY_V4_STRUCTURED_OSM.md](H26_H37_EXPLORATORY_V4_STRUCTURED_OSM.md).
+
+## H26-H37 exploratory-v5: reranking fiable OSM/F3 y visual
+
+- **Estado:** completado sin sustitución de política.
+- **Lineage:** `results/generated/mapillary/h26-h37-exploratory-v5/`.
+- **Objetivo:** explicar las degradaciones v4 y limitar promociones mediante
+  unicidad global, independencia de objetos/familias, coherencia nominal, acuerdo
+  CT2L y evidencia visual existente.
+- **Recursos:** CPU local; sin GPU, red, descargas, imágenes o inferencia nueva.
+- **Resultado:** Top-1 protegido añade un hit @5 a 50 m; Top-1 condicionado añade
+  un hit @1 a 50 m; ninguna política v5 degrada Top-1 frente a Atlas. Todo el
+  beneficio procede de H36 y se pierde la mejora @10 de v4.
+- **Decisión:** conservar Atlas v3, no abrir evaluación independiente y detener
+  nuevas iteraciones de reglas sobre las mismas doce consultas.
+- **Informe:** [H26_H37_EXPLORATORY_V5_RELIABLE_RERANKING.md](H26_H37_EXPLORATORY_V5_RELIABLE_RERANKING.md).
+
+## Auditoría post-v5 de complementariedad y validación independiente
+
+- **Estado:** auditoría completada; experimentos bloqueados pendientes de
+  autorización y datos elegibles.
+- **Lineage:** `results/generated/post-v5-complementarity-audit/`.
+- **Resultado:** F3 y F4 usan snapshots distintos; no puede atribuirse
+  causalmente la señal F3 al formato estructurado. El inventario local contiene
+  cero observaciones humanas confirmadas como independientes y elegibles.
+- **Prioridad:** construir un conjunto `I01–I20` y ejecutar una validación
+  one-shot de políticas congeladas. La ablación cartográfica alineada de 50 m es
+  secundaria y requiere 1.012 renders y embeddings nuevos.
+- **Recursos consumidos:** CPU de auditoría; sin red, GPU, renders, embeddings,
+  descargas o inferencias.
+- **Informe:** [POST_V5_COMPLEMENTARITY_AND_INDEPENDENT_VALIDATION.md](POST_V5_COMPLEMENTARITY_AND_INDEPENDENT_VALIDATION.md).
+
+## Preparación I01–I20
+
+- **Estado:** preparada técnicamente, sin recogida ni evaluación.
+- **Lineage:** `results/generated/i01-i20-preparation-v1/`.
+- **Freeze:** `i20-policy-freeze-sha256-d3d255310369a00d30669216a7d26bad46ca44ca3632946a10d3e26f009dc55b`.
+- **Fuente recomendada:** campaña manual en Madrid con múltiples lecturas GNSS;
+  Mapillary queda como fallback remoto separado.
+- **Ledger:** frontera tri-state por lotes (`CLEAR/EXCLUDE/REVIEW`) operada por
+  custodio independiente, sin razones, scores, distancias o IDs del holdout.
+- **Transferibilidad:** CT2L es ejecutable; Atlas requiere evidencia visual
+  I-específica y su fallback no cuenta como Atlas; v4/v5 son diagnósticos.
+- **Ejecución:** 0 observaciones, 0 adquisiciones, 0 anotaciones, 0 modelos,
+  0 GPU, 0 red y 0 evaluaciones.
+- **Informe:** [I01_I20_INDEPENDENT_PREPARATION.md](I01_I20_INDEPENDENT_PREPARATION.md).
+
+## Adquisición remota I01–I20
+
+- **Estado:** 20 referencias adquiridas y técnicamente válidas; 0 elegibles.
+- **Lineage:** `results/generated/i01-i20-remote-acquisition-v1/`.
+- **Fuente:** Mapillary API v4, miniaturas 1.024 px, CC BY-SA 4.0.
+- **Selección:** 60 IDs congelados, 20 slots, 12 bloques, dos reservas por slot,
+  sin rankings, OSM, GT o píxeles durante selección.
+- **Adquisición:** 60/60, 53 nuevas, 7 cacheadas, 7.704.672 bytes, 0 fallos.
+- **Independencia accesible:** 3 assets exactos y 8 assets near-duplicate en el
+  shortlist; reservas dejan 0 duplicados marcados entre las 20 referencias.
+- **Bloqueos:** 20 `PENDING_BLIND_EXCLUSION`, 20 pendientes de anotación y
+  revisión humana, 9 pares a menos de 75 m, 15 secuencias, GT de precisión
+  desconocida.
+- **Recursos:** red limitada autorizada; 0 GPU, modelos, embeddings o evaluación.
+- **Informe:** [I01_I20_REMOTE_ACQUISITION.md](I01_I20_REMOTE_ACQUISITION.md).
+
+## Interfaces humanas I01–I20
+
+- **Estado:** interfaces listas; 0 outputs humanos y freeze bloqueado.
+- **Lineage:** `results/generated/i01-i20-annotation-workflow-v1/`.
+- **Interfaces:** anotación, auditoría de 12 pares de escena, revisores A/B y
+  adjudicación, en carpetas físicamente separadas.
+- **Privacidad:** archivos opacos, sin coordenadas, IDs de proveedor, OSM,
+  rankings, GT o predicciones.
+- **Gate:** escena, dos revisiones, adjudicación, ledger Ed25519 auténtico y
+  geografía congelada son obligatorios; el navegador no puede marcar elegible.
+- **Estado real:** `ready=false`, 0 anotaciones/revisiones/adjudicaciones.
+- **Informe:** [I01_I20_ANNOTATION_WORKFLOW.md](I01_I20_ANNOTATION_WORKFLOW.md).
+
+## I01–I20-assisted-annotation-v1
+
+- **Estado:** workflow semiautomático preparado; 0 propuestas VLM reales.
+- **Lineage:** `results/generated/i01-i20-assisted-annotation-v1/`.
+- **Plan:** 12 comparaciones y 20 borradores, Qwen3-VL-8B local, JSON guiado,
+  dos checkpoints reanudables.
+- **Interfaces:** original IA read-only y versión humana editable; estado inicial
+  `pending`; ausencia de cambios no equivale a aceptación.
+- **Modelos:** 8B recomendado por calidad; 2B disponible para desarrollo; no hay
+  otro VLM local completo y no se descargan modelos.
+- **Trazabilidad:** propuestas y decisiones humanas en sidecars; contratos humanos
+  originales no cambian.
+- **Ejecución:** 0 GPU, modelos, VLM, red, descargas, CT2L o reranking.
+- **Informe:** [I01_I20_ASSISTED_ANNOTATION.md](I01_I20_ASSISTED_ANNOTATION.md).
+
+## Quality gate visual Mapillary
+
+- **Estado:** implementación técnica completada; ejecución real bloqueada.
+- **Lineage:** `results/generated/visual-quality-gate-v1/`.
+- **Objetivo:** filtrar calidad técnica `ACCEPT/REVIEW/REJECT` antes de claims y
+  sustituir mediante reservas metadata-only precongeladas.
+- **Integración:** nueva implementación de `VisualPostprocessor`; CT2L y la
+  fórmula de reranking permanecen inalterados.
+- **Fixture:** 3 candidatos, 6 imágenes, 3 rechazos, 1 review, 2 accepts,
+  2 sustituciones, 1 abstención; solo ACCEPT llegó a claims.
+- **Ejecución real:** 0 imágenes, 0 red, 0 GPU, 0 modelos, 0 VLM, 0 claims,
+  0 rerankings y 0 evaluación.
+- **Autorización recomendada siguiente:** smoke de 5 candidatos, máximo 15
+  llamadas 8B de calidad, sin claims ni reranking.
+- **Informe:** [VISUAL_QUALITY_GATE_PIPELINE.md](VISUAL_QUALITY_GATE_PIPELINE.md).
+
+## Preparación de validación multimodal posterior
+
+- **Estado:** smoke 8B y diagnóstico preparados; GPU no autorizada.
+- **Smoke:** 5 candidatos H11 de desarrollo, 15 assets locales, 1,95 MB,
+  15 llamadas máximas, 0 red/claims/reranking/GT/evaluación.
+- **Plan:** `visual-quality-reserve-plan-sha256-fd21be1e129012d135eb13416f4a7b0634ad421dc7499890bcaa41a89b958967`.
+- **Quality gate:** runner real disponible offline, pero no conectado aún al
+  backend HTTP por incompatibilidad de factory/contrato/timings.
+- **I01–I20:** 20/20 referencias decodifican; 0 avisos CPU extremos; 0 elegibles
+  y revisión humana todavía obligatoria.
+- **Ejecución:** 0 GPU, red, modelos, VLM, descargas, claims, rerankings o
+  evaluación.
+- **Informe:** [NEXT_MULTIMODAL_VALIDATION_PLAN.md](NEXT_MULTIMODAL_VALIDATION_PLAN.md).

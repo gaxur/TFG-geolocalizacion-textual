@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "i20_remote_asset_manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "manifest_id", "status", "provider", "selection_sha256", "authorization_sha256", "budget", "assets"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "i20-remote-asset-manifest-v1"},
+    "manifest_id": {"pattern": "^i20-remote-assets-sha256-[0-9a-f]{64}$"},
+    "status": {"enum": ["acquired", "partially_acquired", "blocked"]},
+    "provider": {"const": "mapillary"},
+    "selection_sha256": {"pattern": "^[0-9a-f]{64}$"},
+    "authorization_sha256": {"pattern": "^[0-9a-f]{64}$"},
+    "budget": {"type": "object", "additionalProperties": false, "required": ["maximum_downloads", "maximum_total_bytes", "downloads_attempted", "downloads_succeeded", "bytes_acquired"], "properties": {"maximum_downloads": {"const": 60}, "maximum_total_bytes": {"type": "integer", "minimum": 1}, "downloads_attempted": {"type": "integer", "minimum": 0, "maximum": 60}, "downloads_succeeded": {"type": "integer", "minimum": 0, "maximum": 60}, "bytes_acquired": {"type": "integer", "minimum": 0}}},
+    "assets": {"type": "array", "maxItems": 60, "items": {"type": "object", "additionalProperties": false, "required": ["observation_id", "slot_order", "role", "provider_record_id", "sequence_id", "status", "logical_path", "sha256", "perceptual_hash", "perceptual_hash_algorithm", "size_bytes", "media_type", "width_px", "height_px", "creator", "attribution", "license_identifier", "license_url", "source_page_url", "metadata_sha256", "acquired_at_utc", "retention_deadline_utc"], "properties": {"observation_id": {"pattern": "^I(?:0[1-9]|1[0-9]|20)$"}, "slot_order": {"type": "integer", "minimum": 0, "maximum": 2}, "role": {"enum": ["primary", "reserve_1", "reserve_2"]}, "provider_record_id": {"type": "string", "pattern": "^[0-9]+$"}, "sequence_id": {"type": "string", "minLength": 1}, "status": {"enum": ["downloaded", "reused_verified_cache", "failed"]}, "logical_path": {"type": ["string", "null"]}, "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}, "perceptual_hash": {"type": ["string", "null"], "pattern": "^[0-9a-f]{16}$"}, "perceptual_hash_algorithm": {"const": "dhash-9x8-grayscale-v1"}, "size_bytes": {"type": ["integer", "null"], "minimum": 1}, "media_type": {"type": ["string", "null"], "enum": ["image/jpeg", "image/png", null]}, "width_px": {"type": ["integer", "null"], "minimum": 1}, "height_px": {"type": ["integer", "null"], "minimum": 1}, "creator": {"type": ["object", "null"]}, "attribution": {"type": ["string", "null"]}, "license_identifier": {"const": "CC-BY-SA-4.0"}, "license_url": {"const": "https://creativecommons.org/licenses/by-sa/4.0/"}, "source_page_url": {"type": "string", "format": "uri"}, "metadata_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}, "acquired_at_utc": {"type": ["string", "null"], "format": "date-time"}, "retention_deadline_utc": {"type": "string", "format": "date-time"}, "error_type": {"type": "string"}}}}
+  }
+}

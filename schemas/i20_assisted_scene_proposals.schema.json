@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "i20_assisted_scene_proposals.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "artifact_id", "plan_id", "scene_fixture_sha256", "records"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "i20-assisted-scene-proposals-v1"},
+    "artifact_id": {"type": "string", "pattern": "^i20-assist-scene-proposals-sha256-[0-9a-f]{64}$"},
+    "plan_id": {"type": "string", "pattern": "^i20-assist-plan-sha256-[0-9a-f]{64}$"},
+    "scene_fixture_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "records": {
+      "type": "array", "minItems": 12, "maxItems": 12,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["proposal_id", "pair_id", "left_observation_id", "right_observation_id", "left_reference_asset_sha256", "right_reference_asset_sha256", "proposal_status", "ai_draft", "generation"],
+        "properties": {
+          "proposal_id": {"type": "string", "pattern": "^i20-assist-scene-proposal-sha256-[0-9a-f]{64}$"},
+          "pair_id": {"type": "string", "pattern": "^scene-pair-sha256-[0-9a-f]{64}$"},
+          "left_observation_id": {"type": "string", "pattern": "^I(?:0[1-9]|1[0-9]|20)$"},
+          "right_observation_id": {"type": "string", "pattern": "^I(?:0[1-9]|1[0-9]|20)$"},
+          "left_reference_asset_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "right_reference_asset_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "proposal_status": {"const": "proposed"},
+          "ai_draft": {
+            "type": "object", "additionalProperties": false,
+            "required": ["same_scene", "distinctive_objects_shared", "field_of_view_overlap", "same_place_different_frame", "decision", "justification_es", "uncertainties", "human_review_required"],
+            "properties": {
+              "same_scene": {"enum": ["yes", "no", "uncertain"]},
+              "distinctive_objects_shared": {"enum": ["yes", "no", "uncertain"]},
+              "field_of_view_overlap": {"enum": ["yes", "no", "uncertain"]},
+              "same_place_different_frame": {"enum": ["yes", "no", "uncertain"]},
+              "decision": {"enum": ["CLEAR", "EXCLUDE", "REVIEW"]},
+              "justification_es": {"type": "string", "minLength": 1, "maxLength": 600},
+              "uncertainties": {"type": "array", "maxItems": 6, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 300}},
+              "human_review_required": {"const": true}
+            }
+          },
+          "generation": {"$ref": "#/$defs/generation"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "generation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["input_identity_sha256", "cache_entry_id", "raw_output_sha256", "generated_at_utc", "model_id", "model_revision"],
+      "properties": {
+        "input_identity_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "cache_entry_id": {"type": "string", "pattern": "^i20-assist-cache-sha256-[0-9a-f]{64}$"},
+        "raw_output_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "generated_at_utc": {"type": "string", "format": "date-time"},
+        "model_id": {"type": "string", "minLength": 1},
+        "model_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }
+    }
+  }
+}
