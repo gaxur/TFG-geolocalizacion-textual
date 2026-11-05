@@ -1,0 +1,10 @@
+# Identity lock for the validated ARM64/GB10 virtualenv. Recreate only with the
+# approved CUDA 13.0 wheel source; this file does not authorize downloads.
+torch==2.11.0+cu130
+torchvision==0.26.0+cu130
+numpy==1.26.4
+Pillow==12.3.0
+ftfy==6.3.1
+regex==2026.9.29
+tqdm==4.70.1
+clip @ git+https://github.com/openai/CLIP.git@dcba3cb2e2827b402d2701e7e1c7d9fed8a20ef1

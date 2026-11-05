@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "dialogue-v3-phased-ct2l-gpu-authorization-v1",
+  "status": "PENDING_OPERATOR_AUTHORIZATION",
+  "session_id": "dialogue-session-v2-sha256-eb52dc47db05b82a40c368fd570f8b2f87729c4a15fa9d01e4cb93fd702862a1",
+  "authorized_actions": [
+    "isolated CT2L retrieval on NVIDIA GB10"
+  ],
+  "stable_swap_required": true,
+  "automatic_retries": 0,
+  "authorization_source": null
+}

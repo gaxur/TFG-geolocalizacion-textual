@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "dialogue-observer-image-manifest-v1",
+  "status": "template_incomplete",
+  "image_id": null,
+  "logical_path": null,
+  "sha256": null,
+  "source": null,
+  "author": null,
+  "license_or_authorization": null,
+  "acquired_at_utc": null,
+  "provenance_url": null,
+  "observer_relation": null,
+  "observer_relation_evidence": null,
+  "usage_restrictions": [],
+  "reserved_set_exclusion": null,
+  "session_id": null,
+  "intent_family": null,
+  "authorized": false,
+  "authorization_id": null
+}

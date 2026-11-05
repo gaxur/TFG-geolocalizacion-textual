@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "ct2l-isolated-python-runtime-v1",
+  "status": "validated_for_cpu_preflight",
+  "python_executable": ".venv-cvgtext/bin/python",
+  "python_version": "3.12.3",
+  "environment_root": ".venv-cvgtext",
+  "identity_lock": "config/ct2l_isolated_runtime_requirements.lock.txt",
+  "distributions": {
+    "clip": "1.0",
+    "torch": "2.11.0+cu130",
+    "torchvision": "0.26.0+cu130",
+    "numpy": "1.26.4",
+    "Pillow": "12.3.0"
+  },
+  "openai_clip": {
+    "repository": "https://github.com/openai/CLIP.git",
+    "commit": "dcba3cb2e2827b402d2701e7e1c7d9fed8a20ef1",
+    "installation": "PEP 610 direct_url.json VCS installation"
+  },
+  "cvg_text": {
+    "root": "external/CVG-Text",
+    "commit": "6910d2747a94fbe985309bde60cd4732bcbbf50f",
+    "utils_sha256": "18dad4696c205dba5f934f9382ff5bd7d380c502680e462612bbdc49229ba597"
+  },
+  "clip_weights": {
+    "path": "~/.cache/clip/ViT-L-14-336px.pt",
+    "size_bytes": 934088680,
+    "sha256": "3035c92b350959924f9f00213499208652fc7ea050643e8b385c2dac08641f02"
+  },
+  "ct2l_checkpoint": {
+    "path": "checkpoints/CrossText2Loc/long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth",
+    "size_bytes": 1712649548,
+    "sha256": "d0c2f684ec838fa22dc7e607f0f1dc790468aef6df050cf472720756c26da47d"
+  },
+  "gallery": {
+    "id": "madrid-50m",
+    "embedding_manifest": "data/embeddings/f4-madrid-embeddings-sha256-199dae0e3eb38b206004557f20fae0ef98f620621458fc64c2dfa3f7ef7f84c1/manifest.json"
+  },
+  "cuda_initialization_allowed_in_preflight": false
+}

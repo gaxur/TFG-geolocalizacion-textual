@@ -1360,3 +1360,268 @@ Los rankings cambiaron técnicamente, incluido Top-1, pero no se evaluó ni se
 afirma mejora geográfica. Los artefactos locales están en
 `results/generated/interactive-dialogue-multiturn-real-smoke-v1/` y permanecen
 fuera de Git conforme a la política de resultados generados.
+
+## Caracterización aislada Qwen3-VL-8B: intento v1
+
+**Fecha:** 2026-11-04
+**Estado:** `PARTIAL_PERSISTENCE_FAILURE_NO_RETRY`
+
+Se fijó antes de cargar el modelo una imagen sintética RGB de 384×384, generada
+localmente con Pillow, con un rectángulo rojo, un círculo azul, un triángulo verde
+y el texto «FORMAS Y COLORES». El prompt fue: «Describe brevemente los elementos
+visuales que aparecen en la imagen. No inventes información que no puedas
+observar». La configuración fue BF16, SDPA, `do_sample=false` y máximo 64 tokens.
+
+El snapshot local `Qwen/Qwen3-VL-8B-Instruct`, revisión
+`0c351dd01ed87e9c1b53cbc748cba10e6187ff3b`, coincidió con los cuatro hashes
+documentados. El preflight encontró una GB10 sin procesos compute y Ollama sin
+modelo residente. Se ejecutó un único intento aislado, sin CT2L, Qwen textual,
+DialogueVPR, red, GT o conjuntos reservados.
+
+La salida de consola acredita que la carga alcanzó 750/750 tensores. El proceso
+falló al serializar el informe final porque `processor.image_processor.size` era
+un `SizeDict` de Transformers y no un tipo JSON nativo. El fallo ocurrió en el
+`finally`; por ello no es científicamente seguro recuperar de memoria la salida
+ni afirmar qué etapas posteriores a la carga concluyeron. M0–M3, latencias y
+salida se clasifican `NOT VERIFIED`. Tras terminar el contenedor no quedaron
+procesos compute propios; la RAM disponible observada fue 100.033.617.920 B y el
+swap usado 15.104.573.440 B.
+
+No se realizó un segundo intento, no se cambió precisión, imagen, modelo ni
+configuración. Se corrigió únicamente la serialización de objetos de configuración
+Transformers y se añadieron tests CPU. Los artefactos persistidos locales son:
+
+- `protocol.json`, SHA-256
+  `0b01e96f978be06ca3330d3d177148e08969e2f40b912ee8d87b38062f4025fc`;
+- `synthetic-visual-fixture.png`, SHA-256
+  `b9468994d5ce0a1ae6a6c7ecd37430926064d6088dfc123b2e2388fb22a033fb`.
+
+La medición histórica de 17,83 GB de pico CUDA asignado en otro smoke 8B se
+mantiene como antecedente y no se presenta como medición nueva. Este intento no
+permite decidir coexistencia triple.
+
+## Caracterización aislada Qwen3-VL-8B: repetición v2
+
+**Fecha:** 2026-11-04
+**Estado:** `VLM_ISOLATED_SMOKE_PASS`
+
+Se reutilizaron byte a byte la imagen sintética v1, SHA-256
+`b9468994d5ce0a1ae6a6c7ecd37430926064d6088dfc123b2e2388fb22a033fb`,
+el prompt, BF16, SDPA, `do_sample=false` y el límite de 64 tokens. Antes de cargar
+pesos se validaron en CPU `SizeDict`, NumPy, escalares/vectores PyTorch, tuplas,
+listas, diccionarios y opcionales mediante escritura atómica y relectura.
+
+El preflight encontró cero procesos compute, Ollama sin `llama-server`,
+98.061.754.368 B de RAM disponible y 15.104.557.056 B de swap usada. NVML no
+expuso memoria total/libre en la GB10. No se ejecutaron CT2L, Qwen textual,
+DialogueVPR, red, GT ni conjuntos reservados.
+
+### Inferencia y recursos
+
+- Salida real: descripción de tres formas geométricas, fondo blanco y título
+  «FORMAS Y COLORES»; terminó truncada al alcanzar exactamente 64 tokens.
+- Entrada: 180 tokens totales, 144 tokens visuales, grid `[1, 24, 24]` y tensor
+  visual `[576, 1536]`.
+- M0 CUDA: 0 B asignados/reservados.
+- M1 tras carga: 17.534.319.104 B asignados y 17.536.385.024 B reservados.
+- M2 tras preprocessing: 17.537.863.168 B asignados y 17.557.356.544 B
+  reservados.
+- M3: 17.547.433.984 B asignados; pico 17.601.585.664 B asignados y
+  17.632.854.016 B reservados.
+- M4 tras eliminar referencias y vaciar caché: 9.568.768 B asignados y
+  16.777.216 B reservados. Tras terminar el contenedor, el host observó cero
+  procesos compute.
+- Pico RSS: 18.498.625.536 B.
+
+Latencias monotónicas con sincronización CUDA: processor 250 ms; carga y
+transferencia 93.999 ms; preprocessing 24,8 ms; generación 6.651 ms;
+decodificación 0,17 ms; liberación 308 ms; runtime total 101.757 ms. No incluyen
+la inicialización externa del contenedor.
+
+Los checkpoints `m0.json`–`m4.json`, salida, métricas y manifiesto se escribieron
+atómicamente y se releyeron antes de avanzar. El manifiesto validó hashes y
+tamaños de todos los artefactos. Los resultados locales están en
+`results/generated/qwen3-vl-8b-memory-smoke-v2/`, fuera de Git.
+
+La suma orientativa del pico histórico CT2L + Qwen textual (18.140.423.680 B) y
+el pico aislado VLM (17.601.585.664 B) es 35.742.009.344 B y se etiqueta
+`ESTIMATE_NOT_VALIDATED`: no mide coexistencia, activaciones simultáneas,
+fragmentación ni presión de memoria unificada. La siguiente fase puede preparar
+una prueba específica de coexistencia, pero todavía no autoriza residencia triple.
+
+## Coexistencia real CT2L + Qwen3-8B + Qwen3-VL-8B
+
+**Fecha:** 2026-11-04
+**Estado:** `TRIPLE_COEXISTENCE_PASS`
+
+Se cargaron en un único proceso, sin cuantización u *offloading*, CT2L float32,
+Qwen3-8B BF16 y Qwen3-VL-8B BF16/SDPA. El preflight registró cero procesos
+compute ajenos, Ollama sin `llama-server`, 98.512.576.512 B de RAM disponible y
+15.104.536.576 B de swap usada. NVML no expuso memoria total/libre de la GB10.
+
+Un gate fijado antes del experimento exigió al menos 40 GiB de RAM disponible,
+crecimiento de swap no superior a 1 GiB entre C0 y C2 y ausencia de procesos
+compute ajenos. Pasó con 78.368.870.400 B disponibles y crecimiento de swap 0 B.
+
+### Carga conjunta
+
+| Etapa | CUDA asignada | CUDA reservada | RAM disponible | Swap usada | Carga |
+|---|---:|---:|---:|---:|---:|
+| C0 | 0 B | 0 B | 97.673.990.144 B | 15.104.532.480 B | — |
+| C1 CT2L | 1.712.462.336 B | 1.772.093.440 B | 94.444.007.424 B | 15.104.532.480 B | 5.069 ms |
+| C2 + Qwen texto | 18.093.952.512 B | 18.161.336.320 B | 78.368.870.400 B | 15.104.528.384 B | 84.259 ms |
+| C3 + Qwen VL | 35.629.484.032 B | 35.689.332.736 B | 63.599.046.656 B | 17.179.426.816 B | 94.992 ms |
+
+Los tres objetos de modelo seguían referenciados en C3. La carga VLM produjo
+presión PSI baja pero observable (`avg10=0,05`) y ocupó prácticamente toda la
+swap disponible. No hubo OOM.
+
+### Inferencias secuenciales
+
+- CT2L: ranking exhaustivo de 253 candidatos en 291 ms.
+- Qwen3-8B: 26 tokens de entrada y 24 de salida en 2.745 ms; salida truncada por
+  el límite técnico fijado.
+- Qwen3-VL-8B: misma imagen sintética y prompt del smoke aislado, 180 tokens de
+  entrada y 64 de salida en 6.653 ms; salida idéntica y truncada al límite.
+- Pico conjunto observado durante VLM: 35.707.285.504 B CUDA asignados y
+  35.758.538.752 B reservados.
+
+Tras liberar VLM, Qwen textual y CT2L en ese orden, quedaron 9.568.256 B CUDA
+asignados y 23.068.672 B reservados dentro del proceso. Tras terminar el
+contenedor, el host confirmó cero procesos compute y 101.333.602.304 B de RAM
+disponible. La swap permaneció casi llena; este hecho puede reflejar páginas
+inactivas persistentes y no se interpreta como memoria CUDA asignada.
+
+Los 14 artefactos del manifiesto pasaron hashes y tamaños. Los resultados están
+en `results/generated/triple-model-coexistence-smoke-v1/`, fuera de Git. La
+coexistencia técnica queda demostrada para una única secuencia mínima, pero la
+swap agotada y la presión de memoria desaconsejan residencia triple como política
+operativa inicial. Se recomienda mantener CT2L + Qwen textual residentes y cargar
+el VLM bajo demanda con reserva exclusiva de recursos, hasta evaluar sesiones
+prolongadas y concurrencia en un protocolo separado.
+
+## Integración CPU-first de evidencia visual en DialogueVPR
+
+**Fecha:** 2026-11-04
+**Estado:** `VISUAL_INTEGRATION_CPU_PASS`
+
+Se añadió el contrato `dialogue-visual-evidence-v1` y la sesión aditiva
+`interactive-dialogue-session-v3`. La configuración v2 continúa desactivando VLM
+por defecto. El orquestador v3 consulta como máximo una imagen para una intención
+ya seleccionada por CT2L/F3, verifica autorización, procedencia, SHA-256 y relación
+`observer_view`, y registra `supported`, `contradicted` o `unverifiable`.
+
+Las evidencias visuales permanecen separadas de claims humanos y asociaciones
+F3. No se incorporan a `literal_concatenation`, no ejecutan retrieval, no alteran
+scores/rankings y no eliminan candidatos. Los conflictos humano–VLM conservan
+ambas fuentes y declaran `query_changed=false` y `ranking_changed=false`.
+
+La ruta real Qwen3-VL solo prepara identidad, prompt, schema, imagen y presupuesto
+de una futura petición. No carga modelos ni ejecuta callables en proceso; sin
+runtime aislado se abstiene. La salida futura exige evidencia observada explícita,
+límites y vocabulario acotados; la mera ausencia nunca produce contradicción.
+
+La validación CPU cubrió proveedor desactivado, estados, autorización, fichero,
+hash, procedencia, relación observador, salida inválida, timeout/excepción fake,
+conflictos, manipulación de claim/productor, eventos, schemas, hashes,
+compatibilidad v1/v2, máximo de tres preguntas, retrieval exhaustivo e
+invariancia de consulta/ranking. El smoke CLI v3 con manifiesto local autorizado
+produjo una evidencia, un conflicto trazable y no importó `torch`.
+
+La integración valida software y seguridad fail-closed, no calidad visual,
+Recall@K o precisión geográfica. No se cargó ningún modelo ni GPU y no se accedió
+a conjuntos reservados.
+
+## Primer intento de worker real y sesión visual v3
+
+**Fecha:** 2026-11-04
+**Estado:** `BLOCKED_BY_GPU` y `BLOCKED_BY_IMAGE_ELIGIBILITY`
+
+Se implementó un worker Qwen3-VL aislado con petición cerrada, allowlist de mount,
+doble comprobación SHA-256, BF16/SDPA, JSON guiado, una sola inferencia, alarmas de
+carga/inferencia y supervisor con timeout total efectivo sobre un grupo de
+proceso propio. Las pruebas CPU cubrieron schema, permisos, hashes, traversal,
+request ID, timeout, terminación y error CUDA simulado. El supervisor
+`--validate-only` completó correctamente sin importar modelos.
+
+El gate prefijado exigía cero procesos compute ajenos, al menos 40 GiB de RAM y
+PSI `some/full avg10 < 0,10`. El preflight encontró un `llama-server` de Ollama
+ajeno, PID 3.640.702, con 18.523 MiB, y 17.172.344.832 B de swap usada de
+17.179.865.088 B. Aunque había 81.874.685.952 B de RAM disponible y PSI actual
+era cero, la competencia GPU/material de memoria bloqueó el worker. No se detuvo
+Ollama, no se cargó ningún modelo y no hubo reintento.
+
+Además, el único fixture autorizado disponible para este smoke es sintético y se
+clasifica `synthetic_transport_only`: no es una fotografía desde el observador y
+no puede declararse `observer_view`. No se buscaron imágenes en conjuntos
+reservados ni se relajó el schema. Por ello no se creó una sesión v3 real. Los
+diagnósticos locales están en
+`results/generated/dialogue-v3-real-visual-smoke-v1/`, fuera de Git.
+
+## Desbloqueo del worker visual: segundo preflight
+
+**Fecha:** 2026-11-04
+**Estado:** `BLOCKED_BY_GPU`
+
+El worker y supervisor se ampliaron con allowlist de mount, doble hash, petición
+content-addressed, alarmas separadas de carga/inferencia y timeout total efectivo
+que termina únicamente el grupo de proceso propio. La validación CPU y el modo
+`--validate-only` pasaron. Se añadió una plantilla de fotografía `observer_view`
+que permanece explícitamente incompleta y no autorizada.
+
+Los umbrales se fijaron antes del preflight: cero procesos compute ajenos, al
+menos 40 GiB de RAM, swap usada como máximo al 95 % y PSI `some/full avg10 <
+0,10`. El host tenía 81.746.046.976 B de RAM disponible y PSI cero, pero mantenía
+el `llama-server` de Ollama PID 3.640.702 con 18.523 MiB y 17.172.221.952 B de
+swap usada de 17.179.865.088 B. El supervisor devolvió
+`foreign_compute_process_present` y `swap_fraction_above_limit` antes de crear el
+worker. No hubo carga, inferencia, reintento, modificación de procesos ajenos ni
+sesión v3.
+
+El fixture sintético conservó el rol `synthetic_transport_only`; no se falsificó
+`observer_view`. El diagnóstico local está en
+`results/generated/qwen3-vl-dialogue-worker-real-smoke-v1/`, fuera de Git.
+## Revalidación del desbloqueo del worker visual
+
+**Fecha:** 2026-11-04
+**Estado:** `BLOCKED_BY_GPU`
+
+La infraestructura del worker se completó con schema de petición cerrado,
+request ID content-addressed, allowlist `/authorized-images/<nombre>`, doble
+verificación SHA-256, ejecución Docker sin red, alarmas de carga/inferencia y
+timeout total efectivo del supervisor. Los tests CPU y `--validate-only`
+finalizaron correctamente.
+
+El preflight fijó antes de observar recursos: cero procesos compute ajenos, RAM
+disponible ≥40 GiB, swap usada ≤95 % y PSI `some/full avg10 <0,10`. Se observaron
+62.946.177.024 B de RAM disponible y PSI cero, pero Ollama mantenía el
+`llama-server` PID 3.640.702 con 36.267 MiB y la swap estaba usada al 99,96 %
+(17.172.221.952 de 17.179.865.088 B). El supervisor persistió
+`foreign_compute_process_present` y `swap_fraction_above_limit`, no creó el
+worker y realizó cero inferencias o reintentos.
+
+La imagen sintética conservó `synthetic_transport_only`; no existe aún una
+imagen real autorizada con relación `observer_view`. La plantilla
+`dialogue_observer_image_manifest.template.json` permanece incompleta y no
+autorizada, sin inventar fuente, autor, licencia, perspectiva, sesión o intención.
+
+## Reanudación del worker visual pendiente
+
+**Fecha:** 2026-11-04
+**Estado:** `BLOCKED_BY_MEMORY_POLICY`
+
+Se reanudó únicamente desde el preflight. `ollama ps` estaba vacío, `nvidia-smi`
+no mostraba procesos compute y no existía `llama-server`. Había
+105.100.926.976 B de RAM disponible y PSI `some/full avg10=0`, pero la swap seguía
+usada al 99,97 %: 17.175.097.344 de 17.179.865.088 B. El gate fijo del 95 %
+bloqueó antes de crear el worker.
+
+El supervisor persistió petición, preflight y reporte en
+`results/generated/qwen3-vl-dialogue-worker-real-smoke-v2/`. No cargó pesos, no
+ejecutó inferencia, no creó procesos propios y no reintentó. La clasificación se
+ajustó a `BLOCKED_BY_MEMORY_POLICY`, ya que la GPU estaba libre y el único fallo
+era el umbral de swap. El gate no se modificó.
+
+La plantilla `config/dialogue_observer_image_manifest.template.json` permanece
+`template_incomplete`, `authorized=false` y sin datos inventados; la preparación
+de una fotografía real `observer_view` continúa pendiente e independiente.

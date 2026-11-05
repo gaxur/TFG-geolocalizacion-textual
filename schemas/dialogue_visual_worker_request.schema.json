@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dialogue_visual_worker_request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "request_id", "model", "image", "claim", "generation", "timeouts", "protocol"],
+  "allOf": [
+    {"if": {"properties": {"contract_version": {"const": "dialogue-visual-worker-request-v1"}}}, "then": {"properties": {"generation": {"properties": {"max_new_tokens": {"const": 96}}}}}},
+    {"if": {"properties": {"contract_version": {"const": "dialogue-visual-worker-request-v2"}}}, "then": {"properties": {"generation": {"properties": {"max_new_tokens": {"const": 192}}}}}}
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"enum": ["dialogue-visual-worker-request-v1", "dialogue-visual-worker-request-v2"]},
+    "request_id": {"type": "string", "pattern": "^visual-worker-request-sha256-[0-9a-f]{64}$"},
+    "model": {"type": "object", "additionalProperties": false, "required": ["model_id", "revision", "model_path"], "properties": {"model_id": {"const": "Qwen/Qwen3-VL-8B-Instruct"}, "revision": {"const": "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b"}, "model_path": {"const": "/models/Qwen3-VL-8B"}}},
+    "image": {"type": "object", "additionalProperties": false, "required": ["image_id", "path", "sha256", "provenance", "authorized", "authorization_id", "observer_relation"], "properties": {"image_id": {"type": "string"}, "path": {"type": "string", "pattern": "^/authorized-images/[A-Za-z0-9._-]+$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "provenance": {"type": "object", "required": ["source"]}, "authorized": {"const": true}, "authorization_id": {"type": "string", "minLength": 1}, "observer_relation": {"enum": ["observer_view", "synthetic_transport_only"]}}},
+    "claim": {"type": "object", "additionalProperties": false, "required": ["claim_id", "kind", "value", "source_text"], "properties": {"claim_id": {"type": "string"}, "kind": {"const": "object_presence"}, "value": {"type": "object"}, "source_text": {"type": "string"}}},
+    "generation": {"type": "object", "additionalProperties": false, "required": ["dtype", "attention", "do_sample", "max_new_tokens"], "properties": {"dtype": {"const": "bfloat16"}, "attention": {"const": "sdpa"}, "do_sample": {"const": false}, "max_new_tokens": {"enum": [96, 192]}}},
+    "timeouts": {"type": "object", "additionalProperties": false, "required": ["load_seconds", "inference_seconds", "total_seconds"], "properties": {"load_seconds": {"type": "integer", "minimum": 1}, "inference_seconds": {"type": "integer", "minimum": 1}, "total_seconds": {"type": "integer", "minimum": 1}}},
+    "protocol": {"type": "object", "additionalProperties": false, "required": ["ground_truth_used", "reserved_sets_used", "network_used", "single_inference"], "properties": {"ground_truth_used": {"const": false}, "reserved_sets_used": {"const": false}, "network_used": {"const": false}, "single_inference": {"const": true}}}
+  }
+}

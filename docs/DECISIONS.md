@@ -1319,6 +1319,35 @@ DialogueVPR no carga otro modelo. El punto VLM es solo una interfaz inerte y no
 autoriza inferencia, fotografías ni fusión de scores. La validación de este BUILD
 es CPU con dobles y no demuestra mejora geográfica.
 
+## D096 — Evidencia visual opcional y no vinculante en DialogueVPR
+
+**Estado:** ACEPTADA
+**Componente:** DialogueVPR / VLM / procedencia
+**Fecha:** 2026-11-04
+**Origen:** BUILD autorizado para integración funcional CPU-first.
+
+### Decisión
+
+Introducir una sesión v3 aditiva y el contrato
+`dialogue-visual-evidence-v1`. La selección de intención sigue dependiendo solo
+del ranking CT2L y del soporte positivo F3. El proveedor visual se consulta como
+máximo una vez para una intención ya seleccionada y solo ante una imagen local
+autorizada, íntegra, con procedencia y relación con el observador declaradas.
+
+Los estados `supported`, `contradicted` y `unverifiable` describen exclusivamente
+lo observable en esa imagen. No son probabilidades, GT ni scores de recuperación.
+Los claims visuales no se incorporan a la consulta canónica, no modifican scores,
+no reordenan ni eliminan candidatos y no sustituyen respuestas humanas. Los
+conflictos conservan ambas fuentes y mantienen inmutables consulta y ranking.
+
+### Compatibilidad
+
+La configuración v2 continúa con `vlm_enabled=false`; v1 y v2 permanecen sin
+cambios. El adaptador Qwen3-VL preparado no carga modelos: requiere en el futuro
+un ejecutor autorizado ya existente y se abstiene si no está inicializado. La
+validación actual utiliza únicamente un proveedor fake CPU y no demuestra mejora
+geográfica o calidad visual.
+
 ## D001 — Identidad del candidato
 ## D094 — Resultado del linaje exploratorio posterior
 

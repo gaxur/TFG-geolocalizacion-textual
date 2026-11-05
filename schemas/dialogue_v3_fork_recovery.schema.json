@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dialogue_v3_fork_recovery.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "fork_id", "status", "parent_run", "parent_state_sha256", "parent_checkpoint_id", "parent_checkpoint_sha256", "parent_snapshot_sha256", "parent_generation", "parent_failure_attempt", "parent_failure_artifacts", "pending_answer", "recovery_reason", "target_run", "configuration_sha256", "authorizations_reused", "created_at_utc"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "dialogue-v3-fork-recovery-v1"},
+    "fork_id": {"type": "string", "pattern": "^dialogue-fork-recovery-sha256-[0-9a-f]{64}$"},
+    "status": {"const": "committed"},
+    "parent_run": {"type": "string", "minLength": 1},
+    "parent_state_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "parent_checkpoint_id": {"type": "string", "minLength": 1},
+    "parent_checkpoint_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "parent_snapshot_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "parent_generation": {"type": "integer", "minimum": 0},
+    "parent_failure_attempt": {"type": "string", "minLength": 1},
+    "parent_failure_artifacts": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+    "pending_answer": {"type": "object", "required": ["literal", "sha256", "turn_index"]},
+    "recovery_reason": {"type": "string", "minLength": 1},
+    "target_run": {"type": "string", "minLength": 1},
+    "configuration_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "authorizations_reused": {"const": false},
+    "created_at_utc": {"type": "string", "minLength": 1}
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dialogue_v3_retrieval_checkpoint.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "checkpoint_id", "status", "session_id", "session_label", "initial_description_sha256", "intent_family", "gallery_id", "identities", "dialogue_policy", "ranking_initial", "candidate_ids", "scores", "timings_ms", "configuration_sha256", "provenance", "session_v2"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "dialogue-v3-retrieval-checkpoint-v1"},
+    "checkpoint_id": {"type": "string", "pattern": "^dialogue-retrieval-checkpoint-sha256-[0-9a-f]{64}$"},
+    "status": {"const": "completed"},
+    "session_id": {"type": "string"},
+    "session_label": {"type": "string"},
+    "initial_description_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "intent_family": {"type": "string"},
+    "gallery_id": {"type": "string"},
+    "identities": {"type": "object"},
+    "dialogue_policy": {"type": "object"},
+    "ranking_initial": {"type": "object"},
+    "candidate_ids": {"type": "array", "items": {"type": "string"}},
+    "scores": {"type": "array", "items": {"type": "number"}},
+    "timings_ms": {"type": "object"},
+    "configuration_sha256": {"type": "string"},
+    "provenance": {"type": "object"},
+    "session_v2": {"type": "object"}
+  }
+}

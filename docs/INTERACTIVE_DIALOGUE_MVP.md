@@ -7,14 +7,17 @@ recuperación global CrossText2Loc después de cada respuesta informativa. Está
 inspirado en el principio iterativo de DialogueVPR, pero no reproduce DQ-pilot,
 CMPL, su entrenamiento SFT/GRPO, su testigo sintético ni sus resultados.
 
-No recibe *ground truth*, no abre conjuntos reservados, no evalúa precisión
-geográfica y no ejecuta Qwen3-VL-8B. Un cambio entre rankings es un resultado
-técnico, no una mejora demostrada de localización.
+No recibe *ground truth*, no abre conjuntos reservados y no evalúa precisión
+geográfica. El contrato v3 puede orquestar evidencia visual mediante un proveedor
+CPU simulado; no ejecuta Qwen3-VL-8B real. Un cambio entre rankings es un
+resultado técnico, no una mejora demostrada de localización.
 
 El contrato histórico `interactive-dialogue-session-v1` y sus artefactos se
 mantienen legibles y sin cambios. Las sesiones nuevas utilizan
 `interactive-dialogue-session-v2`. Configurar `max_questions=1` conserva el
 límite funcional anterior; `--legacy-one-turn` permite escribir expresamente v1.
+La evidencia visual opt-in utiliza `interactive-dialogue-session-v3`; v1 y v2 no
+se migran ni reescriben.
 
 ## Arquitectura
 
@@ -27,6 +30,10 @@ flowchart TD
     P -->|Sin diferencia fiable| S[Parada anticipada]
     P -->|Intención nueva| Q[Qwen3-8B compartido: redacción opcional]
     Q --> V[Validador y plantilla de fallback]
+    V --> X{Imagen local autorizada para la intención}
+    X -->|Sí| XV[Proveedor visual: claim acotado a la imagen]
+    X -->|No| A
+    XV --> A
     V --> A[Respuesta humana literal]
     A -->|Informativa| L[Consulta literal acumulada]
     A -->|Desconocida o ambigua| P
@@ -51,6 +58,9 @@ La configuración v1 permanece en `config/interactive_dialogue_mvp.json`; v2 usa
 | `F3EvidenceIndex` | Soporte cartográfico positivo por candidato | Inferir visibilidad o contradicción por ausencia |
 | Política determinista | Intención respaldada y familia semántica | Tratar scores como probabilidades |
 | `QwenDialogueAdapter` | Redactar y proponer reescrituras auditables | Cambiar intención o ranking |
+| `FakeVisualEvidenceProvider` | Simular claims visuales deterministas en CPU | Cargar modelos, GPU o red |
+| `Qwen3VLDialogueEvidenceAdapter` | Preparar una petición para un ejecutor VLM externo ya cargado | Instanciar Qwen3-VL o modificar CT2L |
+| `VisualMultiTurnDialogueOrchestrator` | Enlazar imagen, intención, claim, evento y conflicto | Fusionar scores o convertir píxeles en GT |
 
 ## Máquina de estados
 
@@ -180,14 +190,60 @@ reescritura inválida se omite sin afectar a la consulta canónica.
 
 ## Extensión VLM inerte
 
-El contrato reserva un `VisualEvidenceProvider` independiente para una futura
-integración de `Qwen/Qwen3-VL-8B-Instruct`, revisión
-`0c351dd01ed87e9c1b53cbc748cba10e6187ff3b`. Este BUILD exige `enabled=false` y
-`calls=0`; intentar inyectar un proveedor produce error.
+## Evidencia visual opcional v3
 
-El punto futuro deberá recibir procedencia fotográfica, claims y presupuesto, y
-devolver `supported`, `contradicted` o `unverifiable`. No habrá fusión implícita
-de scores ni equivalencia entre una cámara Mapillary y el observador.
+El contrato `dialogue-visual-evidence-v1` enlaza una imagen autorizada con una
+sesión, turno, intención, pregunta y ranking de entrada. Exige SHA-256,
+procedencia, autorización, productor, salida bruta, estado, limitaciones y hash
+content-addressed. Los estados son:
+
+- `supported`: evidencia favorable dentro de los píxeles de esa imagen; no es
+  verdad geográfica;
+- `contradicted`: evidencia visible explícitamente incompatible; la ausencia no
+  cuenta como contradicción;
+- `unverifiable`: encuadre, autorización, integridad, procedencia, salida o
+  relación con el observador insuficientes.
+
+La política predeterminada v2 conserva `vlm_enabled=false`. El modo v3 es opt-in,
+requiere imagen local y no descarga nada. Con `require_observer_relation=true`,
+una fotografía cuya relación con el observador sea desconocida solo puede
+producir `unverifiable`.
+
+La evidencia visual se almacena separada de `claims` humanos y de `f3`. Nunca se
+añade a `literal_concatenation`, no ejecuta CT2L, no cambia rankings y no elimina
+candidatos. Si contradice una respuesta humana, ambas fuentes se conservan y se
+registra `preserve_human_query_and_record_conflict`. Si F3 contiene una asociación
+y la imagen no verifica el objeto, la salida permanece `unverifiable`.
+
+`Qwen3VLDialogueEvidenceAdapter` fija la identidad
+`Qwen/Qwen3-VL-8B-Instruct` revisión
+`0c351dd01ed87e9c1b53cbc748cba10e6187ff3b`, BF16/SDPA y reutiliza el prompt
+atómico existente. En este BUILD es exclusivamente constructor de petición y
+parser de respuesta: se abstiene con `runtime_not_initialized`, no acepta un
+callable síncrono, no importa PyTorch ni carga pesos. La futura ejecución real
+deberá aislarse en un proceso con timeout efectivo y verificar de nuevo el hash
+de los bytes consumidos para evitar una ventana TOCTOU.
+
+El worker preparado está en `scripts/qwen3_vl_dialogue_worker.py` y su supervisor
+en `scripts/run_dialogue_v3_visual_worker_smoke.py`. El supervisor crea un grupo
+de proceso propio, aplica timeout total real y termina solo ese grupo. El worker
+aplica además alarmas separadas a carga e inferencia, valida una petición JSON
+cerrada, limita imágenes a `/authorized-images/<nombre>`, comprueba SHA-256 antes
+de validar y justo antes de abrir, desactiva red mediante el contenedor y ejecuta
+como máximo una generación. La salida se analiza con
+`parse_qwen3_vl_dialogue_output`; una salida inválida es fail-closed.
+
+Una imagen `synthetic_transport_only` puede validar worker, transporte y
+persistencia, pero nunca se convierte en evidencia v3. Solo `observer_view`
+explícitamente autorizado es elegible para el orquestador visual.
+
+La plantilla de incorporación está en
+`config/dialogue_observer_image_manifest.template.json` y su schema en
+`schemas/dialogue_observer_image_manifest.schema.json`. Permanece
+`template_incomplete` y `authorized=false` hasta documentar ruta, hash, fuente,
+autor, licencia/autorización, fecha, procedencia, prueba de perspectiva del
+observador, restricciones, exclusión de conjuntos reservados, sesión e intención.
+No se completan campos por inferencia ni se seleccionan imágenes usando GT.
 
 ## Contratos e integridad
 
@@ -195,6 +251,8 @@ Los schemas son:
 
 - [`interactive_dialogue_session.schema.json`](../schemas/interactive_dialogue_session.schema.json), v1;
 - [`interactive_dialogue_session_v2.schema.json`](../schemas/interactive_dialogue_session_v2.schema.json), v2.
+- [`interactive_dialogue_session_v3.schema.json`](../schemas/interactive_dialogue_session_v3.schema.json), v3 visual opt-in;
+- [`dialogue_visual_evidence.schema.json`](../schemas/dialogue_visual_evidence.schema.json), evidencia por imagen.
 
 Ambos rechazan GT. El validador v2 comprueba además universo global, continuidad
 entre ranking posterior y turno siguiente, familias únicas, presupuesto textual,
@@ -210,9 +268,66 @@ python scripts/run_interactive_dialogue.py \
   --answers "Sí" "No puedo comprobarlo" "No"
 ```
 
+Escenario visual fake CPU explícito:
+
+```bash
+python scripts/run_interactive_dialogue.py \
+  --mode fake \
+  --max-questions 1 \
+  --output-dir /tmp/dialogue-visual-v3 \
+  --description "Una calle urbana" \
+  --answers "Sí" \
+  --fake-visual-manifest /ruta/manifest-autorizado.json \
+  --fake-visual-state contradicted
+```
+
 La CLI solicita respuestas que falten y muestra el Top-5 técnico después de cada
 turno. `--max-questions 1` prueba compatibilidad funcional. El modo real reutiliza
 los adaptadores actuales, pero no se ejecutó en este BUILD.
+
+### Worker visual real preparado
+
+La CLI admite `--visual-image-manifest` únicamente en modo `real` multivuelta.
+Esta opción no basta para abrir GPU: exige además `--authorize-visual-gpu`, un
+snapshot local mediante `--visual-model-dir` y un directorio nuevo mediante
+`--visual-worker-output`. Es incompatible con `--fake-visual-manifest`.
+
+Antes de invocar el worker se valida
+`dialogue-observer-image-manifest-v1`, su estado `authorized`, el SHA-256, la
+procedencia, `observer_view`, la evidencia de esa relación y la exclusión literal
+`confirmed_not_from_ground_truth_h26_h37_h38_h61_or_other_reserved_sets`. El
+`session_id` y la `intent_family` deben coincidir con la sesión y el turno que
+solicitan evidencia; cualquier divergencia se cierra sin ejecutar el worker.
+
+El proveedor real delega en `scripts/run_dialogue_visual_worker.py`. El proceso
+principal no importa PyTorch ni carga Qwen3-VL. El ejecutor comprueba la imagen
+Docker validada, aplica `stable-swap-v1`, crea una petición v2 de 192 tokens y
+lanza un único contenedor sin red mediante el supervisor existente. La respuesta
+se valida contra el schema atómico y el contrato semántico antes de convertirse
+en evidencia v3. Un timeout, bloqueo o respuesta inválida produce evidencia
+`unverifiable`; nunca modifica consulta, embeddings o ranking.
+
+Comando previsto, **no ejecutado** y condicionado a un manifiesto completo cuyo
+`session_id` corresponda a los mismos argumentos de sesión:
+
+```bash
+python scripts/run_interactive_dialogue.py \
+  --mode real \
+  --output-dir results/generated/dialogue-v3-real-session-v1 \
+  --session-label <etiqueta-congelada> \
+  --description "<descripcion-literal-congelada>" \
+  --visual-image-manifest <directorio-autorizado>/manifest.json \
+  --authorize-visual-gpu \
+  --visual-worker-output results/generated/dialogue-v3-real-worker-v1 \
+  --visual-model-dir <snapshot-local-qwen3-vl-8b> \
+  --f3-bundle <bundle-f3> \
+  --cvg-utils-sha256 <sha256> \
+  --clip-weights <clip-local>
+```
+
+Este comando ejecutaría recuperación real y una inferencia visual, por lo que
+requiere una autorización de ejecución posterior y no constituye una instrucción
+para usar imágenes pendientes o conjuntos reservados.
 
 | Preguntas usadas | Secuencia ilustrativa | Parada posible |
 |---:|---|---|
@@ -240,5 +355,8 @@ de 300 tokens, schemas, hashes, rechazo de GT y ausencia de VLM/GPU.
 - Las respuestas complejas solo tienen interpretación conservadora por reglas.
 - El recorte explícito de textos largos necesita un smoke con tokenizer CT2L real.
 - F3 no representa visibilidad y sus ausencias no son contradicciones.
-- Qwen3-VL-8B y las fotografías quedan fuera de este BUILD.
+- Qwen3-VL-8B real y las fotografías externas quedan fuera de este BUILD; los
+  tests usan únicamente bytes locales sintéticos o temporales autorizados.
+- La ruta visual v3 solo valida contratos y orquestación CPU; no valida calidad
+  de Qwen3-VL, fotografías reales, mejora de ranking o precisión geográfica.
 - Los umbrales de la política no se ajustaron con conjuntos reservados.

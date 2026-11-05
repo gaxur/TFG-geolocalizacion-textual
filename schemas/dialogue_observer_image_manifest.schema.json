@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dialogue_observer_image_manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "status", "image_id", "logical_path", "sha256", "source", "author", "license_or_authorization", "acquired_at_utc", "provenance_url", "observer_relation", "observer_relation_evidence", "usage_restrictions", "reserved_set_exclusion", "session_id", "intent_family", "authorized", "authorization_id"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "dialogue-observer-image-manifest-v1"},
+    "status": {"enum": ["template_incomplete", "authorized"]},
+    "image_id": {"type": ["string", "null"]},
+    "logical_path": {"type": ["string", "null"]},
+    "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+    "source": {"type": ["string", "null"]},
+    "author": {"type": ["string", "null"]},
+    "license_or_authorization": {"type": ["string", "null"]},
+    "acquired_at_utc": {"type": ["string", "null"]},
+    "provenance_url": {"type": ["string", "null"]},
+    "observer_relation": {"enum": ["observer_view", null]},
+    "observer_relation_evidence": {"type": ["string", "null"]},
+    "usage_restrictions": {"type": "array", "items": {"type": "string"}},
+    "reserved_set_exclusion": {"type": ["string", "null"]},
+    "session_id": {"type": ["string", "null"]},
+    "intent_family": {"enum": ["square", "church", "monument", "intersection", "park", "commercial", null]},
+    "authorized": {"type": "boolean"},
+    "authorization_id": {"type": ["string", "null"]}
+  },
+  "allOf": [
+    {"if": {"properties": {"status": {"const": "authorized"}}}, "then": {"properties": {"image_id": {"type": "string", "minLength": 1}, "logical_path": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "source": {"type": "string", "minLength": 1}, "author": {"type": "string", "minLength": 1}, "license_or_authorization": {"type": "string", "minLength": 1}, "observer_relation": {"const": "observer_view"}, "observer_relation_evidence": {"type": "string", "minLength": 1}, "reserved_set_exclusion": {"type": "string", "minLength": 1}, "session_id": {"type": "string", "minLength": 1}, "intent_family": {"type": "string"}, "authorized": {"const": true}, "authorization_id": {"type": "string", "minLength": 1}}}}
+  ]
+}

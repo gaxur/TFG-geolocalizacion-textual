@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "interactive-dialogue-visual-policy-v1",
+  "enabled": true,
+  "maximum_calls": 3,
+  "allow_query_update": false,
+  "allow_ranking_update": false,
+  "require_observer_relation": true,
+  "provider": "fake-dialogue-visual-v1",
+  "gpu_allowed": false,
+  "downloads_allowed": false,
+  "ground_truth_allowed": false
+}

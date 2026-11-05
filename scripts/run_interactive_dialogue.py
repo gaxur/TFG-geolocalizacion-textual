@@ -31,6 +31,8 @@ from src.tfg_phase0.interactive_dialogue_multiturn import (
     MultiTurnDialogueOrchestrator,
     write_multiturn_session,
 )
+from src.tfg_phase0.dialogue_visual_evidence import FakeVisualEvidenceProvider, RealQwen3VLDialogueEvidenceProvider, VisualEvidencePolicy, VisualImageReference, file_sha256, load_observer_image_manifest
+from src.tfg_phase0.interactive_dialogue_visual import VisualMultiTurnConfig, VisualMultiTurnDialogueOrchestrator, write_visual_session
 
 
 class FakeRetriever:
@@ -165,6 +167,13 @@ def main() -> int:
     parser.add_argument("--answers", nargs="*", help="Respuestas técnicas en orden; si faltan se solicitan por terminal.")
     parser.add_argument("--max-questions", type=int, choices=(1, 2, 3))
     parser.add_argument("--legacy-one-turn", action="store_true", help="Escribe el contrato histórico v1.")
+    parser.add_argument("--fake-visual-manifest", type=Path, help="Manifest local autorizado; solo modo fake CPU y contrato v3.")
+    parser.add_argument("--visual-image-manifest", type=Path, help="Manifest observer_view autorizado; solo modo real.")
+    parser.add_argument("--authorize-visual-gpu", action="store_true", help="Autoriza explícitamente una única inferencia visual aislada.")
+    parser.add_argument("--visual-worker-output", type=Path, help="Directorio nuevo para preflight y artefactos del worker visual.")
+    parser.add_argument("--visual-model-dir", type=Path, help="Snapshot local exacto de Qwen3-VL-8B.")
+    parser.add_argument("--visual-docker-image", default="qwen3-vl-dialogue-worker:lmfe-0.11.3-tf5.9-v1")
+    parser.add_argument("--fake-visual-state", choices=("supported", "contradicted", "unverifiable"), default="unverifiable")
     parser.add_argument("--session-label", default="interactive-cli")
     parser.add_argument("--ct2l-config", type=Path, default=ROOT / "config/madrid_f46_retriever.json")
     parser.add_argument("--f3-bundle", type=Path)
@@ -172,6 +181,12 @@ def main() -> int:
     parser.add_argument("--clip-weights", type=Path)
     parser.add_argument("--qwen-model-dir", type=Path, help="Snapshot local exacto; no se descarga nada.")
     args = parser.parse_args()
+    if args.fake_visual_manifest is not None and (args.mode != "fake" or args.legacy_one_turn):
+        parser.error("la evidencia visual fake solo está disponible en modo fake multivuelta")
+    if args.fake_visual_manifest is not None and args.visual_image_manifest is not None:parser.error("los manifests visuales fake y real son mutuamente excluyentes")
+    if args.visual_image_manifest is not None and (args.mode!="real" or args.legacy_one_turn):parser.error("el manifest observer_view real exige modo real multivuelta")
+    if args.visual_image_manifest is not None and (not args.authorize_visual_gpu or args.visual_worker_output is None or args.visual_model_dir is None):parser.error("la evidencia visual real exige --authorize-visual-gpu, --visual-worker-output y --visual-model-dir")
+    if args.authorize_visual_gpu and args.visual_image_manifest is None:parser.error("--authorize-visual-gpu exige --visual-image-manifest")
 
     if args.legacy_one_turn:
         gallery_id, config = load_policy(args.policy)
@@ -197,7 +212,23 @@ def main() -> int:
             session_path, events_path = write_session(session, args.output_dir)
             print_summary(session)
         else:
-            orchestrator = MultiTurnDialogueOrchestrator(retriever=retriever, evidence=evidence, config=multiturn_config, text_adapter=text_adapter)
+            visual_mode = args.fake_visual_manifest is not None or args.visual_image_manifest is not None
+            if args.fake_visual_manifest is not None:
+                manifest=json.loads(args.fake_visual_manifest.read_text(encoding="utf-8"));required={"contract_version","image_id","logical_path","sha256","provenance","authorized","authorization_id","observer_relation"}
+                if set(manifest)!=required or manifest["contract_version"]!="dialogue-fake-visual-image-v1" or manifest["authorized"] is not True or not manifest["authorization_id"]:raise ValueError("manifest visual fake no autorizado")
+                image_path=(args.fake_visual_manifest.parent/manifest["logical_path"]).resolve()
+                if not image_path.is_file() or file_sha256(image_path)!=manifest["sha256"]:raise ValueError("fixture visual fake ausente o alterado")
+                reference=VisualImageReference(manifest["image_id"],image_path,manifest["sha256"],manifest["provenance"],True,manifest["authorization_id"],manifest["observer_relation"])
+                features=("square","church","monument","intersection","park","commercial");scenario={"state":args.fake_visual_state,"observed_evidence":"evidencia visual fake" if args.fake_visual_state!="unverifiable" else None,"reason":"cli_scripted_unverifiable" if args.fake_visual_state=="unverifiable" else None};provider=FakeVisualEvidenceProvider(images={feature:reference for feature in features},scenarios={feature:scenario for feature in features})
+                orchestrator = VisualMultiTurnDialogueOrchestrator(retriever=retriever,evidence=evidence,config=VisualMultiTurnConfig(multiturn_config,VisualEvidencePolicy(enabled=True)),text_adapter=text_adapter,visual_provider=provider)
+            elif args.visual_image_manifest is not None:
+                from scripts.run_dialogue_visual_worker import ExternalQwen3VLWorkerExecutor
+                manifest,reference=load_observer_image_manifest(args.visual_image_manifest,ROOT/"schemas/dialogue_observer_image_manifest.schema.json")
+                executor=ExternalQwen3VLWorkerExecutor(output_root=args.visual_worker_output,model_dir=args.visual_model_dir,docker_image=args.visual_docker_image)
+                provider=RealQwen3VLDialogueEvidenceProvider(manifest=manifest,reference=reference,executor=executor)
+                orchestrator=VisualMultiTurnDialogueOrchestrator(retriever=retriever,evidence=evidence,config=VisualMultiTurnConfig(multiturn_config,VisualEvidencePolicy(enabled=True)),text_adapter=text_adapter,visual_provider=provider)
+            else:
+                orchestrator = MultiTurnDialogueOrchestrator(retriever=retriever, evidence=evidence, config=multiturn_config, text_adapter=text_adapter)
             session = orchestrator.start(session_label=args.session_label, description=description)
             supplied = list(args.answers if args.answers is not None else ([args.answer] if args.answer is not None else []))
             while session["status"] == "awaiting_answer":
@@ -210,7 +241,7 @@ def main() -> int:
                 for row in ranking:
                     print(f"  {row['rank']}. {row['candidate_id']} ({row['cosine_similarity']:.4f})")
             print(f"\nFin: {session['stop_reason']}. No se ha evaluado mejora geográfica.")
-            session_path, events_path = write_multiturn_session(session, args.output_dir)
+            session_path, events_path = (write_visual_session(session,args.output_dir) if visual_mode else write_multiturn_session(session, args.output_dir))
         print(f"\nSesión: {session_path}\nEventos: {events_path}")
     finally:
         for resource in reversed(resources):

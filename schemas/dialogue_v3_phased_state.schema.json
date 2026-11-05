@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dialogue_v3_phased_state.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "session_id", "phase", "generation", "configuration_sha256", "retrieval_checkpoint", "session_snapshot", "pending_answer", "visual_attempt", "next_action", "updated_at_utc"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "dialogue-v3-phased-state-v1"},
+    "session_id": {"type": "string", "pattern": "^dialogue-session-v2-sha256-[0-9a-f]{64}$"},
+    "phase": {"enum": ["prepared", "retrieval_reserved", "retrieved", "retrieval_failed", "retrieval_uncertain", "awaiting_visual", "visual_reserved", "visual_completed", "visual_failed", "visual_uncertain", "awaiting_answer", "completed"]},
+    "generation": {"type": "integer", "minimum": 0},
+    "configuration_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "retrieval_checkpoint": {"type": ["string", "null"]},
+    "session_snapshot": {"type": ["string", "null"]},
+    "pending_answer": {"type": ["object", "null"]},
+    "visual_attempt": {"type": ["object", "null"]},
+    "next_action": {"enum": ["retrieve", "resume", "visual", "answer", "review", "none"]},
+    "updated_at_utc": {"type": "string", "minLength": 1}
+  }
+}

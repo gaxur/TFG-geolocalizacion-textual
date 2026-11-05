@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "interactive_dialogue_session_v3.schema.json",
+  "title": "Adaptive dialogue session with optional visual evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "session_id", "status", "max_questions", "questions_asked", "gallery_id", "policy", "models", "inputs", "f3", "initial_query", "initial_ranking", "current_ranking", "claims", "turns", "stop_reason", "events", "limitations", "visual_policy", "visual_evidence", "source_conflicts"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "interactive-dialogue-session-v3"},
+    "session_id": {"type": "string", "pattern": "^dialogue-session-v2-sha256-[0-9a-f]{64}$"},
+    "status": {"enum": ["awaiting_answer", "completed"]},
+    "max_questions": {"type": "integer", "minimum": 1, "maximum": 3},
+    "questions_asked": {"type": "integer", "minimum": 0, "maximum": 3},
+    "gallery_id": {"type": "string"},
+    "policy": {"$ref": "#/$defs/safeObject"}, "models": {"$ref": "#/$defs/safeObject"}, "inputs": {"$ref": "#/$defs/safeObject"}, "f3": {"$ref": "#/$defs/safeObject"},
+    "initial_query": {"$ref": "#/$defs/safeObject"}, "initial_ranking": {"$ref": "#/$defs/safeObject"}, "current_ranking": {"$ref": "#/$defs/safeObject"},
+    "claims": {"type": "array", "items": {"$ref": "#/$defs/safeValue"}}, "turns": {"type": "array", "maxItems": 3, "items": {"$ref": "#/$defs/safeObject"}}, "stop_reason": {"type": ["string", "null"]},
+    "events": {"type": "array", "items": {"$ref": "#/$defs/safeObject"}}, "limitations": {"type": "array", "items": {"type": "string"}},
+    "visual_policy": {"type": "object", "additionalProperties": false, "required": ["enabled", "maximum_calls", "allow_query_update", "allow_ranking_update", "require_observer_relation"], "properties": {"enabled": {"type": "boolean"}, "maximum_calls": {"type": "integer", "minimum": 0, "maximum": 3}, "allow_query_update": {"const": false}, "allow_ranking_update": {"const": false}, "require_observer_relation": {"const": true}}},
+    "visual_evidence": {"type": "array", "maxItems": 3, "items": {"$ref": "#/$defs/visualEvidence"}},
+    "source_conflicts": {"type": "array", "items": {"$ref": "#/$defs/safeObject"}}
+  },
+  "$defs": {
+    "visualEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_id", "contract_version", "session_id", "turn_index", "intent_id", "intent_family", "question_sha256", "input_ranking_sha256", "claim", "image", "provider", "state", "observed_evidence", "raw_output", "abstention_reason", "limitations", "scope", "query_update_allowed", "ranking_update_allowed", "recorded_at_utc"],
+      "properties": {
+        "evidence_id": {"type": "string", "pattern": "^dialogue-visual-evidence-sha256-[0-9a-f]{64}$"},
+        "contract_version": {"const": "dialogue-visual-evidence-v1"},
+        "session_id": {"type": "string"}, "turn_index": {"type": "integer", "minimum": 1, "maximum": 3},
+        "intent_id": {"type": "string"}, "intent_family": {"type": "string"},
+        "question_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "input_ranking_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "claim": {"$ref": "#/$defs/safeObject"}, "image": {"type": "object", "required": ["image_id", "sha256", "logical_path", "provenance", "authorized", "authorization_id", "observer_relation"], "properties": {"image_id": {"type": "string"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "logical_path": {"type": "string"}, "provenance": {"type": "object", "required": ["source"], "properties": {"source": {"type": "string", "minLength": 1}}, "additionalProperties": {"$ref": "#/$defs/safeValue"}}, "authorized": {"type": "boolean"}, "authorization_id": {"type": ["string", "null"]}, "observer_relation": {"type": "string"}}, "additionalProperties": false}, "provider": {"$ref": "#/$defs/safeObject"},
+        "state": {"enum": ["supported", "contradicted", "unverifiable"]}, "observed_evidence": {"type": ["string", "null"]},
+        "raw_output": {"type": ["string", "null"]}, "abstention_reason": {"type": ["string", "null"]}, "limitations": {"type": "array", "items": {"type": "string"}},
+        "scope": {"const": "image_pixels_only_not_geographic_truth"}, "query_update_allowed": {"const": false}, "ranking_update_allowed": {"const": false}, "recorded_at_utc": {"type": "string"}
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"enum": ["supported", "contradicted"]}}}, "then": {"properties": {"observed_evidence": {"type": "string", "pattern": "\\S"}, "image": {"properties": {"authorized": {"const": true}, "authorization_id": {"type": "string", "minLength": 1}, "observer_relation": {"const": "observer_view"}, "provenance": {"properties": {"source": {"type": "string", "minLength": 1}}}}}}}},
+        {"if": {"properties": {"state": {"const": "unverifiable"}}}, "then": {"properties": {"abstention_reason": {"type": "string", "minLength": 1}}}}
+      ]
+    },
+    "safeObject": {
+      "type": "object",
+      "propertyNames": {"not": {"enum": ["ground_truth", "ground_truth_candidate", "target_candidate_id", "reference_coordinate", "correct_candidate", "gt"]}},
+      "additionalProperties": {"$ref": "#/$defs/safeValue"}
+    },
+    "safeValue": {
+      "anyOf": [
+        {"type": ["string", "number", "integer", "boolean", "null"]},
+        {"$ref": "#/$defs/safeObject"},
+        {"type": "array", "items": {"$ref": "#/$defs/safeValue"}}
+      ]
+    }
+  }
+}

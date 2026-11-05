@@ -43,6 +43,20 @@ UNKNOWN_PREFIXES = (
 CORRECTION_STOPWORDS = {"un", "una", "o", "elemento", "lugar", "algún", "alguna", "identificable", "amplio"}
 
 
+def project_visual_session_to_v2(session: Mapping[str,Any])->dict[str,Any]:
+    """Proyección estructural v3→v2 sin importar componentes visuales."""
+    value=json.loads(json.dumps(session,ensure_ascii=False));value["contract_version"]=CONTRACT_VERSION_V2;value.pop("visual_evidence",None);value.pop("source_conflicts",None);value.pop("visual_policy",None);value["models"]["vlm"]={"enabled":False,"adapter":None,"expected_model_id":"Qwen/Qwen3-VL-8B-Instruct","expected_revision":"0c351dd01ed87e9c1b53cbc748cba10e6187ff3b","evidence_states":["supported","contradicted","unverifiable"],"calls":0}
+    for turn in value["turns"]:turn.pop("visual_evidence_id",None)
+    return value
+
+
+def multiturn_session_id(*,session_label:str,description:str,language:str,gallery_id:str,config:"MultiTurnConfig")->str:
+    if not session_label.strip() or not description.strip():raise InteractiveDialogueError("entrada inicial inválida")
+    p=config.policy;policy={"version":"deterministic-positive-f3-adaptive-v2","query_policy_version":QUERY_POLICY_VERSION,"max_questions":config.max_questions,"reserve_size":p.reserve_size,"cluster_radius_m":p.cluster_radius_m,"minimum_hypotheses":p.minimum_hypotheses,"minimum_supported_hypotheses":p.minimum_supported_hypotheses,"maximum_supported_fraction":p.maximum_supported_fraction,"allow_qwen_question":p.allow_qwen_question,"enable_controlled_rewrite":p.enable_controlled_rewrite,"canonical_variant":"literal_concatenation","absence_semantics":"unknown_not_contradicted","scores_are_probabilities":False}
+    identity={"label":session_label,"description":description,"language":language,"gallery":gallery_id,"max_questions":config.max_questions,"policy":policy}
+    return "dialogue-session-v2-sha256-"+_sha256(identity)
+
+
 class MultiTurnRetriever(Protocol):
     gallery_id: str
     @property
@@ -54,6 +68,8 @@ class VisualEvidenceProvider(Protocol):
     @property
     def metadata(self) -> Mapping[str, Any]: ...
     def inspect(self, *, query: str, ranking: Mapping[str, Any], budget: Mapping[str, Any]) -> Mapping[str, Any]: ...
+
+class RetrievalDeferred(RuntimeError):pass
 
 
 @dataclass(frozen=True)
@@ -190,8 +206,7 @@ class MultiTurnDialogueOrchestrator:
     def start(self, *, session_label: str, description: str, language: str = "es") -> dict[str, Any]:
         if not session_label.strip() or not description.strip():
             raise InteractiveDialogueError("entrada inicial inválida")
-        identity = {"label": session_label, "description": description, "language": language, "gallery": self.retriever.gallery_id, "max_questions": self.config.max_questions, "policy": self._policy()}
-        session_id = "dialogue-session-v2-sha256-" + _sha256(identity)
+        session_id=multiturn_session_id(session_label=session_label,description=description,language=language,gallery_id=self.retriever.gallery_id,config=self.config)
         initial_query = build_canonical_query(description, (), self.retriever, budget=self.config.text_token_budget)
         ranking = self.retriever.retrieve_full(query_id=f"{session_id}-initial", text=initial_query["text"], language=language)
         _validate_ranking_document(ranking, self.retriever.gallery_id)
@@ -254,6 +269,7 @@ class MultiTurnDialogueOrchestrator:
             try:
                 ranking = self.retriever.retrieve_full(query_id=f"{result['session_id']}-turn-{turn['index']:03d}-literal", text=query["text"], language=result["inputs"]["description"]["language"])
                 _validate_ranking_document(ranking, self.retriever.gallery_id)
+            except RetrievalDeferred:raise
             except Exception as error:
                 turn["runtime_error"] = type(error).__name__
                 return self._stop(result, turn, "runtime_failure")

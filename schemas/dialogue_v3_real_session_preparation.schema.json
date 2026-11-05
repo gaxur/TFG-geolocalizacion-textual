@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dialogue_v3_real_session_preparation.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "status", "mode", "region", "region_config", "dialogue_policy", "ct2l_config", "ct2l_isolated_runtime", "gallery_id", "f3_bundle", "language", "max_questions", "reserve_size", "cluster_radius_m", "text_token_budget", "session_label", "initial_description", "session_id", "intent_family", "observer_manifest", "observer_directory", "cvg_utils_sha256", "clip_weights", "qwen_text_model_dir", "visual_model_dir", "visual_docker_image", "visual_docker_image_id", "visual_worker_output", "session_output"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "dialogue-v3-real-session-preparation-v1"},
+    "status": {"enum": ["pending_operator_input", "pending_observer_manifest", "ready_for_cpu_validation"]},
+    "mode": {"const": "real"},
+    "region": {"const": "madrid_pilot"},
+    "region_config": {"const": "config/madrid.yaml"},
+    "dialogue_policy": {"const": "config/interactive_dialogue_multiturn.json"},
+    "ct2l_config": {"const": "config/madrid_f46_retriever.json"},
+    "ct2l_isolated_runtime": {"const": "config/ct2l_isolated_runtime_cvgtext.json"},
+    "gallery_id": {"const": "madrid-50m"},
+    "f3_bundle": {"type": "string", "minLength": 1},
+    "language": {"const": "es"},
+    "max_questions": {"const": 3},
+    "reserve_size": {"const": 20},
+    "cluster_radius_m": {"const": 75.0},
+    "text_token_budget": {"const": 300},
+    "session_label": {"type": ["string", "null"], "minLength": 1},
+    "initial_description": {"type": ["string", "null"], "minLength": 1},
+    "session_id": {"type": ["string", "null"], "pattern": "^dialogue-session-v2-sha256-[0-9a-f]{64}$"},
+    "intent_family": {"enum": ["square", "church", "monument", "intersection", "park", "commercial", null]},
+    "observer_manifest": {"type": ["string", "null"]},
+    "observer_directory": {"const": "data/madrid/observer_view_authorized"},
+    "cvg_utils_sha256": {"const": "18dad4696c205dba5f934f9382ff5bd7d380c502680e462612bbdc49229ba597"},
+    "clip_weights": {"type": ["string", "null"]},
+    "qwen_text_model_dir": {"type": ["string", "null"]},
+    "visual_model_dir": {"type": ["string", "null"], "minLength": 1},
+    "visual_docker_image": {"const": "qwen3-vl-dialogue-worker:lmfe-0.11.3-tf5.9-v1"},
+    "visual_docker_image_id": {"const": "sha256:4ed13751602503ee412fc854e4c33bee0ae172df67690d5420e32650bae2edd2"},
+    "visual_worker_output": {"type": "string", "minLength": 1},
+    "session_output": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {"if": {"properties": {"status": {"const": "pending_observer_manifest"}}}, "then": {"properties": {"session_label": {"type": "string"}, "initial_description": {"type": "string"}, "session_id": {"type": "string"}, "intent_family": {"type": "string"}, "clip_weights": {"type": "string"}}}},
+    {"if": {"properties": {"status": {"const": "ready_for_cpu_validation"}}}, "then": {"properties": {"observer_manifest": {"type": "string", "minLength": 1}, "visual_model_dir": {"type": "string", "minLength": 1}}}}
+  ]
+}
