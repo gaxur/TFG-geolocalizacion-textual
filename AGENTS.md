@@ -7,6 +7,12 @@ Leer [README.md](README.md), [BASELINE.md](BASELINE.md) completo y
 [docs/DECISIONS.md](docs/DECISIONS.md), los requisitos de datos y las licencias
 aplicables. Conservar `BASELINE.md` sin cambios salvo petición expresa.
 
+Antes de comenzar trabajo sustancial, consultar
+[docs/TFG_COMPLETION_ROADMAP.md](docs/TFG_COMPLETION_ROADMAP.md) para identificar
+estado, dependencias y restricciones. Después de completarlo, actualizar allí el
+estado real, evidencias, artefactos, bloqueos, historial y siguiente paso; no
+iniciar automáticamente esa tarea siguiente sin autorización.
+
 El monorepo contiene documentación en `docs/`, contratos y código propio de la
 Fase 0 en `src/tfg_phase0/`, schemas en `schemas/`, configuración en `config/`,
 tests en `tests/`, un prototipo previo en `frontend/` y la memoria en
