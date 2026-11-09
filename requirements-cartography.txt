@@ -1,0 +1,16 @@
+# Dependencias opcionales para auditar PBF y generar PMTiles offline.
+# Instalar solo en un entorno virtual dedicado, nunca en Python global.
+osmium==4.3.2
+shapely==2.1.2
+numpy==2.5.4
+mapbox-vector-tile==2.2.0
+pmtiles==3.8.1
+mercantile==1.2.1
+protobuf==6.33.6
+pyclipper==1.4.0
+click==8.5.0
+requests==2.34.2
+charset-normalizer==3.5.2
+idna==3.20
+urllib3==2.8.0
+certifi==2026.10.23

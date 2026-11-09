@@ -12,7 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from .errors import install_error_handlers
 from .lifespan import build_lifespan, default_retriever_factory, default_transformer_factory
 from .routes.health import router as health_router
+from .routes.progress import router as progress_router
 from .routes.retrieval import router as retrieval_router
+from .progress import ProgressHub
 from .settings import Settings
 
 
@@ -23,6 +25,7 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
     from .lifespan import default_visual_factory
     app = FastAPI(title="Geolocalización textual", version="3.0-experimental", lifespan=build_lifespan(settings, factory, qwen_factory, visual_factory or default_visual_factory))
     app.state.inference_gate = asyncio.Lock()
+    app.state.progress_hub = ProgressHub()
     app.state.reject_when_busy = settings.reject_when_busy
     app.state.search_area = {"region_id": "madrid_pilot", "crs": "EPSG:4326", "bbox": settings.region_bbox()}
     if settings.allowed_origins:
@@ -37,5 +40,6 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
 
     install_error_handlers(app)
     app.include_router(health_router)
+    app.include_router(progress_router)
     app.include_router(retrieval_router)
     return app

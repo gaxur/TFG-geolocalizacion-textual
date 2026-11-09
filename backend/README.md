@@ -67,5 +67,11 @@ Endpoints:
 GET  /api/v1/health/live
 GET  /api/v1/health/ready
 GET  /api/v1/capabilities
+GET  /api/v1/progress/{query_id}   (SSE efímero)
 POST /api/v1/retrievals
 ```
+
+El endpoint de progreso no sustituye el POST síncrono. Emite solo transiciones y
+subfases medibles de la consulta activa; las colas son acotadas y viven en memoria
+del único worker. Al desconectar se liberan; no se almacenan descripciones ni se
+conserva historial de eventos.
