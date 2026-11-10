@@ -49,6 +49,16 @@
 # Salidas voluminosas y temporales; los CSV/JSON pequeños siguen permitidos.
 /logs/
 /results/generated/
+!/results/generated/
+/results/generated/*
+!/results/generated/description-length-experiments/
+/results/generated/description-length-experiments/*
+!/results/generated/description-length-experiments/manifest.json
+!/results/generated/description-length-experiments/manifest.sha256
+!/results/generated/map-assets-context-2000m/
+/results/generated/map-assets-context-2000m/*
+!/results/generated/map-assets-context-2000m/README.md
+!/results/generated/map-assets-context-2000m/madrid-context-2000m.pmtiles.provenance.json
 /results/raw/
 /results/large/
 /results/cache/

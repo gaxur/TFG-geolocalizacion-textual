@@ -12,6 +12,70 @@ entorno, dataset, checkpoint y hash, configuración, comando, resultados,
 métricas, tiempo, memoria, problemas y cambios realizados. Solo se sustituirán
 valores pendientes por observaciones reales.
 
+## Preparación del MVP MapLibre para DialogueVPR
+
+El 9 de noviembre de 2026 se añadió, sin ejecutar modelos, una capa web de
+sesiones HXX al worktree `feature/mvp-maplibre-progress-pgx`. La API valida
+descripciones oficiales por bytes/SHA-256, sirve la imagen original, persiste
+estados incrementalmente y permite reanudar sin repetir `start`. Las consultas
+exploratorias usan IDs `X-` y almacenamiento separado por sesión.
+
+La UI conserva el diseño MapLibre existente y añade selector oficial/exploratorio,
+HXX, hash esperado, imagen, pregunta y respuesta literal. La respuesta pública no
+expone rankings, scores, coordenadas o GT. Una autorización por sesión limita tres
+preguntas, cargas/llamadas, cero retries y exclusiones metodológicas.
+
+La integración posterior incorporó un supervisor ligero y dos workers efímeros:
+Qwen3-8B termina antes de cargar CT2L. Se conserva `stable-swap-v2`, retrieval
+exhaustivo de 253 candidatos, cero retries, tres preguntas y parada inmediata sin
+EN3/E3. Las sesiones se reservan antes de inferencia y una caída queda marcada
+`runtime_error_no_retry`.
+
+Validación final sin modelos: 35 tests Python PASS, 30 tests Node PASS, build Vite
+7.3.7 PASS, Compose/`py_compile`/`bash -n`/`git diff --check` PASS. El smoke real
+sirvió health, catálogo H26–H37, imagen H27 y PMTiles Range; `start` devolvió 503
+por autorización pendiente. Los cinco assets MapLibre coinciden con manifests y
+provenance. No hubo inferencias, sesiones H27 ni cambios en el checkout original.
+
+## Mejora 3D y preparación de longitudes
+
+El 9 de noviembre de 2026 se separó el límite de navegación de D004 sin modificar
+la región científica. Se generó un PMTiles visual nuevo con margen de 2.000 m,
+SHA-256 `c170faa62cf5e664d3481f19bca0efe86dc9e1df8ea7c981479b3d81de61e2ba`,
+sin sobrescribir el original de 250 m. `maxBounds` usa un margen interior cercano
+a 1.000 m y zoom mínimo 14,5 para evitar que el viewport alcance el vacío.
+El botón `Centrar región evaluada` usa la bbox científica exacta y margen
+responsive.
+
+La provenance muestra 6 alturas explícitas entre 3.517 edificios base y 105 entre
+2.510 partes. Para visualización se añadió una única extrusión con tres casos
+identificados por color: `height` explícita, `building:levels × 3 m` y 9 m por
+defecto. Estas dos últimas son estimaciones visuales, no mediciones. Chromium
+headless real observó 19.318 features fuente, 5.278 huellas y 5.278 extrusiones
+con la base ampliada;
+también validó 2D/3D, contorno, centrado e interfaz de longitudes sin modelos.
+
+Se prepararon 24 variantes pareadas y 48 condiciones pendientes en
+`results/generated/description-length-experiments/manifest.json`, SHA-256
+`cfd54ee90ec80baac1dc076fbf5b3d2428a02932a5e26262b120055707fe4bbf`.
+El conteo CLIP se hizo sin pesos ni GPU. `literal_conversion` no existe: el brazo
+real es `literal_concatenation`. No se ejecutó Qwen, CT2L, VLM ni evaluación.
+
+## Auditoría de texturas 3D en D004
+
+Se auditaron activos locales, Mapillary, Google Photorealistic 3D Tiles, Cesium,
+deck.gl, MapLibre/Three.js y servicios I3S del Ayuntamiento de Madrid. No se
+encontró una fuente de bajo riesgo que cubra D004 con fachadas reales y permita
+recorte, caché y reproducción compatibles con el TFG.
+
+El servicio municipal `EdificiosMadrid_LOD1v2` cubre Madrid, pero usa renderer
+blanco y geometría extruida. La `IntegratedMesh` municipal
+`VUELOS_2019_TEXTURAS` sí declara JPEG/DDS, pero comienza en latitud 40.4369974;
+D004 termina en 40.420, por lo que no existe solape. Google sería la vía visual
+viable, pero exige billing/key, operación online, atribución dinámica y prohíbe
+caché persistente/modelos derivados. No se añadió ninguna dependencia, clave o
+llamada externa. Resultado: `D004_TEXTURED_3D_BLOCKED_NO_COMPATIBLE_SOURCE`.
+
 ## F4.1b-B: galería visual OSM de Madrid
 
 ### Objetivo y resultado

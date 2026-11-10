@@ -30,7 +30,7 @@ KIND_TO_TASK = {value: key for key, value in TASK_TO_KIND.items()}
 PLACEHOLDER_RE = re.compile(r"__TOPONYM_(\d{3})__")
 NUMBER_RE = re.compile(r"(?<!\w)\d+(?:[.,]\d+)?(?:\s*(?:m|km|metros?|kilómetros?|meters?|kilometers?))?", re.IGNORECASE)
 NEGATION_ES = re.compile(r"\b(?:no|sin|nunca|ningun[oa]s?)\b", re.IGNORECASE)
-NEGATION_EN = re.compile(r"\b(?:no|not|without|never|none)\b", re.IGNORECASE)
+NEGATION_EN = re.compile(r"\b(?:no|not|cannot|without|never|none)\b", re.IGNORECASE)
 ORIENTATION_CONCEPTS = {
     "north": (r"\bnorte\b", r"\bnorth\b"), "south": (r"\bsur\b", r"\bsouth\b"),
     "east": (r"\beste\b", r"\beast\b"), "west": (r"\boeste\b", r"\bwest\b"),

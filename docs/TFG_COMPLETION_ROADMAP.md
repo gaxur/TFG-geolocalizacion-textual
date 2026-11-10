@@ -463,6 +463,21 @@ Si una tarea falla:
 
 Las entradas son append-only.
 
+### 2026-11-09 — MVP-DIALOGUE-MAPLIBRE-PREPARATION-01
+
+- **Tarea:** preparar el MVP MapLibre para recoger sesiones HXX desde navegador.
+- **Resultado:** API de catálogo/start/estado/respuesta, validación byte-exacta de
+  descripciones oficiales, imagen original hashada, persistencia atómica,
+  reanudación y autorización por sesión. El frontend conserva MapLibre/PMTiles,
+  mapa 3D, ranking y SSE y añade solo controles DialogueVPR.
+- **Validación:** 28 tests Python (2 skips por map assets reales ausentes), 30
+  tests Node dirigidos y build Vite PASS. El test Vite Range aislado queda
+  bloqueado por límite global de watchers, sin cambiar sysctl.
+- **Bloqueos:** faltan cinco map assets originales y conectar/versionar el
+  ejecutor secuencial HXX; `ATLAS_DIALOGUE_ENABLED=false` por defecto.
+- **Próximo paso:** transferir los map assets desde Windows y aprobar la
+  integración del ejecutor real antes de habilitar sesiones oficiales.
+
 ### 2026-11-06 — P2-04-CONTINUATION-BLOCKED-01
 
 - **Tarea:** registrar aprobación humana de E0 y generar E1–E3 mediante contrato
@@ -588,6 +603,71 @@ Las entradas son append-only.
 - **Decisiones:** run congelado; no reabrir ni modificar.
 - **Bloqueos:** sin GT F5.4 enlazado.
 - **Próximo paso:** evaluación exploratoria separada, ya completada en P3-03.
+
+### 2026-11-09 — MVP-DIALOGUEVPR-RUNTIME-01
+
+- **Tarea:** integrar el runtime secuencial DialogueVPR y preparar H27 desde el
+  MVP MapLibre sin ejecutar modelos.
+- **Resultado:** `IMPLEMENTED`, `TESTED` y `VALIDATED` técnicamente con dobles y
+  smoke HTTP. La API `dialogue-only` no mantiene modelos residentes; lanza Qwen
+  y CT2L como procesos efímeros secuenciales, aplica `stable-swap-v2`, persiste
+  antes de cada transición y no ejecuta EN3/E3 al cerrar por tres preguntas.
+- **Evidencia:** `backend/atlas_api/dialogue_executor.py`,
+  `scripts/run_mvp_dialogue_worker.py`, `tests/test_api_dialogue.py`,
+  `tests/test_dialogue_executor.py`, [MVP_DIALOGUEVPR.md](MVP_DIALOGUEVPR.md) y
+  [HXX_OFFICIAL_INPUTS.md](HXX_OFFICIAL_INPUTS.md). Health, catálogo, imagen H27
+  y PMTiles Range respondieron desde Compose en `http://127.0.0.1:8080`.
+- **Decisiones:** una autorización sirve para una sola sesión; los hashes de
+  cohorte, descripción, imagen y runtime son vinculantes; un fallo queda
+  `runtime_error_no_retry` y no se reanuda automáticamente. H26 permanece
+  bloqueado y H38–H61 no se incorporaron.
+- **Bloqueos:** H27 continúa `PENDING_OPERATOR_AUTHORIZATION`. Durante el smoke
+  había un `llama-server` de Ollama ajeno en GPU; no se detuvo ni modificó.
+- **Próximo paso:** tras liberar recursos, revisar `stable-swap-v2` y aprobar de
+  forma explícita `config/dialogue_h27_session_authorization.request.json`; no
+  iniciar H27 automáticamente.
+
+### 2026-11-09 — MVP-MAP-3D-LENGTH-01
+
+- **Tarea:** mejorar navegación/3D MapLibre y preparar experimentos de longitud
+  sin ejecutar modelos.
+- **Resultado:** `IMPLEMENTED`, `TESTED` y `VALIDATED` técnicamente. La cámara se
+  limita a un margen interior del PMTiles visual D004 más 2.000 m, mientras D004 sigue como región
+  científica y el botón de centrado usa `fitBounds`. El 3D distingue por color altura explícita, estimación
+  `building:levels × 3 m` y fallback visual de 9 m; ninguna estimación se presenta
+  como medida. Chromium real observó 19.318 features fuente, 5.278 huellas y 5.278
+  extrusiones visibles.
+- **Cobertura:** el PMTiles visual cubre D004 más 2.000 m
+  (`[-3.7328530, 40.3937753, -3.6751663, 40.4382180]`). Los centros se limitan
+  aproximadamente al margen interior de 1.000 m para no mostrar el borde. La bbox científica,
+  253 candidatos, embeddings y rankings no cambiaron.
+- **Experimentos:** 24 variantes (8 cortas, 8 medias, 8 largas), 48 condiciones
+  `literal_concatenation`/`en_cartographic` y conteos CLIP congelados en
+  [DESCRIPTION_LENGTH_EXPERIMENTS.md](DESCRIPTION_LENGTH_EXPERIMENTS.md). El
+  selector web prepara IDs `X-`; no reutiliza la autorización oficial.
+- **Recursos:** GPU sin procesos compute; Ollama `/api/ps` vacío. Solo Xorg y
+  GNOME usan GPU gráfica. H27 continúa pendiente y no existe ninguna sesión H27.
+- **Próximo paso:** revisión visual humana desde Windows y, después, autorización
+  explícita de H27. No iniciar automáticamente variantes ni las 48 condiciones.
+
+### 2026-11-09 — D004-TEXTURED-3D-AUDIT-01
+
+- **Tarea:** incorporar texturas reales en edificios únicamente dentro de D004 si
+  existía una vía de bajo riesgo.
+- **Resultado:** auditoría completada; integración `BLOCKED`. No hay malla local
+  texturizada. El I3S municipal que cubre D004 es geometría blanca extruida; la
+  malla municipal JPEG/DDS encontrada está en AZCA y no intersecta D004.
+- **Evidencia:** [D004_TEXTURED_3D_FEASIBILITY.md](D004_TEXTURED_3D_FEASIBILITY.md),
+  metadata pública ArcGIS, políticas de Google Map Tiles, documentación de
+  MapLibre `maplibre-gl-three` y deck.gl `Tile3DLayer`.
+- **Decisiones:** no proyectar imágenes Mapillary sin calibración ni presentar
+  texturas genéricas como realidad. Google Photorealistic 3D Tiles es la vía
+  propuesta, condicionada a facturación, key restringida, atribución dinámica,
+  operación online y clipping estricto D004.
+- **Bloqueos:** faltan autorización de cuenta/facturación, API key y prueba de
+  cobertura. No se incorporó dependencia, credencial ni llamada externa al MVP.
+- **Próximo paso:** solo con autorización expresa, crear una prueba Google online
+  separada y validar clipping/licencia antes de integrarla.
 
 ## Checklist de cierre global
 

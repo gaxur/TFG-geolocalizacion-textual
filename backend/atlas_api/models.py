@@ -121,3 +121,20 @@ class ErrorResponse(StrictModel):
     schema_version: Literal["1.0"] = "1.0"
     contract_version: Literal["atlas-api-error-v1"] = "atlas-api-error-v1"
     error: ErrorDetail
+
+
+class DialogueStartRequest(StrictModel):
+    schema_version: Literal["1.0"]
+    contract_version: Literal["atlas-dialogue-start-request-v1"]
+    mode: Literal["official", "exploratory"]
+    query_id: NonEmpty
+    description_es: Annotated[str, StringConstraints(min_length=3, max_length=2400)]
+
+
+class DialogueAnswerRequest(StrictModel):
+    schema_version: Literal["1.0"]
+    contract_version: Literal["atlas-dialogue-answer-request-v1"]
+    answer_literal: Annotated[str, StringConstraints(min_length=1, max_length=600)]
+    answer_kind: Literal["affirmation", "negation", "unknown", "unobservable", "ambiguous", "stop"]
+    human_attested: Literal[True]
+    external_context_used: Literal[False]

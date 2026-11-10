@@ -1,0 +1,514 @@
+{
+  "catalog_lineage": {
+    "geojson_sha256_reproduced_in_validation_temp": {
+      "madrid-25m": "4ad0cfd9551e058fb963bf302075956ce95ca66159caef496d963bdf52de30ae",
+      "madrid-50m": "b720962e3a183c5acba98ff02a4a4b2198db53e0fc88dcf49c198e35022c8ed2"
+    },
+    "manifest_sha256": {
+      "madrid-25m": "a23d3f3b54958661db76914dff9ff40a3f01a133ee86499fb9e4ddf706a49f11",
+      "madrid-50m": "ad35d5cb3b602a9ce313e06e10f913f169430d62a948c0f5e77b396bc810f2aa"
+    },
+    "manifests_are_f1_geometry": true,
+    "osm_snapshot_id": null,
+    "selection_config_sha256": {
+      "madrid-25m": "e5f28809d3fb85277a4211c6871ce165aacc0a15a69e7393bbd6299672acb5f0",
+      "madrid-50m": "2758a291222646cc84ec1ee1bcbfd69759a066d968129d202f457754de712389"
+    }
+  },
+  "contract_version": "madrid-osm-vector-cartography-v1",
+  "extent": {
+    "bounds_wgs84": {
+      "east": -3.675166311509438,
+      "north": 40.43821802155517,
+      "south": 40.39377530011397,
+      "west": -3.7328529604157494
+    },
+    "construction_crs": "EPSG:25830",
+    "crs": "EPSG:4326",
+    "d004_bbox_wgs84": {
+      "east": -3.699,
+      "north": 40.42,
+      "south": 40.412,
+      "west": -3.709
+    },
+    "margin_m": 2000.0
+  },
+  "feature_audit": {
+    "area_geometries_unreadable_sourcewide": 2,
+    "area_geometry_invalid_total": 0,
+    "base_buildings_after_relation_deduplication": 19212,
+    "building_area_geometries_unreadable_sourcewide": 1,
+    "building_nodes_coarse_bbox_candidates": 22,
+    "building_parts": 11908,
+    "building_way_entities_coarse_bbox_candidates": 27903,
+    "candidate_building_area_geometries": 31125,
+    "closed_building_way_entities_coarse_bbox_candidates": 27903,
+    "feature_count_for_map": 57134,
+    "feature_counts_by_layer": {
+      "building": 31120,
+      "landcover": 806,
+      "landuse": 1630,
+      "place": 889,
+      "transportation": 17232,
+      "transportation_name": 5296,
+      "water": 161
+    },
+    "height_coverage_base_buildings": {
+      "denominator": 19212,
+      "explicit_numeric_metre_height": 30,
+      "explicit_percent": 0.1562,
+      "levels_converted_to_meters": false,
+      "levels_only_percent": 21.9186,
+      "levels_present_no_metre_conversion": 4211,
+      "min_height_is_not_a_top_height": true,
+      "unknown_or_unusable_metre_height": 19182,
+      "unknown_or_unusable_percent": 99.8438
+    },
+    "height_coverage_building_parts": {
+      "denominator": 11908,
+      "explicit_numeric_metre_height": 303,
+      "explicit_percent": 2.5445,
+      "height_unknown_or_unusable": 11605,
+      "levels_converted_to_meters": false
+    },
+    "height_tags": {
+      "base_buildings": {
+        "building:height": 0,
+        "building:levels": 4224,
+        "building:levels:aboveground": 0,
+        "height": 32,
+        "min_height": 1
+      },
+      "building_parts": {
+        "building:height": 0,
+        "building:levels": 11425,
+        "building:levels:aboveground": 0,
+        "height": 303,
+        "min_height": 133
+      }
+    },
+    "interpretation": {
+      "base_buildings_and_parts_reported_separately": true,
+      "building_height_is_measured": false,
+      "context_bbox_wgs84": {
+        "east": -3.675166311509438,
+        "north": 40.43821802155517,
+        "south": 40.39377530011397,
+        "west": -3.7328529604157494
+      },
+      "extrusion_policy": "explicit_numeric_height_only",
+      "levels_were_converted_to_meters": false,
+      "relation_member_ways_suppressed_only_when_relation_area_exists": true,
+      "source_scope_note": "F4 regional Geofabrik extract; features clipped to local context only."
+    },
+    "invalid_area_geometry_samples": [],
+    "invalid_building_area_geometries_in_context": 0,
+    "invalid_building_way_rings": 0,
+    "invalid_road_geometries": 0,
+    "open_building_way_entities_coarse_bbox_candidates": 0,
+    "pbf_object_counts": {
+      "node": 8771004,
+      "object_order_violations": 0,
+      "relation": 30557,
+      "way": 1345682
+    },
+    "raw_building_relations_in_source": 12960,
+    "relation_member_way_areas_deduplicated": 5,
+    "source": {
+      "bbox_wgs84": {
+        "east": -3.050423,
+        "north": 41.16864,
+        "south": 39.881157,
+        "west": -4.589539
+      },
+      "data_timestamp_utc": "2026-10-14T20:21:12Z",
+      "header": {
+        "bbox_wgs84": {
+          "east": -3.050423,
+          "north": 41.16864,
+          "south": 39.881157,
+          "west": -4.589539
+        },
+        "data_timestamp_utc": "2026-10-14T20:21:12Z",
+        "has_multiple_object_versions": false,
+        "reader": "pyosmium 4.3.2"
+      },
+      "license": "ODbL-1.0",
+      "path": "data/raw/osm/f4_sources/madrid-geofabrik-20261014",
+      "provenance_sha256": "dff044685808f284a69b2dc37337037d514dedcacd126d9ac7ec070e1d3b936d",
+      "sha256": "9ef85f5c728a26995712a835a68f0cb30e01a32af6d2a7facd6744f3a3840db8",
+      "size_bytes": 85306514,
+      "source_id": "f4-osm-madrid-geofabrik-sha256-9ef85f5c728a26995712a835a68f0cb30e01a32af6d2a7facd6744f3a3840db8",
+      "source_url": "https://download.geofabrik.de/europe/spain/madrid-261014.osm.pbf"
+    },
+    "spatial_coverage": {
+      "building_union_area_in_context_m2": 8264676.049,
+      "building_union_area_in_d004_m2": 480946.911,
+      "context_area_coverage_percent": 34.7746,
+      "context_area_m2": 23766382.918,
+      "crs": "EPSG:25830",
+      "d004_area_coverage_percent": 62.8324,
+      "d004_area_m2": 765444.611,
+      "margin_m": 2000.0
+    },
+    "tile_generation": {
+      "extent": 4096,
+      "features_dropped_after_tile_quantization": {
+        "building@z11": 6261,
+        "building@z12": 2010,
+        "building@z13": 551,
+        "building@z14": 199,
+        "building@z15": 89,
+        "building@z16": 60,
+        "building@z17": 52,
+        "landcover@z11": 92,
+        "landcover@z12": 29,
+        "landcover@z13": 8,
+        "landcover@z14": 1,
+        "landcover@z15": 1,
+        "landcover@z16": 1,
+        "landcover@z17": 3,
+        "landuse@z11": 120,
+        "landuse@z12": 39,
+        "landuse@z13": 11,
+        "landuse@z14": 9,
+        "landuse@z15": 5,
+        "landuse@z16": 4,
+        "landuse@z17": 3,
+        "place@z11": 5,
+        "place@z12": 4,
+        "place@z13": 1,
+        "place@z14": 1,
+        "place@z15": 1,
+        "place@z16": 1,
+        "transportation@z11": 504,
+        "transportation@z12": 128,
+        "transportation@z13": 23,
+        "transportation@z14": 3,
+        "transportation@z15": 4,
+        "transportation@z16": 3,
+        "transportation@z17": 12,
+        "transportation_name@z11": 42,
+        "transportation_name@z12": 8,
+        "transportation_name@z13": 8,
+        "transportation_name@z14": 2,
+        "transportation_name@z17": 1,
+        "water@z11": 35,
+        "water@z12": 12,
+        "water@z13": 4,
+        "water@z15": 1
+      },
+      "max_zoom_requested": 17,
+      "min_zoom_requested": 11,
+      "nonempty_tiles_by_zoom": {
+        "11": 2,
+        "12": 2,
+        "13": 4,
+        "14": 12,
+        "15": 36,
+        "16": 121,
+        "17": 474
+      },
+      "quantization_policy": "Mapbox Vector Tile integer extent; collapsed/invalid geometries omitted per zoom, no repair"
+    },
+    "toolchain": {
+      "cartography_module_sha256": "db682e1d45aefec30ac78d96f579255d254ca1b9d1630fb42caf4349c8f23141",
+      "generator_script_sha256": "a3c39ae6e706a6ba9f06e14d66f5d2693038db6f600f89bcacd3aa3003637e08",
+      "mapbox_vector_tile": "2.2.0",
+      "mercantile": "1.2.1",
+      "numpy": "2.5.4",
+      "osmium": "4.3.2",
+      "pmtiles_writer": "3.8.1",
+      "protobuf": "6.33.6",
+      "pyclipper": "1.4.0",
+      "python": "3.12.3",
+      "requirements_sha256": "28d186e1b029136b5a1271dc249fee31bb71e26aa240f3bf083f772ffbe0e294",
+      "shapely": "2.1.2"
+    },
+    "unreadable_area_geometry_samples": [
+      {
+        "error": "RuntimeError: invalid area (area_id=42357333)",
+        "layer": "building",
+        "name": "Monasterio de San Jerónimo de Guisando",
+        "osm_id": 21178666,
+        "source_type": "relation"
+      },
+      {
+        "error": "RuntimeError: invalid area (area_id=42803503)",
+        "layer": "landuse",
+        "name": "Polígono Industrial La Arboleda",
+        "osm_id": 21401751,
+        "source_type": "relation"
+      }
+    ],
+    "valid_building_area_geometries": 31125,
+    "valid_building_way_rings": 27903
+  },
+  "layers": [
+    {
+      "description": "OSM building local, clipped to D004 plus margin",
+      "fields": {
+        "building": "String",
+        "building:levels": "String",
+        "building:part": "String",
+        "class": "String",
+        "height": "Number",
+        "height_raw": "String",
+        "height_source": "String",
+        "height_source_raw": "String",
+        "min_height": "Number",
+        "min_height_raw": "String",
+        "name": "String",
+        "osm_id": "Number",
+        "osm_type": "String"
+      },
+      "id": "building",
+      "maxzoom": 17,
+      "minzoom": 11
+    },
+    {
+      "description": "OSM landcover local, clipped to D004 plus margin",
+      "fields": {
+        "class": "String",
+        "name": "String",
+        "osm_id": "Number",
+        "osm_type": "String"
+      },
+      "id": "landcover",
+      "maxzoom": 17,
+      "minzoom": 11
+    },
+    {
+      "description": "OSM landuse local, clipped to D004 plus margin",
+      "fields": {
+        "class": "String",
+        "name": "String",
+        "osm_id": "Number",
+        "osm_type": "String"
+      },
+      "id": "landuse",
+      "maxzoom": 17,
+      "minzoom": 11
+    },
+    {
+      "description": "OSM place local, clipped to D004 plus margin",
+      "fields": {
+        "class": "String",
+        "name": "String",
+        "osm_id": "Number",
+        "osm_type": "String"
+      },
+      "id": "place",
+      "maxzoom": 17,
+      "minzoom": 11
+    },
+    {
+      "description": "OSM transportation local, clipped to D004 plus margin",
+      "fields": {
+        "class": "String",
+        "highway": "String",
+        "name": "String",
+        "osm_id": "Number",
+        "osm_type": "String",
+        "ref": "String"
+      },
+      "id": "transportation",
+      "maxzoom": 17,
+      "minzoom": 11
+    },
+    {
+      "description": "OSM transportation_name local, clipped to D004 plus margin",
+      "fields": {
+        "class": "String",
+        "highway": "String",
+        "name": "String",
+        "osm_id": "Number",
+        "osm_type": "String",
+        "ref": "String"
+      },
+      "id": "transportation_name",
+      "maxzoom": 17,
+      "minzoom": 11
+    },
+    {
+      "description": "OSM water local, clipped to D004 plus margin",
+      "fields": {
+        "class": "String",
+        "name": "String",
+        "osm_id": "Number",
+        "osm_type": "String"
+      },
+      "id": "water",
+      "maxzoom": 17,
+      "minzoom": 11
+    }
+  ],
+  "pmtiles": {
+    "path": "madrid-context-2000m.pmtiles",
+    "sha256": "c170faa62cf5e664d3481f19bca0efe86dc9e1df8ea7c981479b3d81de61e2ba",
+    "size_bytes": 12068745,
+    "validation": {
+      "addressed_tiles_count": 651,
+      "bounds_wgs84": {
+        "east": -3.6751663,
+        "north": 40.438218,
+        "south": 40.3937753,
+        "west": -3.732853
+      },
+      "decoded_feature_counts_by_layer": {
+        "building": 218805,
+        "landcover": 6025,
+        "landuse": 13364,
+        "place": 6293,
+        "transportation": 130934,
+        "transportation_name": 42169,
+        "water": 1194
+      },
+      "explicit_height_features_in_tiles": 2266,
+      "max_zoom": 17,
+      "metadata_attribution": "© OpenStreetMap contributors. Datos disponibles bajo la Open Database License (ODbL). https://www.openstreetmap.org/copyright",
+      "min_zoom": 11,
+      "tile_compression": "GZIP",
+      "tile_contents_count": 651,
+      "tile_entries_count": 651,
+      "tile_type": "MVT",
+      "vector_layers": [
+        {
+          "description": "OSM building local, clipped to D004 plus margin",
+          "fields": {
+            "building": "String",
+            "building:levels": "String",
+            "building:part": "String",
+            "class": "String",
+            "height": "Number",
+            "height_raw": "String",
+            "height_source": "String",
+            "height_source_raw": "String",
+            "min_height": "Number",
+            "min_height_raw": "String",
+            "name": "String",
+            "osm_id": "Number",
+            "osm_type": "String"
+          },
+          "id": "building",
+          "maxzoom": 17,
+          "minzoom": 11
+        },
+        {
+          "description": "OSM landcover local, clipped to D004 plus margin",
+          "fields": {
+            "class": "String",
+            "name": "String",
+            "osm_id": "Number",
+            "osm_type": "String"
+          },
+          "id": "landcover",
+          "maxzoom": 17,
+          "minzoom": 11
+        },
+        {
+          "description": "OSM landuse local, clipped to D004 plus margin",
+          "fields": {
+            "class": "String",
+            "name": "String",
+            "osm_id": "Number",
+            "osm_type": "String"
+          },
+          "id": "landuse",
+          "maxzoom": 17,
+          "minzoom": 11
+        },
+        {
+          "description": "OSM place local, clipped to D004 plus margin",
+          "fields": {
+            "class": "String",
+            "name": "String",
+            "osm_id": "Number",
+            "osm_type": "String"
+          },
+          "id": "place",
+          "maxzoom": 17,
+          "minzoom": 11
+        },
+        {
+          "description": "OSM transportation local, clipped to D004 plus margin",
+          "fields": {
+            "class": "String",
+            "highway": "String",
+            "name": "String",
+            "osm_id": "Number",
+            "osm_type": "String",
+            "ref": "String"
+          },
+          "id": "transportation",
+          "maxzoom": 17,
+          "minzoom": 11
+        },
+        {
+          "description": "OSM transportation_name local, clipped to D004 plus margin",
+          "fields": {
+            "class": "String",
+            "highway": "String",
+            "name": "String",
+            "osm_id": "Number",
+            "osm_type": "String",
+            "ref": "String"
+          },
+          "id": "transportation_name",
+          "maxzoom": 17,
+          "minzoom": 11
+        },
+        {
+          "description": "OSM water local, clipped to D004 plus margin",
+          "fields": {
+            "class": "String",
+            "name": "String",
+            "osm_id": "Number",
+            "osm_type": "String"
+          },
+          "id": "water",
+          "maxzoom": 17,
+          "minzoom": 11
+        }
+      ],
+      "version": 3
+    }
+  },
+  "profile": "madrid-osm-explicit-height-v1",
+  "schema_version": "1.0",
+  "source": {
+    "attribution": "© OpenStreetMap contributors. Datos disponibles bajo la Open Database License (ODbL). https://www.openstreetmap.org/copyright",
+    "data_timestamp_utc": "2026-10-14T20:21:12Z",
+    "license": "ODbL-1.0",
+    "source_bbox_wgs84": {
+      "east": -3.050423,
+      "north": 41.16864,
+      "south": 39.881157,
+      "west": -4.589539
+    },
+    "source_id": "f4-osm-madrid-geofabrik-sha256-9ef85f5c728a26995712a835a68f0cb30e01a32af6d2a7facd6744f3a3840db8",
+    "source_pbf_sha256": "9ef85f5c728a26995712a835a68f0cb30e01a32af6d2a7facd6744f3a3840db8",
+    "source_provenance_sha256": "dff044685808f284a69b2dc37337037d514dedcacd126d9ac7ec070e1d3b936d",
+    "source_url": "https://download.geofabrik.de/europe/spain/madrid-261014.osm.pbf"
+  },
+  "tile_compression": "GZIP",
+  "tile_type": "MVT",
+  "toolchain": {
+    "cartography_module_sha256": "db682e1d45aefec30ac78d96f579255d254ca1b9d1630fb42caf4349c8f23141",
+    "generator_script_sha256": "a3c39ae6e706a6ba9f06e14d66f5d2693038db6f600f89bcacd3aa3003637e08",
+    "mapbox_vector_tile": "2.2.0",
+    "mercantile": "1.2.1",
+    "numpy": "2.5.4",
+    "osmium": "4.3.2",
+    "pmtiles_writer": "3.8.1",
+    "protobuf": "6.33.6",
+    "pyclipper": "1.4.0",
+    "python": "3.12.3",
+    "requirements_sha256": "28d186e1b029136b5a1271dc249fee31bb71e26aa240f3bf083f772ffbe0e294",
+    "shapely": "2.1.2"
+  },
+  "zoom": {
+    "max": 17,
+    "min": 11
+  }
+}

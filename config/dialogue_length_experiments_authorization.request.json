@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "atlas-dialogue-exploratory-batch-authorization-v1",
+  "authorization_id": "atlas-dialogue-length-experiments-v1",
+  "status": "PENDING_OPERATOR_AUTHORIZATION",
+  "approved": false,
+  "scope_manifest": "results/generated/description-length-experiments/manifest.json",
+  "scope_manifest_sha256": "cfd54ee90ec80baac1dc076fbf5b3d2428a02932a5e26262b120055707fe4bbf",
+  "session_count": 24,
+  "maximum_questions_per_session": 3,
+  "maximum_qwen_calls_per_session": 3,
+  "maximum_ct2l_calls_per_session": 3,
+  "automatic_retries": 0,
+  "memory_policy": "stable-swap-v2",
+  "ground_truth_permitted": false,
+  "vlm_permitted": false,
+  "h38_h61_permitted": false,
+  "reusable_for_official_sessions": false
+}
