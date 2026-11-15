@@ -34,6 +34,9 @@ class Settings:
     dialogue_enabled: bool = False
     dialogue_completed_query_ids: tuple[str, ...] = ("H26",)
     dialogue_authorization_path: Path | None = None
+    freetext_operational_enabled: bool = False
+    freetext_operational_session_root: Path | None = None
+    dialogue_variants_path: Path | None = None
 
     def region_bbox(self) -> dict[str, float]:
         try:
@@ -77,4 +80,9 @@ class Settings:
         dialogue_authorization = os.environ.get("ATLAS_DIALOGUE_AUTHORIZATION_PATH")
         if dialogue_enabled and (not dialogue_cohort or not dialogue_root or not dialogue_images):
             raise ValueError("DialogueVPR requiere cohort, session root e image root")
-        return cls(runtime_config, region_config, cvg_utils_sha256, clip_weights_path, origins, True, Path(qwen_path) if qwen_path else None, os.environ.get("ATLAS_QWEN_MODEL_ID", "Qwen/Qwen3-8B"), os.environ.get("ATLAS_QWEN_MODEL_REVISION", "b968826d9c46dd6066d109eabc6255188de91218"), qwen_required, visual_enabled, Path(visual_policy) if visual_policy else None, Path(visual_bundle) if visual_bundle else None, visual_fallback, visual_required, Path(dialogue_cohort) if dialogue_cohort else None, Path(dialogue_root) if dialogue_root else None, Path(dialogue_images) if dialogue_images else None, dialogue_enabled, completed, Path(dialogue_authorization) if dialogue_authorization else None)
+        operational_enabled = os.environ.get("ATLAS_FREETEXT_OPERATIONAL_ENABLED", "false").casefold() in {"1", "true", "yes"}
+        operational_root = os.environ.get("ATLAS_FREETEXT_OPERATIONAL_SESSION_ROOT")
+        if operational_enabled and not operational_root:
+            raise ValueError("ATLAS_FREETEXT_OPERATIONAL_SESSION_ROOT es obligatorio al habilitar FreeText operacional")
+        variants_path = os.environ.get("ATLAS_DIALOGUE_VARIANTS_PATH")
+        return cls(runtime_config, region_config, cvg_utils_sha256, clip_weights_path, origins, True, Path(qwen_path) if qwen_path else None, os.environ.get("ATLAS_QWEN_MODEL_ID", "Qwen/Qwen3-8B"), os.environ.get("ATLAS_QWEN_MODEL_REVISION", "b968826d9c46dd6066d109eabc6255188de91218"), qwen_required, visual_enabled, Path(visual_policy) if visual_policy else None, Path(visual_bundle) if visual_bundle else None, visual_fallback, visual_required, Path(dialogue_cohort) if dialogue_cohort else None, Path(dialogue_root) if dialogue_root else None, Path(dialogue_images) if dialogue_images else None, dialogue_enabled, completed, Path(dialogue_authorization) if dialogue_authorization else None, operational_enabled, Path(operational_root) if operational_root else None, Path(variants_path) if variants_path else None)

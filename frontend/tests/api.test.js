@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AtlasApiError, getCapabilities, retrieve } from '../src/api.js';
+import { AtlasApiError, answerFreeText, getCapabilities, parseJsonResponse, retrieve, startFreeText } from '../src/api.js';
 import { adaptRetrievalResponse, buildRetrievalRequest, createQueryId, createRequestGuard } from '../src/retrieval.js';
 
 const response = (body, status = 200, headers = {}) => ({ ok: status >= 200 && status < 300, status, headers: { get: key => headers[key.toLowerCase()] || null }, json: async () => body });
+const invalidResponse=(status,contentType='text/html')=>({ok:false,status,headers:{get:key=>key.toLowerCase()==='content-type'?contentType:null},json:async()=>{throw new SyntaxError('invalid json')}});
 const searchArea = { region_id: 'madrid_pilot', crs: 'EPSG:4326', bbox: { north: 40.42, south: 40.412, east: -3.699, west: -3.709 } };
 
 test('construye petición experimental exclusiva y genera query_id', () => {
@@ -56,6 +57,10 @@ test('parsea errores API y request ID', async () => {
   const fetchImpl = async () => response({ error: { code: 'RUNTIME_BUSY', message: 'ocupado', request_id: 'req-1' } }, 503, { 'x-request-id': 'req-header' });
   await assert.rejects(() => getCapabilities({ fetchImpl }), error => error instanceof AtlasApiError && error.code === 'RUNTIME_BUSY' && error.requestId === 'req-1');
 });
+test('clasifica HTML 504 y cuerpo vacío de proxy como respuesta perdida reconciliable',async()=>{
+  for(const value of [invalidResponse(504,'text/html'),invalidResponse(502,''),invalidResponse(503,'text/plain')])await assert.rejects(()=>parseJsonResponse(value),error=>error instanceof AtlasApiError&&error.code==='UPSTREAM_RESPONSE_LOST');
+  await assert.rejects(()=>parseJsonResponse(invalidResponse(200,'application/json')),error=>error.code==='INVALID_API_RESPONSE');
+});
 
 test('acepta capacidades v3 del backend', async () => {
   const capabilities = {
@@ -99,4 +104,7 @@ test('el guard impide que respuestas canceladas u obsoletas publiquen estado', (
   assert.equal(guard.isCurrent(second), true);
   guard.cancel();
   assert.equal(guard.isCurrent(second), false);
+});
+test('FreeText operacional envía la misma clave idempotente en body y cabecera',async()=>{
+ const calls=[];const fetchImpl=async(url,options)=>{calls.push({url,options});return response({ok:true});};const start={client_operation_id:'op-start',description_es:'Una plaza'},answer={client_operation_id:'op-answer',answer_literal:'Sí'};await startFreeText(start,{fetchImpl});await answerFreeText('dialogue-freetext-id',answer,{fetchImpl});assert.deepEqual(calls.map(x=>x.options.headers['Idempotency-Key']),['op-start','op-answer']);assert.equal(JSON.parse(calls[1].options.body).client_operation_id,'op-answer');assert.equal(calls[1].url,'/api/v1/dialogue-freetext/sessions/dialogue-freetext-id/answers');
 });

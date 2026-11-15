@@ -293,3 +293,31 @@ byte-exacta de descripciones oficiales, imagen original, respuestas, persistenci
 atómica y reanudación. `ATLAS_DIALOGUE_ENABLED` continúa desactivado hasta integrar
 y versionar el ejecutor secuencial HXX validado. Véase
 [MVP_DIALOGUEVPR.md](MVP_DIALOGUEVPR.md).
+# Activación del FreeText operacional
+
+La política de producto está deshabilitada por defecto. Para una ejecución
+autorizada en PGX:
+
+```bash
+ATLAS_FREETEXT_OPERATIONAL_ENABLED=true
+MVP_FREETEXT_OPERATIONAL_SESSION_DIR=./runtime/freetext-operational-sessions
+ATLAS_QWEN_REQUIRED=false
+docker compose -f compose.mvp.yaml up --build
+```
+
+`ATLAS_QWEN_REQUIRED=false` evita mantener Qwen residente junto a CT2L. El
+servicio FreeText lanza workers secuenciales y aplica los gates existentes antes
+de cada carga. Los artefactos host necesarios siguen montados read-only; solo el
+directorio de sesiones operativas es writable.
+
+Antes de activar:
+
+1. comprobar snapshot Qwen y revisión;
+2. comprobar checkpoint/CLIP/CVG-Text/embeddings;
+3. verificar espacio, GPU, Ollama, RAM, PSI y swap;
+4. usar un solo worker Uvicorn;
+5. conservar `stable-swap-v2` y cero retries;
+6. no montar GT o H38-H61 en el contenedor.
+
+La candidata medium provisional no se activa mediante esta variable y requiere
+una autorización distinta.

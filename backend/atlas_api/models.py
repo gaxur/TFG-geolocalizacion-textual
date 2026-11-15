@@ -129,12 +129,58 @@ class DialogueStartRequest(StrictModel):
     mode: Literal["official", "exploratory"]
     query_id: NonEmpty
     description_es: Annotated[str, StringConstraints(min_length=3, max_length=2400)]
+    policy_id: Literal["legacy-official-v1", "post-final-answer-retrieval-v1", "post-final-answer-retrieval-v3", "dialogue-vpr-freetext-v1"] = "legacy-official-v1"
 
 
 class DialogueAnswerRequest(StrictModel):
     schema_version: Literal["1.0"]
     contract_version: Literal["atlas-dialogue-answer-request-v1"]
-    answer_literal: Annotated[str, StringConstraints(min_length=1, max_length=600)]
-    answer_kind: Literal["affirmation", "negation", "unknown", "unobservable", "ambiguous", "stop"]
+    answer_literal: Annotated[str, StringConstraints(min_length=1, max_length=1200)]
+    answer_kind: Literal["affirmation", "negation", "unknown", "unobservable", "ambiguous", "stop", "free_text", "spatial_description", "orientation_clarification"]
     human_attested: Literal[True]
     external_context_used: Literal[False]
+
+class FreeTextStartRequest(StrictModel):
+    schema_version: Literal["1.0"]
+    contract_version: Literal["atlas-dialogue-freetext-start-request-v1"]
+    experimental_query_id: NonEmpty
+    description_es: Annotated[str, StringConstraints(min_length=3,max_length=2400)]
+
+class FreeTextPolicyStartRequest(StrictModel):
+    schema_version: Literal["1.0"]
+    contract_version: Literal["atlas-dialogue-freetext-start-request-v2"]
+    policy_id: Literal["dialogue-vpr-freetext-v1-medium-provisional"]
+    variant_id: NonEmpty
+
+
+class OperationalFreeTextStartRequest(StrictModel):
+    schema_version: Literal["1.0"]
+    contract_version: Literal["atlas-dialogue-freetext-start-request-v2"]
+    policy_id: Literal["dialogue-vpr-freetext-v1-operational"]
+    description_es: Annotated[str, StringConstraints(min_length=3, max_length=2400)]
+    client_operation_id: NonEmpty
+
+class FreeTextAnswerRequest(StrictModel):
+    schema_version: Literal["1.0"]
+    contract_version: Literal["atlas-dialogue-freetext-answer-request-v1"]
+    answer_literal: Annotated[str, StringConstraints(min_length=1,max_length=1200)]
+    human_attested: Literal[True]
+    external_context_used: Literal[False]
+
+
+class OperationalFreeTextAnswerRequest(StrictModel):
+    schema_version: Literal["1.0"]
+    contract_version: Literal["atlas-dialogue-freetext-answer-request-v2"]
+    turn_index: StrictInt = Field(ge=1, le=3)
+    question_id: NonEmpty | None = None
+    question_sha256: Sha256 | None = None
+    answer_literal: Annotated[str, StringConstraints(min_length=1, max_length=1200)]
+    human_attested: Literal[True]
+    external_context_used: Literal[False]
+    client_operation_id: NonEmpty
+
+    @model_validator(mode="after")
+    def question_binding(self):
+        if self.question_id is None and self.question_sha256 is None:
+            raise ValueError("question_id or question_sha256 is required")
+        return self

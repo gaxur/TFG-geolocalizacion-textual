@@ -39,6 +39,11 @@ def build_lifespan(settings: Settings, retriever_factory: Callable[[Settings], o
         app.state.retriever = None
         app.state.transformer = None
         app.state.visual_promoter = None
+        if settings.freetext_operational_enabled:
+            # FreeText carga Qwen y CT2L en workers efímeros secuenciales. Mantener
+            # runtimes residentes simultáneos rompería el presupuesto de memoria.
+            yield
+            return
         app.state.retriever = await anyio.to_thread.run_sync(retriever_factory, settings)
         try:
             app.state.transformer = await anyio.to_thread.run_sync(transformer_factory, settings)
