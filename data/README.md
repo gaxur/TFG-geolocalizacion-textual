@@ -11,6 +11,7 @@ artefactos materializados de F1–F4.
 | `processed/catalog/` | Manifiestos locales de candidatos de 25 m y 50 m |
 | `processed/visual/` | Bundles locales de imágenes OSM precalculadas |
 | `embeddings/` | Matrices visuales CrossText2Loc precalculadas |
+| `processed/map-assets/` | GeoJSON canónico de celdas y, cuando se valide, PMTiles locales para el frontend |
 
 Los snapshots OSM raw de Fase 2 se almacenan localmente bajo
 `raw/osm/snapshots/<osm_snapshot_id>/`; están ignorados por Git. Cada directorio
@@ -25,12 +26,28 @@ bundle enlaza por hash F1, fuente OSM, renderer, estilo, assets, fuentes e
 imágenes.
 
 El despliegue integrado `compose.mvp.yaml` monta el proyecto completo en solo
-lectura y consume las rutas exactas declaradas por
+lectura para la API y sirve los recursos cartográficos locales desde el Nginx
+frontend. La API consume las rutas exactas declaradas por
 `config/madrid_f46_retriever.json`: manifiestos del catálogo, selecciones,
 bundles visuales y bundles de embeddings de 25 m y 50 m. No importa OSM, no
-renderiza mapas y no recalcula embeddings durante el arranque. El wrapper
+genera PMTiles ni recalcula embeddings durante el arranque. El wrapper
 `scripts/run_mvp3_stack.sh` falla antes de crear el stack si falta alguno de esos
 artefactos. Véase [MVP.md](../docs/MVP.md).
+
+El GeoJSON del mapa se genera offline mediante `scripts/build_madrid_map_assets.py`
+y queda en `processed/map-assets/`, carpeta fuera de Git. Si se usa un manifest
+F4 local, el builder valida su hash contra la selección comprometida y contrasta
+cada geometría con la cuadrícula F1 actual. El modo `--regenerate-grid` solo
+materializa F1 y registra `osm_snapshot_id: null`; no crea ni repara datos F4.
+
+El checkout local conserva el snapshot F2 y la fuente PBF F4 bajo las rutas
+`raw/osm/snapshots/<osm_snapshot_id>/` y
+`raw/osm/f4_sources/madrid-geofabrik-20261014/`, ambos fuera de Git. El PMTiles
+`processed/map-assets/madrid.pmtiles` se genera offline desde el PBF F4 y su
+provenance está en `madrid.pmtiles.provenance.json`. Usa OSM/ODbL 1.0, bbox D004
+con 250 m de margen proyectado y solo etiquetas numéricas `height` explícitas
+para extrusiones; `building:levels` no se convierte a metros. Nginx sirve el
+archive por Range desde el volumen read-only existente.
 
 ## Bundles obligatorios del MVP
 

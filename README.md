@@ -45,18 +45,28 @@ o multigalería.
 MVP.1 añade una API FastAPI interna con health, capabilities y retrieval real,
 manteniendo una sola instancia GPU.
 
-MVP.2 conecta el frontend Vite con esa API y muestra candidatos reales sobre
-Leaflet. La interfaz sintética anterior se retiró de forma definitiva.
+MVP.2 conecta el frontend Vite con esa API y muestra candidatos reales en un
+mapa interactivo. La interfaz sintética anterior se retiró de forma definitiva.
 
 MVP.3 cierra el despliegue integrado mediante `compose.mvp.yaml`: Nginx sirve el
 frontend estático y redirige `/api` a FastAPI dentro de la red Compose. Se
 publica únicamente el frontend en el puerto 8080 de la PGX y CrossText2Loc se
 carga una vez en GPU.
 
+La modernización mantiene ese despliegue y utiliza MapLibre, GeoJSON F1 y el
+PMTiles local `data/processed/map-assets/madrid.pmtiles`, servido por el mismo
+Nginx. F2/F4 se verificaron por hash/provenance; el mapa vectorial local se
+construyó desde el PBF F4 con un buffer cartográfico de 250 m. Las extrusiones
+solo usan alturas OSM numéricas explícitas; la cobertura es parcial y los niveles
+no se convierten a metros. La auditoría, el esquema y la validación están en
+[FRONTEND_MAPLIBRE.md](docs/FRONTEND_MAPLIBRE.md).
+
 ## Ejecutar el MVP
 
 La guía completa de despliegue, configuración, parada y diagnóstico está en
-[MVP.md](docs/MVP.md). Desde la raíz:
+[MVP.md](docs/MVP.md). Para actualizar una rama en PGX, conservar su worktree y
+validar artefactos, SSE, HTTP Range y consultas reales, consulta
+[MVP_PGX_DEPLOYMENT.md](docs/MVP_PGX_DEPLOYMENT.md). Desde la raíz:
 
 Antes de arrancar deben existir localmente:
 

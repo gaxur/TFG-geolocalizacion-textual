@@ -11,7 +11,7 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any, Callable, Mapping, Protocol, Sequence
 
 from .config import load_region_config
 from .f4_preflight import load_verified_selection
@@ -322,6 +322,7 @@ class CrossText2LocRetriever:
         text: str,
         language: str,
         k: int,
+        progress_callback: Callable[[str, str, float | None, str | None], None] | None = None,
     ) -> dict[str, Any]:
         with self._lifecycle:
             self._ensure_open()
@@ -337,15 +338,37 @@ class CrossText2LocRetriever:
                 galleries.append(gallery)
             started = time.perf_counter()
             encoded_started = time.perf_counter()
-            text_embedding = self._encoder.encode_text(text)
+
+            def notify(phase: str, state: str, elapsed_ms: float | None = None, gallery_id: str | None = None) -> None:
+                if progress_callback is None:
+                    return
+                try:
+                    progress_callback(phase, state, elapsed_ms, gallery_id)
+                except Exception:
+                    # Observability must never change retrieval/scoring semantics.
+                    return
+
+            notify("text_encoding", "running")
+            try:
+                text_embedding = self._encoder.encode_text(text)
+            except Exception:
+                notify("text_encoding", "failed", (time.perf_counter() - encoded_started) * 1000)
+                raise
             encoded_at = time.perf_counter()
+            notify("text_encoding", "completed", (encoded_at - encoded_started) * 1000)
             response_rows = []
             ranking_times = {}
             for gallery in galleries:
                 ranking_started = time.perf_counter()
-                ranked = exhaustive_rank(gallery.matrix, gallery.candidate_ids, text_embedding, k)
+                notify("ranking", "running", gallery_id=gallery.gallery_id)
+                try:
+                    ranked = exhaustive_rank(gallery.matrix, gallery.candidate_ids, text_embedding, k)
+                except Exception:
+                    notify("ranking", "failed", (time.perf_counter() - ranking_started) * 1000, gallery.gallery_id)
+                    raise
                 ranking_at = time.perf_counter()
                 ranking_ms = (ranking_at - ranking_started) * 1000
+                notify("ranking", "completed", ranking_ms, gallery.gallery_id)
                 ranking_times[gallery.gallery_id] = ranking_ms
                 result = build_retrieval_result(
                 query_id=query_id,

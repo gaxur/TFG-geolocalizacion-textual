@@ -110,6 +110,9 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D092 | Evaluar reranking discriminativo con descuento de soporte compartido y compatibilidad espacial | PROPUESTA | VLM / reranking |
 | D093 | Seleccionar Qwen3-VL-8B con Top-50 y β=0,1 como política previa al test | ACEPTADA | VLM / calibración H26-H37 |
 | D094 | Mantener Atlas v3 tras ablaciones v2 y proponer nueva fuente/selección visual | PROPUESTA | VLM / mejora posterior |
+| D095 | Diálogo adaptativo de hasta tres preguntas en contrato v2 | ACEPTADA | DialogueVPR / orquestación |
+| D096 | Evidencia visual opcional y no vinculante en DialogueVPR | ACEPTADA | DialogueVPR / VLM / provenance |
+| D097 | Perfil Python local para preparar PMTiles de D004 desde PBF F4 | PROPUESTA | Cartografía / frontend |
 
 ## D053 — API HTTP interna del MVP
 
@@ -4128,3 +4131,53 @@ decisión.
 | Confirmar condiciones del checkpoint y de las imágenes CrossText2Loc | Condiciona uso y publicación de artefactos | Autores y proveedor | No bloquea el diseño; sí antes de distribuir | D007, D013, D016 |
 | Confirmar permisos del proveedor satelital | Condiciona almacenamiento y embeddings derivados | Proveedor | No | D015 |
 | Confirmar licencias y permisos de GeoBridge/GeoLoc y de la galería visual | Condiciona ejecución, almacenamiento de embeddings y publicación | Autores y proveedor | No para el MVP; sí para la extensión | D038 |
+
+## D097 — Perfil Python local para teselas vectoriales PMTiles
+
+**Estado:** PROPUESTA
+**Componente:** Cartografía / frontend MapLibre
+**Fecha:** 2026-11-06
+**Origen:** Implementación local de P12 con las fuentes OSM F2/F4 restauradas.
+
+### Propuesta
+
+Usar un flujo offline y opcional, aislado del runtime del MVP, para convertir el
+PBF F4 regional verificado en un PMTiles local limitado a D004 y un margen de
+250 m calculado en EPSG:25830. El prototipo usa PyOsmium para lectura, Shapely
+para validar/recortar, `mapbox-vector-tile` para MVT y el writer Python de
+PMTiles. El archivo conserva OSM bajo ODbL 1.0 y attribution visible.
+
+La extrusión solo consume valores OSM numéricos explícitos de `height` o
+`building:height`; `min_height` se usa como base únicamente si es menor que una
+altura explícita válida. `building:levels` no se convierte a metros. La
+generación de mapa no interviene en inferencia, selección, ranking, ground truth
+ni embeddings.
+
+### Contexto y alternativas
+
+El repositorio tenía un render F4 raster con Mapnik, no un generador vectorial
+PMTiles. En este host Windows no había `osmium-tool`, Java, Planetiler, Tippecanoe
+ni Docker. Planetiler con un profile propio sería otra alternativa, condicionada
+a fijar JVM/profile y comprobar que no descargue datos auxiliares ni infiera
+alturas. Reutilizar el render Mapnik existente conservaría el raster y no
+habilitaría capas vectoriales/3D. Un proveedor remoto no cumple el requisito
+offline/coste cero.
+
+El margen de 250 m es una extensión cartográfica alrededor de la bbox piloto,
+equivalente a cinco lados de celda de 50 m; no cambia D004, candidatos ni el
+ámbito de evaluación. Sigue siendo una elección de presentación revisable.
+
+### Evidencia y límites
+
+El profile local produjo un PMTiles MVT/GZIP v3 con siete capas, zoom 11–17,
+77 teselas y provenance content-addressed. El PBF F4 se usó exclusivamente como
+fuente cartográfica; los manifests geométricos son F1, con
+`osm_snapshot_id: null`, validados separadamente contra las selecciones F4. El
+browser-check ejecutó MapLibre con el PMTiles y GeoJSON F1 locales y una API
+fake; no valida FastAPI ni Compose/Nginx real.
+
+### Pendiente
+
+Esta propuesta no se promueve a `ACEPTADA` sin aprobación expresa. Antes de
+distribuir el archive debe revisarse el paquete derivado conforme a ODbL. La
+validación en PGX/ARM64, Docker Compose/Nginx y hardware objetivo sigue pendiente.

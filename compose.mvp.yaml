@@ -58,9 +58,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        VITE_TILE_URL: ${VITE_TILE_URL:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}
-        VITE_TILE_ATTRIBUTION: ${VITE_TILE_ATTRIBUTION:-&copy; OpenStreetMap contributors}
     init: true
     read_only: true
     restart: "no"
@@ -73,6 +70,8 @@ services:
       - /tmp:rw,noexec,nosuid,size=32m
       - /var/cache/nginx:rw,noexec,nosuid,size=32m
       - /var/run:rw,noexec,nosuid,size=1m
+    volumes:
+      - ${MVP_MAP_ASSETS_DIR:-./data/processed/map-assets}:/usr/share/nginx/map-assets:ro
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 5s

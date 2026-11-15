@@ -36,4 +36,30 @@ async def capabilities(request: Request):
         raise ApiInternalError("capabilities failure") from error
     qwen = getattr(request.app.state, "transformer", None)
     visual = getattr(request.app.state, "visual_promoter", None)
-    return {"schema_version": "1.0", "api_version": "v3-experimental", "retrievers": [{"id": "crosstext2loc", "available": retriever is not None, "scores_are_probabilities": False}], "processing_modes": [{"id": "no_llm", "available": retriever is not None, "variant": "es_original"}, {"id": "with_llm", "available": retriever is not None and qwen is not None, "variant": "en_cartographic", "experimental": True}], "postprocessing_capabilities": [{"id": "topn_visual_promotion", "available": visual is not None, "enabled": visual is not None, "experimental": True, "source": "precomputed_qwen3_vl" if visual is not None else None, "supported_reserve_k": [10, 20, 50, 100, 200, 500, "full"], "output_top_k": 10, "fallback": "baseline"}, {"id": "visual_contradiction_discard", "available": False, "enabled": False, "experimental": True, "reason": "contradiction_not_independently_validated"}], "galleries": galleries, "search_area": request.app.state.search_area, "supported_languages": {"policy_status": "experimental", "accepted_codes": ["es"]}}
+    progress_available = getattr(request.app.state, "progress_hub", None) is not None
+    return {
+        "schema_version": "1.0",
+        "api_version": "v3-experimental",
+        "retrievers": [{"id": "crosstext2loc", "available": retriever is not None, "scores_are_probabilities": False}],
+        "processing_modes": [
+            {"id": "no_llm", "available": retriever is not None, "variant": "es_original"},
+            {"id": "with_llm", "available": retriever is not None and qwen is not None, "variant": "en_cartographic", "experimental": True},
+        ],
+        "postprocessing_capabilities": [
+            {"id": "topn_visual_promotion", "available": visual is not None, "enabled": visual is not None, "experimental": True, "source": "precomputed_qwen3_vl" if visual is not None else None, "online_inference": False, "supported_reserve_k": [10, 20, 50, 100, 200, 500, "full"], "output_top_k": 10, "fallback": "baseline"},
+            {"id": "visual_contradiction_discard", "available": False, "enabled": False, "experimental": True, "reason": "contradiction_not_independently_validated"},
+        ],
+        "pipeline_progress": {
+            "transport": "sse" if progress_available else "none",
+            "endpoint_template": "/api/v1/progress/{query_id}" if progress_available else None,
+            "stages": [
+                {"id": "llm", "available": qwen is not None, "operation": "optional_en_cartographic_transform"},
+                {"id": "crosstext2loc", "available": retriever is not None, "operation": "text_encoding_and_exhaustive_gallery_ranking"},
+                {"id": "vlm", "available": visual is not None, "source": "precomputed_qwen3_vl" if visual is not None else None, "online_inference": False},
+                {"id": "dialoguevpr", "available": False, "reason": "not_integrated_in_mvp_endpoint"},
+            ],
+        },
+        "galleries": galleries,
+        "search_area": request.app.state.search_area,
+        "supported_languages": {"policy_status": "experimental", "accepted_codes": ["es"]},
+    }

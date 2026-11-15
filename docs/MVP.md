@@ -14,7 +14,8 @@ en la red de Docker Compose. El navegador utiliza un solo origen HTTP.
 ```mermaid
 flowchart LR
     B[Navegador local o LAN] -->|IP_PGX:8080| N[Nginx]
-    N -->|HTML, JS, CSS| B
+    N -->|Frontend y MapLibre| B
+    N -->|PMTiles y GeoJSON locales| B
     N -->|/api/*, red Compose| A[FastAPI]
     A --> M{Modo seleccionado}
     M -->|Sin LLM| R[CrossText2Loc residente]
@@ -60,16 +61,18 @@ ATLAS_VISUAL_PRECOMPUTED_BUNDLE_CONTAINER=/visual-bundles/atlas-visual-bundle.js
 - Top-10 fijo para la combinación seleccionada;
 - ranking exhaustivo CrossText2Loc con pesos congelados;
 - API FastAPI con una instancia residente y un worker;
-- frontend estático Nginx con mapa Leaflet y bbox del piloto;
+- frontend estático Nginx con MapLibre, geometrías de celdas y bbox D004;
 - sincronización de tarjetas y marcadores;
 - historial local, cancelación y errores contractuales;
 - proxy `/api` del mismo origen y healthchecks;
 - acceso local/LAN y browser-check ARM64 reproducible.
 
-No forman parte del MVP: preselección OSM, GOTPR, fotografías, Street View, VLM,
-diálogo, HNSW, fine-tuning o refinamiento TOLoc. Qwen se limita a la
-transformación F5 `en_cartographic`; no extrae coordenadas ni ejecuta variantes
-adicionales.
+No forman parte del MVP: preselección OSM, GOTPR, fotografías/Street View,
+inferencia Qwen3-VL en línea, DialogueVPR interactivo, HNSW, fine-tuning o
+refinamiento TOLoc. El postprocesador visual opcional solo consume evidencia
+Qwen3-VL precalculada; no carga ni ejecuta ese modelo durante la consulta. Qwen
+textual se limita a la transformación F5 `en_cartographic`; no extrae coordenadas
+ni ejecuta variantes adicionales.
 
 ## API FastAPI
 
@@ -79,12 +82,13 @@ Endpoints internos, accesibles desde el navegador mediante el proxy Nginx:
 GET  /api/v1/health/live
 GET  /api/v1/health/ready
 GET  /api/v1/capabilities
+GET  /api/v1/progress/{query_id}   (SSE efímero)
 POST /api/v1/retrievals
 ```
 
 El POST usa `atlas-experimental-retrieval-request-v2`: `gallery_id` admite solo
 `madrid-25m`/`madrid-50m`, `processing_mode` solo `no_llm`/`with_llm` y
-`top_k=10`. La respuesta v2 conserva el texto original y declara texto efectivo,
+`top_k=10`. La respuesta v3 conserva el texto original y declara texto efectivo,
 modo, variante, identidad Qwen y tiempos. Las similitudes son coseno, no
 probabilidades. Un lock cubre transformación y retrieval completos.
 
@@ -104,29 +108,92 @@ Las respuestas no exponen trazas, rutas privadas ni detalles CUDA e incluyen
 `scripts/run_mvp1_api_docker.sh` y `scripts/smoke_mvp1_stack.sh`; no son el
 procedimiento de despliegue principal.
 
-## Frontend y mapa
+### Seguimiento observable de la consulta
 
-El frontend JavaScript/Vite se compila durante la construcción de la imagen y
-Nginx sirve HTML, CSS, JavaScript y recursos Leaflet. `frontend/src/api.js`
-implementa HTTP; `retrieval.js` valida contratos; `map.js` gestiona Leaflet y
-`main.js` coordina estado y vistas.
+El POST síncrono mantiene el mismo contrato y respuesta. El navegador abre antes
+un canal **Server-Sent Events** por `GET /api/v1/progress/{query_id}`; no reemplaza
+la petición ni crea una cola de trabajos. FastAPI publica eventos efímeros en
+memoria mientras el POST está activo, identificados por `query_id` y secuencia.
+El canal no almacena texto, scores, coordenadas ni ground truth; sus colas tienen
+tamaño limitado, se descartan al desconectar y no conservan historial. Si el SSE
+no está disponible o se pierden eventos, el frontend muestra las etapas pendientes
+como desconocidas y confirma el resultado al recibir la respuesta síncrona.
 
-Leaflet recibe `[latitude, longitude]` WGS84. Tarjetas y marcadores comparten la
-clave `gallery_id:candidate_id`. La bbox procede de `config/madrid.yaml`, limita
-la navegación del mapa y se muestra en rojo. El Top-1 se diferencia visualmente,
-pero no confirma la ubicación. Si las teselas fallan, candidatos y fondo neutro
-siguen disponibles.
+| Señal real | Representación | Límite |
+|---|---|---|
+| Modo `with_llm`: inicio y fin/error de Qwen3-8B | Etapa LLM activa/finalizada/error y tiempo de transformación devuelto por el adaptador | No expone tokens ni avance de generación |
+| Codificación de texto y ranking exhaustivo de CT2L | Subfases y duraciones emitidas por el runtime residente | No hay porcentaje ni avance por candidato |
+| Postprocesador visual experimental habilitado | Consulta de evidencia Qwen3-VL precalculada y resultado aplicado/fallback | No significa que Qwen3-VL se ejecute en línea ni que esté validado para producción |
+| Sin bundle de postprocesado | Etapa visual omitida | El ranking CT2L se conserva |
+| DialogueVPR | No disponible | No hay preguntas ni respuestas dentro del endpoint de este MVP |
 
-Cada candidato se representa además mediante un rectángulo semitransparente
-centrado en su coordenada: `25 × 25 m` para `madrid-25m` y `50 × 50 m` para
-`madrid-50m`. El área seleccionada se resalta junto con su marcador. Es una
-aproximación WGS84 de la celda métrica del catálogo y no una estimación precisa
-de la huella del observador.
+Los estados de etapa son `pending`, `running`, `completed`, `failed`, `skipped`,
+`unavailable`, `waiting_for_user` y `unknown`. `waiting_for_user` forma parte del
+contrato visual extensible; el endpoint actual nunca lo emite porque DialogueVPR
+no está integrado. El tiempo mostrado desde el envío mide la espera de extremo a
+extremo en el navegador; no se convierte en avance porcentual. Los tiempos por
+modelo solo se muestran cuando el backend los mide o devuelve.
+
+La cancelación aborta la espera HTTP y cierra el canal del navegador; no garantiza
+detener el hilo de inferencia que ya empezó en FastAPI. Un timeout o desconexión
+deja las etapas no confirmadas como desconocidas. Nginx deshabilita buffering en
+la ruta SSE, envía keep-alive, permite 900 s de lectura del stream y 120 s para la
+respuesta API síncrona, por encima del timeout de cliente de 90 s del modo LLM.
+
+## Frontend y mapa local
+
+El frontend JavaScript/Vite compila MapLibre GL JS y PMTiles durante el build de
+la imagen existente. Nginx sirve HTML, CSS, JS, `/api/` y `/map-assets/`; no se
+añade un contenedor de teselas ni se solicita cartografía a proveedores externos.
+`frontend/src/api.js` conserva el transporte; `retrieval.js` valida el contrato
+actual; `pipeline.js` reduce eventos por consulta, `progress-stream.js` administra
+el SSE y `main.js` presenta las etapas sin acoplarlas a MapLibre. `map.js` mantiene
+una instancia MapLibre estable y `map-data.js` valida las geometrías GeoJSON antes
+de asociarlas a resultados.
+
+Las tarjetas, los marcadores y las celdas comparten `gallery_id:candidate_id`.
+Las coordenadas de puntos usan `[longitude, latitude]` GeoJSON; las coordenadas
+de inferencia continúan siendo WGS84 y no cambian. La bbox D004 se dibuja desde
+`/capabilities`. La selección del mapa no modifica el ranking ni consulta GT.
+El centro de una celda no confirma la posición del observador y la similitud
+coseno no es una probabilidad.
+
+Las celdas se publican como polígonos canónicos F1 en
+`data/processed/map-assets/cells-{25,50}m.geojson`, no como rectángulos
+latitud/longitud aproximados. El generador verifica IDs, CRS, anillos, conteos,
+selección F4 y hashes cuando se le proporcionan los manifests F4 originales. La
+opción `--regenerate-grid` recrea F1 desde la configuración y deja
+`osm_snapshot_id: null`; no sustituye el manifest F4 usado por el recuperador.
+
+El estilo local consume `madrid.pmtiles` con esquema MVT
+`madrid-osm-explicit-height-v1`. Nginx lo sirve por HTTP Range desde el volumen
+read-only `MVP_MAP_ASSETS_DIR`; no se genera cartografía durante el arranque.
+MapLibre comprueba header, bounds, capas, provenance y tamaño del archive. La
+capa `fill-extrusion` utiliza `height` numérico explícito y `min_height` como
+base solo si es menor que esa altura. `building:levels` no se convierte a metros
+y no se asignan alturas a edificios desconocidos.
+
+La fuente de mapa es el PBF F4 regional Geofabrik, SHA-256
+`9ef85f5c728a26995712a835a68f0cb30e01a32af6d2a7facd6744f3a3840db8`, ODbL 1.0,
+recortado a D004 más 250 m en EPSG:25830. Los candidatos permanecen como GeoJSON
+canónico F1, con `osm_snapshot_id: null`; el ranking no se regenera ni usa GT. El
+sidecar PMTiles registra fuente, capas, cobertura, alturas y hash del archive.
+La auditoría halló 6/3.517 edificios base y 105/2.510 partes con alturas OSM
+explícitas. Esta cobertura parcial se muestra en la interfaz y no se presenta
+como reconstrucción topográfica.
+
+El fallback Leaflet no carga teselas externas: muestra el límite, polígonos
+canónicos y marcadores en 2D cuando WebGL2 no está disponible. La lista Top-10
+permanece utilizable con teclado y lector de pantalla en todos los casos.
 
 El servidor Vite (`npm --prefix frontend run dev`) se conserva únicamente para
 desarrollo. La aplicación desplegada no usa Vite dev server ni datos ficticios.
 
 ## Requisitos
+
+El procedimiento paso a paso para actualizar la rama, verificar artefactos y
+validar el stack en PGX está en
+[MVP_PGX_DEPLOYMENT.md](MVP_PGX_DEPLOYMENT.md).
 
 - Host Linux ARM64 con Docker, Docker Compose y NVIDIA Container Toolkit.
 - GPU NVIDIA compatible con la imagen API. El entorno validado es una GB10.
@@ -268,12 +335,11 @@ de Git. Los valores principales son:
 | `MVP_API_IMAGE` | `crosstext2loc-gb10:f511` | Imagen API unificada ARM64/GPU |
 | `MVP_CLIP_CACHE_DIR` | `$HOME/.cache/clip` | Directorio host de pesos CLIP |
 | `MVP_QWEN_MODEL_DIR` | `$HOME/models/hf/Qwen3-8B-b968826d9c46` | Snapshot local Qwen montado read-only |
-| `VITE_TILE_URL` | endpoint público OSM | Plantilla Leaflet compilada |
-| `VITE_TILE_ATTRIBUTION` | atribución OSM | Atribución visible del mapa |
+| `MVP_MAP_ASSETS_DIR` | `./data/processed/map-assets` | Directorio local PMTiles/GeoJSON montado read-only en Nginx |
 
-La URL de teselas es una variable de compilación. Cambiarla requiere reconstruir
-el frontend. El endpoint público predeterminado solo se usa para desarrollo
-local y no autoriza precarga, descarga masiva ni un servicio público sostenido.
+La ruta de recursos cartográficos es un bind mount de Compose; cambiarla no
+requiere reconstruir la imagen frontend. No hay endpoint raster externo por
+defecto ni descarga de teselas durante la build o el arranque.
 
 No es obligatorio crear `.env`: los valores predeterminados funcionan en la PGX
 si CLIP está en `$HOME/.cache/clip`. Para personalizar la ejecución:
@@ -313,6 +379,12 @@ Desde la raíz:
 
 ```bash
 scripts/run_mvp3_stack.sh
+```
+
+También se puede arrancar directamente, con los artefactos locales requeridos:
+
+```bash
+docker compose -f compose.mvp.yaml up
 ```
 
 El comando realiza el preflight y equivale a:
@@ -463,9 +535,14 @@ docker compose -f compose.mvp.yaml --profile test run --rm browser-check npm run
 docker compose -f compose.mvp.yaml --profile test run --rm browser-check npm run test:browser:real
 ```
 
-La primera prueba utiliza una API simulada y verifica contrato UI, selectores,
-Leaflet, selección tarjeta-marcador, responsive y ausencia de datos ficticios.
-La segunda recorre navegador, Nginx, FastAPI, CrossText2Loc y GPU reales.
+La primera prueba usa una API y eventos SSE simulados solo en el servidor de
+test. Si `MVP_MAP_ASSETS_DIR` contiene recursos válidos, Chromium consume PMTiles
+y GeoJSON F1 locales reales; si faltan, usa fixtures sintéticas para comprobar
+el fallback. Verifica Top-10, selección tarjeta-marcador, persistencia del mapa,
+responsive y ausencia de llamadas a proveedores cartográficos externos. No
+valida FastAPI ni inferencia.
+La segunda recorre navegador, Nginx, FastAPI, CrossText2Loc y GPU reales cuando se
+ejecuta desde un host preparado con el stack.
 
 ### Regresión
 
@@ -662,8 +739,9 @@ de geolocalización en Madrid.
   la red Compose; revisar su contenedor y readiness.
 - **`RUNTIME_BUSY`:** esperar a que termine la inferencia activa. El MVP rechaza
   una segunda consulta y no crea una cola externa.
-- **Teselas ausentes:** el ranking y los marcadores siguen operativos sobre el
-  fondo neutro; revisar URL, red y atribución del proveedor.
+- **PMTiles local ausente:** el ranking, los centros y las celdas canónicas
+  siguen disponibles sobre fondo neutro; revisar `MVP_MAP_ASSETS_DIR` y la
+  preparación offline. No se solicita una fuente externa como fallback.
 - **Chromium no arranca:** reconstruir el servicio `browser-check`; no asumir que
   una imagen amd64 funciona en ARM64.
 
