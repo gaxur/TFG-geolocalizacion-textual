@@ -26,6 +26,15 @@ services:
       ATLAS_VISUAL_PRECOMPUTED_BUNDLE: ${ATLAS_VISUAL_PRECOMPUTED_BUNDLE_CONTAINER:-}
       ATLAS_VISUAL_PROMOTION_FALLBACK: baseline
       ATLAS_VISUAL_PROMOTION_REQUIRED: "false"
+      ATLAS_DIALOGUE_ENABLED: ${ATLAS_DIALOGUE_ENABLED:-false}
+      ATLAS_DIALOGUE_COHORT_PATH: /dialogue-inputs/cohort.json
+      ATLAS_DIALOGUE_SESSION_ROOT: /dialogue-sessions
+      ATLAS_DIALOGUE_IMAGE_ROOT: /dialogue-images
+      ATLAS_DIALOGUE_COMPLETED_QUERY_IDS: ${ATLAS_DIALOGUE_COMPLETED_QUERY_IDS:-H26}
+      ATLAS_DIALOGUE_AUTHORIZATION_PATH: /dialogue-inputs/session-authorization.json
+      ATLAS_DIALOGUE_VARIANTS_PATH: /dialogue-inputs/description-length-manifest.json
+      ATLAS_DIALOGUE_F3_BUNDLE: ${ATLAS_DIALOGUE_F3_BUNDLE_CONTAINER:-/workspace/project/data/processed/osm/osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141/f3-madrid-pilot-associations-sha256-5f4af89b9349de792d3a60752a15f227d49b96cdb688a671504e4cf30bf68453}
+      ATLAS_OLLAMA_PS_URL: ${ATLAS_OLLAMA_PS_URL:-http://host.docker.internal:11434/api/ps}
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=1g
     volumes:
@@ -33,14 +42,27 @@ services:
       - ${MVP_CLIP_CACHE_DIR:-${HOME}/.cache/clip}:/root/.cache/clip:ro
       - ${MVP_QWEN_MODEL_DIR:-${HOME}/models/hf/Qwen3-8B-b968826d9c46}:/models/Qwen3-8B:ro
       - ${MVP_VISUAL_BUNDLE_DIR:-./config}:/visual-bundles:ro
+      - ${MVP_DIALOGUE_COHORT_FILE:-./config/dialogue_development_h26_h37_cohort.json}:/dialogue-inputs/cohort.json:ro
+      - ${MVP_DIALOGUE_AUTHORIZATION_FILE:-./config/dialogue_h27_session_authorization.request.json}:/dialogue-inputs/session-authorization.json:ro
+      - ${MVP_DIALOGUE_VARIANTS_FILE:-./results/generated/description-length-experiments/manifest.json}:/dialogue-inputs/description-length-manifest.json:ro
+      - ${MVP_DIALOGUE_SESSION_DIR:-./results/generated/mvp-dialogue-sessions}:/dialogue-sessions:rw
+      - ${MVP_DIALOGUE_IMAGE_DIR:-./data/cache/mapillary/images}:/dialogue-images:ro
+      - ${MVP_PROCESSED_DATA_DIR:-./data/processed}:/workspace/project/data/processed:ro
+      - ${MVP_EMBEDDINGS_DIR:-./data/embeddings}:/workspace/project/data/embeddings:ro
+      - ${MVP_EXTERNAL_DIR:-./external}:/workspace/project/external:ro
+      - ${MVP_CHECKPOINT_DIR:-./checkpoints/CrossText2Loc}:/workspace/project/checkpoints/CrossText2Loc:ro
     working_dir: /workspace/project
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command:
       - /bin/bash
       - -lc
       - >-
         export ATLAS_CVG_UTILS_SHA256=$$(sha256sum
         /workspace/project/external/CVG-Text/utils.py | cut -d' ' -f1) &&
-        exec /workspace/project/scripts/run_mvp1_api.sh
+        if [ "$${ATLAS_DIALOGUE_ENABLED}" = "true" ]; then
+          exec python -m uvicorn backend.atlas_api.dialogue_main:app --host 0.0.0.0 --port 8000 --workers 1;
+        else exec /workspace/project/scripts/run_mvp1_api.sh; fi
     expose:
       - "8000"
     healthcheck:
@@ -72,6 +94,7 @@ services:
       - /var/run:rw,noexec,nosuid,size=1m
     volumes:
       - ${MVP_MAP_ASSETS_DIR:-./data/processed/map-assets}:/usr/share/nginx/map-assets:ro
+      - ${MVP_MAP_CONTEXT_DIR:-./results/generated/map-assets-context-2000m}:/usr/share/nginx/map-context:ro
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 5s

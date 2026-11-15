@@ -28,6 +28,12 @@ class Settings:
     visual_precomputed_bundle_path: Path | None = None
     visual_promotion_fallback: str = "baseline"
     visual_promotion_required: bool = False
+    dialogue_cohort_path: Path | None = None
+    dialogue_session_root: Path | None = None
+    dialogue_image_root: Path | None = None
+    dialogue_enabled: bool = False
+    dialogue_completed_query_ids: tuple[str, ...] = ("H26",)
+    dialogue_authorization_path: Path | None = None
 
     def region_bbox(self) -> dict[str, float]:
         try:
@@ -63,4 +69,12 @@ class Settings:
             raise ValueError("ATLAS_VISUAL_PROMOTION_FALLBACK inválido")
         if visual_enabled and not visual_bundle:
             raise ValueError("ATLAS_VISUAL_PRECOMPUTED_BUNDLE es obligatorio al habilitar promoción")
-        return cls(runtime_config, region_config, cvg_utils_sha256, clip_weights_path, origins, True, Path(qwen_path) if qwen_path else None, os.environ.get("ATLAS_QWEN_MODEL_ID", "Qwen/Qwen3-8B"), os.environ.get("ATLAS_QWEN_MODEL_REVISION", "b968826d9c46dd6066d109eabc6255188de91218"), qwen_required, visual_enabled, Path(visual_policy) if visual_policy else None, Path(visual_bundle) if visual_bundle else None, visual_fallback, visual_required)
+        dialogue_cohort = os.environ.get("ATLAS_DIALOGUE_COHORT_PATH")
+        dialogue_root = os.environ.get("ATLAS_DIALOGUE_SESSION_ROOT")
+        dialogue_images = os.environ.get("ATLAS_DIALOGUE_IMAGE_ROOT")
+        dialogue_enabled = os.environ.get("ATLAS_DIALOGUE_ENABLED", "false").casefold() in {"1", "true", "yes"}
+        completed = tuple(value.strip() for value in os.environ.get("ATLAS_DIALOGUE_COMPLETED_QUERY_IDS", "H26").split(",") if value.strip())
+        dialogue_authorization = os.environ.get("ATLAS_DIALOGUE_AUTHORIZATION_PATH")
+        if dialogue_enabled and (not dialogue_cohort or not dialogue_root or not dialogue_images):
+            raise ValueError("DialogueVPR requiere cohort, session root e image root")
+        return cls(runtime_config, region_config, cvg_utils_sha256, clip_weights_path, origins, True, Path(qwen_path) if qwen_path else None, os.environ.get("ATLAS_QWEN_MODEL_ID", "Qwen/Qwen3-8B"), os.environ.get("ATLAS_QWEN_MODEL_REVISION", "b968826d9c46dd6066d109eabc6255188de91218"), qwen_required, visual_enabled, Path(visual_policy) if visual_policy else None, Path(visual_bundle) if visual_bundle else None, visual_fallback, visual_required, Path(dialogue_cohort) if dialogue_cohort else None, Path(dialogue_root) if dialogue_root else None, Path(dialogue_images) if dialogue_images else None, dialogue_enabled, completed, Path(dialogue_authorization) if dialogue_authorization else None)
