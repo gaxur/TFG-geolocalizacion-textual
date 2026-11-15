@@ -280,3 +280,16 @@ Qwen3-8B y bundles visuales/embeddings; por tanto, no pudo ejecutarse allí una
 consulta real. No fue posible autenticar por SSH al host PGX y no se conoce desde
 esta sesión si sus artefactos o contenedores están presentes. Verifica esas rutas
 en PGX antes de cualquier transferencia; esta guía no inicia descargas.
+
+## 10. Estado PGX y DialogueVPR interactivo
+
+En PGX la rama se mantiene en un worktree separado para preservar los cambios
+experimentales locales. Los modelos, catálogos, embeddings y resultados pueden
+reutilizarse desde el checkout original mediante rutas absolutas o montajes, sin
+duplicar bytes. Los cinco map assets todavía deben transferirse desde Windows.
+
+La UI ya incluye controles DialogueVPR y la API implementa catálogo, validación
+byte-exacta de descripciones oficiales, imagen original, respuestas, persistencia
+atómica y reanudación. `ATLAS_DIALOGUE_ENABLED` continúa desactivado hasta integrar
+y versionar el ejecutor secuencial HXX validado. Véase
+[MVP_DIALOGUEVPR.md](MVP_DIALOGUEVPR.md).

@@ -37,6 +37,7 @@ async def capabilities(request: Request):
     qwen = getattr(request.app.state, "transformer", None)
     visual = getattr(request.app.state, "visual_promoter", None)
     progress_available = getattr(request.app.state, "progress_hub", None) is not None
+    dialogue = getattr(request.app.state, "dialogue_service", None)
     return {
         "schema_version": "1.0",
         "api_version": "v3-experimental",
@@ -56,7 +57,7 @@ async def capabilities(request: Request):
                 {"id": "llm", "available": qwen is not None, "operation": "optional_en_cartographic_transform"},
                 {"id": "crosstext2loc", "available": retriever is not None, "operation": "text_encoding_and_exhaustive_gallery_ranking"},
                 {"id": "vlm", "available": visual is not None, "source": "precomputed_qwen3_vl" if visual is not None else None, "online_inference": False},
-                {"id": "dialoguevpr", "available": False, "reason": "not_integrated_in_mvp_endpoint"},
+                {"id": "dialoguevpr", "available": bool(dialogue and dialogue.available), "reason": None if dialogue and dialogue.available else "runtime_or_dataset_not_configured"},
             ],
         },
         "galleries": galleries,

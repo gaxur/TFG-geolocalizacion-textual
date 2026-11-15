@@ -20,7 +20,7 @@ async function parseJsonResponse(response) {
     throw new AtlasApiError('El servicio devolvió una respuesta que no es JSON válido.', { code: 'INVALID_API_RESPONSE', status: response.status, requestId, cause });
   }
   if (!response.ok) {
-    const error = body?.error;
+    const error = body?.error || body?.detail;
     throw new AtlasApiError(error?.message || 'El servicio no pudo completar la petición.', {
       code: error?.code || `HTTP_${response.status}`,
       status: response.status,
@@ -61,6 +61,23 @@ export function getCapabilities(options = {}) {
 
 export function retrieve(request, options = {}) {
   return fetchJson('/retrievals', { ...options, method: 'POST', body: request });
+}
+
+export function getDialogueQueries(options = {}) {
+  return fetchJson('/dialogue/queries', options);
+}
+export function getDialogueVariants(options={}){return fetchJson('/dialogue/variants',options);}
+
+export function startDialogue(request, options = {}) {
+  return fetchJson('/dialogue/sessions', { ...options, method: 'POST', body: request });
+}
+
+export function getDialogueSession(sessionId, options = {}) {
+  return fetchJson(`/dialogue/sessions/${encodeURIComponent(sessionId)}`, options);
+}
+
+export function answerDialogue(sessionId, request, options = {}) {
+  return fetchJson(`/dialogue/sessions/${encodeURIComponent(sessionId)}/answers`, { ...options, method: 'POST', body: request });
 }
 
 export const apiBaseUrl = import.meta.env?.VITE_ATLAS_API_BASE_URL || DEFAULT_BASE_URL;

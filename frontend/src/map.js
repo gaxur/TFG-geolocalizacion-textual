@@ -19,7 +19,8 @@ import {
 
 const ASSET_BASE = '/map-assets';
 const ASSET_MANIFEST_URL = `${ASSET_BASE}/map-assets.json`;
-const PMTILES_URL = new URL(`${ASSET_BASE}/madrid.pmtiles`, window.location.origin).toString();
+const PMTILES_FILE = 'madrid-context-2000m.pmtiles';
+const PMTILES_URL = new URL(`/map-context/${PMTILES_FILE}`, window.location.origin).toString();
 const PMTILES_PROTOCOL_KEY = Symbol.for('atlas.maplibre.pmtiles.protocol');
 let mapInstanceCounter = 0;
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -63,11 +64,11 @@ function createBoundaryLayers(map, searchArea) {
   const firstSymbol = map.getStyle().layers.find(layer => layer.type === 'symbol')?.id;
   map.addLayer({
     id: 'madrid-region-fill', type: 'fill', source: 'madrid-region',
-    paint: { 'fill-color': '#b35f3f', 'fill-opacity': 0.035 },
+    paint: { 'fill-color': '#e00000', 'fill-opacity': 0.075 },
   }, firstSymbol);
   map.addLayer({
     id: 'madrid-region-outline', type: 'line', source: 'madrid-region',
-    paint: { 'line-color': '#9d4e36', 'line-width': 2, 'line-dasharray': [2, 2], 'line-opacity': 0.9 },
+    paint: { 'line-color': '#d40000', 'line-width': 4, 'line-dasharray': [2, 1.5], 'line-opacity': 1 },
   }, firstSymbol);
 }
 
@@ -135,38 +136,29 @@ function addBasemapLayers(map, basemap) {
     id: 'madrid-water', type: 'fill', source: 'madrid-local', 'source-layer': 'water',
     paint: { 'fill-color': '#cbdfe2', 'fill-opacity': 0.94 },
   });
-  add('transportation', {
-    id: 'madrid-roads', type: 'line', source: 'madrid-local', 'source-layer': 'transportation',
-    paint: {
-      'line-color': ['match', ['get', 'class'], 'motorway', '#d4b696', 'primary', '#d8c7b0', 'secondary', '#dfd5c9', '#fffefa'],
-      'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 16, 3.4],
-      'line-opacity': 0.98,
-    },
-  });
   if (available.has('building')) {
     map.addLayer({
       id: 'madrid-building-footprints', type: 'fill', source: 'madrid-local', 'source-layer': 'building',
       minzoom: 14,
       paint: { 'fill-color': '#d5d0c4', 'fill-outline-color': '#b5afa2', 'fill-opacity': 0.8 },
     });
-    if (basemap.heightProperty) {
-      map.addLayer({
-        id: 'madrid-buildings-3d', type: 'fill-extrusion', source: 'madrid-local', 'source-layer': 'building',
-        minzoom: 15,
-        layout: { visibility: 'none' },
-        filter: ['all', ['!=', ['get', 'hide_3d'], true], ['>', ['to-number', ['get', basemap.heightProperty], 0], 0]],
-        paint: {
-          'fill-extrusion-color': ['case', ['has', 'colour'], ['get', 'colour'], '#c6c0b3'],
-          'fill-extrusion-height': ['to-number', ['get', basemap.heightProperty], 0],
-          'fill-extrusion-base': basemap.baseHeightProperty
-            ? ['to-number', ['get', basemap.baseHeightProperty], 0]
-            : 0,
-          'fill-extrusion-opacity': 0.96,
-          'fill-extrusion-vertical-gradient': true,
-        },
-      });
-    }
+    map.addLayer({
+      id: 'madrid-buildings-3d', type: 'fill-extrusion', source: 'madrid-local', 'source-layer': 'building', minzoom: 14, layout: { visibility: 'none' },
+      paint: {
+        'fill-extrusion-color': ['case',['>', ['to-number',['get',basemap.heightProperty],0],0],'#a79b86',['>', ['to-number',['get','building:levels'],0],0],'#c8bfae','#d7d1c5'],
+        'fill-extrusion-height': ['case',['>', ['to-number',['get',basemap.heightProperty],0],0],['to-number',['get',basemap.heightProperty],9],['>', ['to-number',['get','building:levels'],0],0],['*',['min',['to-number',['get','building:levels'],3],30],3],9],
+        'fill-extrusion-base': ['case',['>', ['to-number',['get',basemap.heightProperty],0],0],['to-number',['get',basemap.baseHeightProperty],0],0],
+        'fill-extrusion-opacity': 0.82, 'fill-extrusion-vertical-gradient': true,
+      },
+    });
   }
+  add('transportation', {
+    id: 'madrid-roads', type: 'line', source: 'madrid-local', 'source-layer': 'transportation',
+    paint: {
+      'line-color': ['match', ['get', 'class'], 'motorway', '#d4b696', 'primary', '#d8c7b0', 'secondary', '#dfd5c9', '#fffefa'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 16, 3.4], 'line-opacity': 0.98,
+    },
+  });
   add('place', {
     id: 'madrid-place-labels', type: 'symbol', source: 'madrid-local', 'source-layer': 'place',
     layout: { 'text-field': ['coalesce', ['get', 'name:latin'], ['get', 'name'], ''], 'text-font': ['Noto Sans Regular'], 'text-size': ['interpolate', ['linear'], ['zoom'], 11, 10, 16, 13], 'text-max-width': 8 },
@@ -220,8 +212,9 @@ async function inspectLocalBasemap(searchArea, assetManifest) {
   }
   const layers = Array.isArray(metadata?.vector_layers) ? metadata.vector_layers : [];
   const layerIds = new Set(layers.map(layer => layer?.id));
-  if (!layerIds.has('building') || !layerIds.has('transportation')) {
-    throw new Error('PMTiles no contiene las capas building y transportation del esquema esperado.');
+  const expectedLayers=assetManifest.basemap.expected_source_layers;
+  if (!Array.isArray(expectedLayers) || expectedLayers.some(id=>!layerIds.has(id))) {
+    throw new Error('PMTiles no contiene todas las capas declaradas por map-assets.json.');
   }
   const building = layers.find(layer => layer?.id === 'building');
   const fields = building?.fields || {};
@@ -232,7 +225,7 @@ async function inspectLocalBasemap(searchArea, assetManifest) {
     ? 'min_height'
     : null;
   if (header.tileType !== TileType.Mvt || !layers.length) throw new Error('El archivo local no contiene teselas vectoriales con metadatos de capas.');
-  const provenanceResponse = await fetch(`${ASSET_BASE}/madrid.pmtiles.provenance.json`, {
+  const provenanceResponse = await fetch(`/map-context/${PMTILES_FILE}.provenance.json`, {
     headers: { Accept: 'application/json' },
   });
   if (!provenanceResponse.ok) throw new Error('Falta la provenance local de madrid.pmtiles.');
@@ -240,7 +233,7 @@ async function inspectLocalBasemap(searchArea, assetManifest) {
   if (provenance?.contract_version !== 'madrid-osm-vector-cartography-v1' ||
       provenance?.profile !== 'madrid-osm-explicit-height-v1' ||
       !/^[0-9a-f]{64}$/.test(provenance?.pmtiles?.sha256 || '') ||
-      provenance?.pmtiles?.path !== 'madrid.pmtiles' ||
+       provenance?.pmtiles?.path !== PMTILES_FILE ||
       !/^[0-9a-f]{64}$/.test(provenance?.source?.source_pbf_sha256 || '') ||
       provenance?.source?.license !== 'ODbL-1.0') {
     throw new Error('La provenance del PMTiles local no coincide con el perfil/licencia esperados.');
@@ -266,7 +259,11 @@ async function inspectLocalBasemap(searchArea, assetManifest) {
     heightProperty,
     baseHeightProperty,
     heightAudit: { base: heightAudit, parts: partsAudit, explicitTileFeatures: declaredHeightCount },
-    buildings3dAvailable: Boolean(building && heightProperty && explicitHeightCount > 0),
+    buildings3dAvailable: Boolean(building),
+    navigationBounds: [
+      [(header.minLon+searchArea.bbox.west)/2,(header.minLat+searchArea.bbox.south)/2],
+      [(header.maxLon+searchArea.bbox.east)/2,(header.maxLat+searchArea.bbox.north)/2],
+    ],
     attribution: metadata.attribution || '© OpenStreetMap contributors · ODbL 1.0',
   };
 }
@@ -459,7 +456,7 @@ export async function createResultsMap({
     missingCellCount: 0,
     message: basemap.available
       ? basemap.buildings3dAvailable
-        ? `Extrusión 3D parcial: ${basemap.heightAudit.base.explicit_numeric_metre_height}/${basemap.heightAudit.base.denominator} edificios y ${basemap.heightAudit.parts.explicit_numeric_metre_height}/${basemap.heightAudit.parts.denominator} partes tienen etiqueta height explícita en metros; no es una medición independiente y el resto sigue en 2D.`
+        ? `3D visual: ${basemap.heightAudit.base.explicit_numeric_metre_height}/${basemap.heightAudit.base.denominator} edificios y ${basemap.heightAudit.parts.explicit_numeric_metre_height}/${basemap.heightAudit.parts.denominator} partes usan height explícita. El resto se estima con building:levels × 3 m o 9 m por defecto; las estimaciones no son medidas reales.`
         : 'Base local preparada, pero no ofrece un campo de altura utilizable para extrusión 3D.'
       : 'Falta madrid.pmtiles en los recursos locales. No se solicitan mapas a proveedores externos.',
     detail: assets.error?.message || basemapError?.message || null,
@@ -468,6 +465,7 @@ export async function createResultsMap({
   element.dataset.renderer = 'maplibre';
   element.dataset.mapInstanceId = String(++mapInstanceCounter);
   element.dataset.mapMode = '2d';
+  if(basemap.navigationBounds)element.dataset.mapNavigationBounds=JSON.stringify(basemap.navigationBounds);
   element.classList.toggle('map-without-tiles', !basemap.available);
 
   let map;
@@ -479,7 +477,9 @@ export async function createResultsMap({
       zoom: 15,
       pitch: view?.pitch ?? 0,
       bearing: view?.bearing ?? 0,
-      maxBounds: boundsFrom(searchArea),
+      maxBounds: basemap.navigationBounds || boundsFrom(searchArea),
+      minZoom: 14.5,
+      maxZoom: 19,
       maxPitch: 65,
       attributionControl: { compact: true },
       canvasContextAttributes: { antialias: true, failIfMajorPerformanceCaveat: false },
@@ -506,6 +506,7 @@ export async function createResultsMap({
   let appliedCatalog = null;
   let catalogInitialized = false;
   let current = { retrievals, selectedKey, catalogs, galleryId, gridVisible: false, buildingsVisible: true, mode: '2d' };
+  const extrusionLayers=['madrid-buildings-3d'];
 
   async function ensureGalleryCatalog(nextGalleryId) {
     if (current.catalogs?.[nextGalleryId] || destroyed) return;
@@ -577,13 +578,11 @@ export async function createResultsMap({
     if (map.getLayer('catalog-cell-grid')) {
       map.setLayoutProperty('catalog-cell-grid', 'visibility', current.gridVisible ? 'visible' : 'none');
     }
-    if (map.getLayer('madrid-buildings-3d')) {
-      map.setLayoutProperty('madrid-buildings-3d', 'visibility', current.mode === '3d' && current.buildingsVisible ? 'visible' : 'none');
-    }
-    const extrusionLayer = map.getLayer('madrid-buildings-3d');
+    for(const layerId of extrusionLayers)if(map.getLayer(layerId))map.setLayoutProperty(layerId,'visibility',current.mode==='3d'&&current.buildingsVisible?'visible':'none');
+    const extrusionLayer = extrusionLayers.some(layerId=>map.getLayer(layerId));
     element.dataset.mapBuilding3dLayer = extrusionLayer ? 'ready' : 'unavailable';
     element.dataset.mapBuilding3dVisibility = extrusionLayer
-      ? map.getLayoutProperty('madrid-buildings-3d', 'visibility')
+      ? map.getLayoutProperty(extrusionLayers.find(layerId=>map.getLayer(layerId)), 'visibility')
       : 'unavailable';
   }
 
@@ -627,7 +626,7 @@ export async function createResultsMap({
   }
 
   map.on('atlas-candidate-select', event => onSelect?.(event.candidateKey));
-  map.on('moveend', () => onViewChange?.(currentCameraView(map)));
+  map.on('moveend', () => {const view=currentCameraView(map);element.dataset.mapCenter=`${view.center[0]},${view.center[1]}`;element.dataset.mapZoom=String(view.zoom);onViewChange?.(view);});
   map.on('error', event => {
     if (event?.error && /pmtiles|madrid-local/i.test(`${event.error.message} ${event.sourceId || ''}`)) {
       const updated = { ...status, basemap: 'error', buildings3dAvailable: false, message: 'No se pudo leer madrid.pmtiles; revisa el archivo local y sus metadatos.' };
@@ -662,21 +661,30 @@ export async function createResultsMap({
     setMode(mode) {
       if (destroyed) return;
       current.mode = mode === '3d' && basemap.buildings3dAvailable ? '3d' : '2d';
+      if(current.mode==='3d'){map.dragRotate.enable();map.touchPitch.enable();map.touchZoomRotate.enableRotation();}
+      else{map.dragRotate.disable();map.touchPitch.disable();map.touchZoomRotate.disableRotation();}
       element.dataset.mapMode = current.mode;
       element.dataset.mapBuilding3dRenderedFeatureCount = current.mode === '3d' ? 'pending' : '0';
       map.easeTo({
+        zoom: current.mode === '3d' ? Math.max(map.getZoom(),15.5) : map.getZoom(),
         pitch: current.mode === '3d' ? 48 : 0,
         bearing: current.mode === '3d' ? (map.getBearing() || 18) : 0,
         duration: reducedMotion() ? 0 : 620,
         essential: false,
       });
       applyCurrentData();
-      if (current.mode === '3d' && map.getLayer('madrid-buildings-3d')) {
-        map.once('idle', () => {
-          if (destroyed || current.mode !== '3d') return;
-          const visible = map.queryRenderedFeatures({ layers: ['madrid-buildings-3d'] }).length;
-          element.dataset.mapBuilding3dRenderedFeatureCount = String(visible);
-        });
+      if(current.mode==='3d'){
+        let attempts=0;
+        const measure=()=>{
+          if(destroyed||current.mode!=='3d')return;
+          const visible=map.queryRenderedFeatures({layers:extrusionLayers.filter(layerId=>map.getLayer(layerId))}).length;
+          element.dataset.mapBuildingSourceFeatureCount=String(map.querySourceFeatures('madrid-local',{sourceLayer:'building'}).length);
+          element.dataset.mapBuildingFootprintCount=String(map.queryRenderedFeatures({layers:['madrid-building-footprints']}).length);
+          element.dataset.mapEffectiveZoom=String(map.getZoom());element.dataset.mapExtrusionVisibility=String(map.getLayoutProperty('madrid-buildings-3d','visibility'));
+          if(visible>0||++attempts>=10)element.dataset.mapBuilding3dRenderedFeatureCount=String(visible);
+          else setTimeout(measure,500);
+        };
+        setTimeout(measure,reducedMotion()?100:700);
       }
     },
     setGallery(nextGalleryId) {
@@ -695,7 +703,7 @@ export async function createResultsMap({
     },
     reset() {
       if (destroyed) return;
-      map.easeTo({ center: [(searchArea.bbox.west + searchArea.bbox.east) / 2, (searchArea.bbox.south + searchArea.bbox.north) / 2], zoom: 15, pitch: 0, bearing: 0, duration: reducedMotion() ? 0 : 620, essential: false });
+      map.fitBounds(boundsFrom(searchArea), { padding: window.innerWidth<720?24:54, pitch:0, bearing:0, duration: reducedMotion()?0:620 });
     },
     north() {
       if (destroyed) return;

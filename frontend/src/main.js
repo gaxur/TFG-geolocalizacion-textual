@@ -1,6 +1,8 @@
 import './minimal.css';
 import { icon } from './visuals.js';
-import { AtlasApiError, apiBaseUrl, getCapabilities, retrieve } from './api.js';
+import { AtlasApiError, answerDialogue, apiBaseUrl, getCapabilities, getDialogueQueries,getDialogueVariants, retrieve, startDialogue } from './api.js';
+import { buildDialogueAnswer, buildDialogueStart, validateDialogueSession } from './dialogue.js';
+import { experimentalSessionId,getDescriptionVariant,validateDescriptionVariantManifest } from './description-variants.js';
 import {
   adaptRetrievalResponse,
   buildRetrievalRequest,
@@ -57,6 +59,7 @@ const state = {
     message: 'Comprobando recursos cartográficos locales…',
   },
   openSelect: '',
+  dialogue: { catalogue: null, variants:null, mode: 'official', queryId: 'H27', variantQueryId:'H27', length:'short', session: null, answer: '', answerKind: 'negation', status: 'idle', error: null },
 };
 
 let toastTimer;
@@ -202,6 +205,7 @@ function shell() {
   window.addEventListener('resize', () => mapHandle?.resize());
   render();
   loadCapabilities();
+  loadDialogueCatalogue();
 }
 
 function navigate(page) {
@@ -235,6 +239,15 @@ function render() {
     $('#form-error').textContent = '';
   });
   $('#search-form')?.addEventListener('submit', event => { event.preventDefault(); runSearch(); });
+  $('#dialogue-form')?.addEventListener('submit', event => { event.preventDefault(); startDialogueSession(); });
+  $('#dialogue-answer-form')?.addEventListener('submit', event => { event.preventDefault(); submitDialogueAnswer(); });
+  $('#dialogue-query')?.addEventListener('change', event => { state.dialogue.queryId=event.target.value;state.dialogue.session=null;state.dialogue.error=null;render(); });
+  $('#dialogue-mode')?.addEventListener('change', event => { state.dialogue.mode=event.target.value;state.dialogue.queryId=event.target.value==='official'?'H27':'X-prueba';state.dialogue.session=null;render(); });
+  $('#dialogue-variant-query')?.addEventListener('change',event=>{state.dialogue.variantQueryId=event.target.value;render();});
+  $('#dialogue-length')?.addEventListener('change',event=>{state.dialogue.length=event.target.value;render();});
+  renderDialogueVariantPanel();
+  $('#dialogue-answer')?.addEventListener('input', event => { state.dialogue.answer=event.target.value; });
+  $('#dialogue-answer-kind')?.addEventListener('change', event => { state.dialogue.answerKind=event.target.value; });
   document.querySelectorAll('.select-trigger').forEach(trigger => trigger.addEventListener('keydown', handleSelectKeydown));
   document.querySelectorAll('.select-menu [role="option"]').forEach(option => option.addEventListener('keydown', handleOptionKeydown));
   updateMapStatus(state.mapAssets);
@@ -252,7 +265,8 @@ async function loadCapabilities() {
   try {
     const data = await getCapabilities({ baseUrl: apiBaseUrl, timeoutMs: 12000 });
     if (!requestGuard.isCurrent(epoch)) return;
-    if (!data?.retrievers?.some(item => item.id === 'crosstext2loc' && item.available) || !Array.isArray(data.galleries) || !data.galleries.length) throw new TypeError('CrossText2Loc no está disponible.');
+    const dialogueAvailable=data?.pipeline_progress?.stages?.some(item=>item.id==='dialoguevpr'&&item.available);
+    if ((!data?.retrievers?.some(item => item.id === 'crosstext2loc' && item.available) && !dialogueAvailable) || !Array.isArray(data.galleries) || !data.galleries.length) throw new TypeError('CrossText2Loc y DialogueVPR no están disponibles.');
     state.capabilities = { status: 'ready', data, error: null };
     const available = new Set(data.galleries.map(item => item.gallery_id));
     state.galleryIds = state.galleryIds.filter(id => available.has(id));
@@ -264,6 +278,32 @@ async function loadCapabilities() {
     state.capabilities = { status: 'error', data: null, error: normalizeUiError(error) };
   }
   if (requestGuard.isCurrent(epoch)) render();
+}
+
+async function loadDialogueCatalogue() {
+  try { const [catalogue,variants]=await Promise.all([getDialogueQueries({baseUrl:apiBaseUrl,timeoutMs:12000}),getDialogueVariants({baseUrl:apiBaseUrl,timeoutMs:12000})]);state.dialogue.catalogue=catalogue;state.dialogue.variants=validateDescriptionVariantManifest(variants); }
+  catch { state.dialogue.catalogue={available:false,queries:[]}; }
+  render();
+}
+
+async function startDialogueSession() {
+  if (state.dialogue.status==='loading') return;
+  try {
+    state.dialogue.status='loading';state.dialogue.error=null;render();
+    const request=buildDialogueStart({mode:state.dialogue.mode,queryId:state.dialogue.queryId,description:state.text});
+    state.dialogue.session=validateDialogueSession(await startDialogue(request,{baseUrl:apiBaseUrl,timeoutMs:300000}));state.dialogue.status='ready';
+  } catch(error) { state.dialogue.status='error';state.dialogue.error=normalizeUiError(error); }
+  render();
+}
+
+async function submitDialogueAnswer() {
+  const session=state.dialogue.session;if (!session||state.dialogue.status==='loading') return;
+  try {
+    state.dialogue.status='loading';state.dialogue.error=null;render();
+    const request=buildDialogueAnswer({literal:state.dialogue.answer,kind:state.dialogue.answerKind});
+    state.dialogue.session=validateDialogueSession(await answerDialogue(session.session_id,request,{baseUrl:apiBaseUrl,timeoutMs:300000}));state.dialogue.answer='';state.dialogue.status='ready';
+  } catch(error) { state.dialogue.status='error';state.dialogue.error=normalizeUiError(error); }
+  render();
 }
 
 function normalizeUiError(error) {
@@ -443,7 +483,7 @@ function selectControl({ id, label, iconName, disabled, value, options }) {
 }
 
 function explorePage() {
-  const ready = state.capabilities.status === 'ready';
+  const ready = state.capabilities.status === 'ready' && state.capabilities.data?.retrievers?.some(item=>item.id==='crosstext2loc'&&item.available)===true;
   const loading = state.request.status === 'loading';
   const galleries = state.capabilities.data?.galleries || [];
   const count = state.results.reduce((total, row) => total + row.results.length, 0);
@@ -469,10 +509,11 @@ function explorePage() {
   <div class="workspace" data-mobile-view="${state.mobileView}">
     <section class="search-panel panel"><div class="panel-heading"><span class="panel-kicker">Consulta</span><h2>¿Qué ves a tu alrededor?</h2><p>Incluye edificios, espacios abiertos y detalles distintivos.</p></div>${status}<form id="search-form"><label for="description" class="field-label">Descripción del entorno</label><div class="textarea-wrap"><textarea id="description" name="description" autocomplete="off" maxlength="1200" rows="4" placeholder="Veo una plaza amplia rodeada de edificios…" ${loading ? 'disabled' : ''}>${escapeHtml(state.text)}</textarea><div class="textarea-footer"><span>Idioma: español</span><span id="char-count">${state.text.length} / 1.200</span></div></div><div class="example-label">Prueba una descripción</div><div class="example-chips">${examples.map((example, index) => `<button type="button" class="example-chip" data-example="${index}" ${loading ? 'disabled' : ''}>${escapeHtml(example.label)}</button>`).join('')}</div>${selectControl({ id: 'gallery', label: 'Galería', iconName: 'layers', disabled: !ready || loading, value: state.galleryIds[0], options: galleryOptions })}${selectControl({ id: 'processing', label: 'Procesamiento', iconName: 'chat', disabled: !ready || loading, value: state.processingMode, options: modeOptions })}<div class="unknown-note">${state.processingMode === 'with_llm' ? 'Con LLM transforma una vez con Qwen en_cartographic. No implica superioridad científica.' : 'Sin LLM envía el texto español directamente a CrossText2Loc.'}</div><p class="form-error" id="form-error" role="alert"></p><button class="primary search-button" type="submit" ${!ready || loading ? 'disabled' : ''}>${loading ? '<span class="spinner"></span> ' + (state.processingMode === 'with_llm' ? 'Transformando y recuperando…' : 'Recuperando candidatos…') : icon('search', 18) + ' Buscar Top-10 ' + icon('arrow', 18)}</button></form>${loading ? '<button class="cancel-button" data-action="cancel">Cancelar espera</button>' : ''}${requestError}<p class="privacy-note">${icon('info', 13)} La descripción se envía al servicio local del TFG. No introduzcas datos personales.</p></section>
     <section class="exploration" aria-label="Mapa y ranking de resultados">
+      ${dialogueControls()}
       ${pipelinePanel()}
       <section class="map-panel panel" aria-labelledby="map-heading">
         <div class="map-top"><div class="map-title"><span class="panel-kicker">Madrid · región piloto</span><strong id="map-heading">Mapa de candidatos</strong></div><div class="map-legend"><span class="evaluation-legend"><i></i> D004</span>${selectedCellSize ? `<span class="cell-legend"><i></i> Celda ${selectedCellSize} × ${selectedCellSize} m</span>` : ''}<span class="map-meta">WGS84</span></div></div>
-        <div class="map-toolbar" role="toolbar" aria-label="Controles del mapa"><div class="map-mode-group" role="group" aria-label="Perspectiva"><button type="button" data-map-action="mode-2d" aria-pressed="${state.mapMode === '2d'}">2D</button><button type="button" data-map-action="mode-3d" aria-pressed="${state.mapMode === '3d'}" ${state.mapAssets.buildings3dAvailable ? '' : 'disabled title="Requiere teselas locales con alturas de edificio verificadas"'}>3D</button></div><button type="button" class="map-tool" data-map-action="buildings" aria-pressed="${state.showBuildings}" ${state.mapAssets.buildings3dAvailable ? '' : 'disabled'}>${icon('building', 15)} Edificios</button><button type="button" class="map-tool" data-map-action="grid" aria-pressed="${state.showGrid}" ${mapReady ? '' : 'disabled'}>${icon('layers', 15)} Cuadrícula</button><button type="button" class="map-tool" data-map-action="north" aria-label="Orientar al norte">${icon('compass', 15)} Norte</button><button type="button" class="map-tool" data-map-action="reset" aria-label="Ajustar mapa a D004">${icon('target', 15)} D004</button></div>
+        <div class="map-toolbar" role="toolbar" aria-label="Controles del mapa"><div class="map-mode-group" role="group" aria-label="Perspectiva"><button type="button" data-map-action="mode-2d" aria-pressed="${state.mapMode === '2d'}">2D</button><button type="button" data-map-action="mode-3d" aria-pressed="${state.mapMode === '3d'}" ${state.mapAssets.buildings3dAvailable ? '' : 'disabled title="Requiere teselas locales de edificios"'}>3D visual</button></div><button type="button" class="map-tool" data-map-action="buildings" aria-pressed="${state.showBuildings}" ${state.mapAssets.buildings3dAvailable ? '' : 'disabled'}>${icon('building', 15)} Extrusiones</button><button type="button" class="map-tool" data-map-action="grid" aria-pressed="${state.showGrid}" ${mapReady ? '' : 'disabled'}>${icon('layers', 15)} Cuadrícula</button><button type="button" class="map-tool" data-map-action="north" aria-label="Orientar al norte">${icon('compass', 15)} Norte</button><button type="button" class="map-tool" data-map-action="reset" aria-label="Centrar región evaluada">${icon('target', 15)} Centrar región evaluada</button></div>
         <p id="map-data-status" class="map-data-status" role="status" aria-live="polite" data-state="partial">${escapeHtml(mapMessage)}</p>
         <div id="results-map" class="real-map" aria-label="Mapa interactivo de la región D004 y los candidatos del Top-10" aria-describedby="map-description"></div>
         <p id="map-description" class="sr-only">El mapa complementa la lista textual de resultados. Las celdas representan candidatos del catálogo, no la posición confirmada del observador.</p>
@@ -482,6 +523,21 @@ function explorePage() {
       <div class="results-footnote">${icon('info', 13)} <span id="results-footnote-text">${mapReady ? 'Se usan polígonos canónicos de las celdas; el centro no confirma la posición del observador. La similitud coseno no es una probabilidad.' : 'Sin geometría canónica disponible, el mapa no dibuja celdas aproximadas. La lista conserva los centros y el ranking; la similitud coseno no es una probabilidad.'}</span></div>
     </section>
   </div>`;
+}
+
+function dialogueControls() {
+  const dialogue=state.dialogue;const available=dialogue.catalogue?.available===true;const official=(dialogue.catalogue?.queries||[]).filter(item=>!item.completed);const session=dialogue.session;const imageUrl=dialogue.mode==='official'&&dialogue.queryId?`${apiBaseUrl}/dialogue/queries/${encodeURIComponent(dialogue.queryId)}/image`:null;const question=session?.current_question;
+  const selectedOfficial=official.find(row=>row.query_id===dialogue.queryId);
+  return `<section class="dialogue-controls panel" aria-labelledby="dialogue-heading"><div class="section-label">DIALOGUEVPR</div><h3 id="dialogue-heading">Sesión interactiva</h3><p class="small muted">Escribe la descripción tú mismo. Las sesiones oficiales exigen coincidencia exacta con el texto congelado.</p><form id="dialogue-form"><label class="field-label" for="dialogue-mode">Tipo</label><select id="dialogue-mode"><option value="official" ${dialogue.mode==='official'?'selected':''}>Cohorte oficial</option><option value="exploratory" ${dialogue.mode==='exploratory'?'selected':''}>Exploratoria separada</option></select><label class="field-label" for="dialogue-query">Identificador</label>${dialogue.mode==='official'?`<select id="dialogue-query">${official.map(row=>`<option value="${escapeHtml(row.query_id)}" ${row.query_id===dialogue.queryId?'selected':''} ${!row.image_available?'disabled':''}>${escapeHtml(row.query_id)}${row.image_available?'':' · sin imagen'}</option>`).join('')}</select>`:`<input id="dialogue-query" value="${escapeHtml(dialogue.queryId)}" placeholder="X-prueba">`}${selectedOfficial?`<small class="dialogue-hash">Descripción oficial SHA-256: ${escapeHtml(selectedOfficial.description_sha256)}</small>`:''}${imageUrl?`<img class="dialogue-reference" src="${imageUrl}" alt="Fotografía original de ${escapeHtml(dialogue.queryId)}">`:''}<button class="secondary full-width" type="submit" ${!available||dialogue.status==='loading'||session?.status==='awaiting_answer'?'disabled':''}>Iniciar DialogueVPR</button></form>${!available?'<p class="service-state">Runtime DialogueVPR no configurado en este arranque.</p>':''}${dialogue.error?`<p class="service-state error">${escapeHtml(dialogue.error.message)}</p>`:''}${question?`<form id="dialogue-answer-form" class="dialogue-question"><strong>Pregunta ${question.turn_index}</strong><p>${escapeHtml(question.question)}</p><textarea id="dialogue-answer" rows="2" maxlength="600" placeholder="Respuesta literal">${escapeHtml(dialogue.answer)}</textarea><select id="dialogue-answer-kind"><option value="affirmation">Sí / afirmación</option><option value="negation" ${dialogue.answerKind==='negation'?'selected':''}>No / negación</option><option value="unknown">Desconocida</option><option value="unobservable">No observable</option><option value="ambiguous">Ambigua</option><option value="stop">Detener</option></select><button class="primary full-width" type="submit" ${dialogue.status==='loading'?'disabled':''}>Guardar respuesta y continuar</button></form>`:''}${session?.status==='completed'?`<p class="service-state"><strong>Sesión completada</strong><span>${escapeHtml(session.stop_reason||'Criterio de parada alcanzado')}</span><small>SHA-256: ${escapeHtml(session.session_sha256)}</small></p>`:''}</section>`;
+}
+
+function renderDialogueVariantPanel(){
+  if(state.dialogue.mode!=='exploratory')return;
+  const form=$('#dialogue-form');const mode=$('#dialogue-mode');if(!form||!mode)return;
+  const variant=getDescriptionVariant(state.dialogue.variants,state.dialogue.variantQueryId,state.dialogue.length);if(!variant)return;
+  const fieldset=document.createElement('fieldset');fieldset.className='dialogue-variants';fieldset.innerHTML=`<legend>Descripción experimental</legend><label class="field-label" for="dialogue-variant-query">HXX de origen</label><select id="dialogue-variant-query">${state.dialogue.variants.scope_query_ids.map(id=>`<option value="${id}" ${id===state.dialogue.variantQueryId?'selected':''}>${id}</option>`).join('')}</select><label class="field-label" for="dialogue-length">Longitud</label><select id="dialogue-length">${[['short','Corta'],['medium','Media'],['long','Larga']].map(([id,label])=>`<option value="${id}" ${id===state.dialogue.length?'selected':''}>${label}</option>`).join('')}</select><div class="dialogue-preview"><strong>${variant.word_count} palabras</strong><p>${escapeHtml(variant.text_es)}</p><small>${variant.text_sha256}</small></div><img class="dialogue-reference" src="${apiBaseUrl}/dialogue/queries/${variant.source_query_id}/image" alt="Fotografía original de ${variant.source_query_id}"><button class="secondary full-width" type="button" data-action="load-dialogue-variant">Cargar descripción seleccionada</button>`;mode.insertAdjacentElement('afterend',fieldset);
+  $('#dialogue-variant-query')?.addEventListener('change',event=>{state.dialogue.variantQueryId=event.target.value;render();});
+  $('#dialogue-length')?.addEventListener('change',event=>{state.dialogue.length=event.target.value;render();});
 }
 
 function selectValue(id, value) {
@@ -628,6 +684,7 @@ async function handleClick(event) {
   const data = button.dataset;
   if (data.mobile) { state.mobileView = data.mobile; render(); document.querySelector(`[data-mobile="${data.mobile}"]`).focus({ preventScroll: true }); return; }
   if (data.mapAction) return updateMapAction(data.mapAction);
+  if(data.action==='load-dialogue-variant'){const variant=getDescriptionVariant(state.dialogue.variants,state.dialogue.variantQueryId,state.dialogue.length);if(!variant)return;state.dialogue.queryId=experimentalSessionId(variant.source_query_id,variant.length);state.text=variant.text_es;clearResults();render();toast('Variante experimental cargada; requiere autorización separada.');return;}
   if (data.dropdown) { state.openSelect = state.openSelect === data.dropdown ? '' : data.dropdown; render(); queueMicrotask(() => (state.openSelect ? document.querySelector(`[data-select-id="${data.dropdown}"]`) : document.querySelector(`[data-dropdown="${data.dropdown}"]`))?.focus()); return; }
   if (data.selectId) { selectValue(data.selectId, data.selectValue); return; }
   if (data.page) return navigate(data.page);
