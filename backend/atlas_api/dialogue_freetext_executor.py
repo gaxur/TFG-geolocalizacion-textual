@@ -37,8 +37,7 @@ class FreeTextRuntimeExecutor(SequentialDialogueExecutor):
   if self.progress_callback:self.progress_callback(stage,component,state)
  @property
  def identity(self):
-  current=self._build_identity()[0]
-  if current!=self._identity:raise RuntimeError('artefactos del ejecutor FreeText modificados')
+  if self._artifact_stats()!=self._identity_stats:raise RuntimeError('artefactos del ejecutor FreeText modificados')
   return dict(self._identity)
  def _artifact_paths(self):
   root=Path(__file__).resolve().parents[2];return [root/'backend/atlas_api',root/'src/tfg_phase0',root/'scripts/run_dialogue_freetext_worker.py',root/'scripts/run_mvp_dialogue_worker.py',root/'config/interactive_dialogue_freetext_v1.json',self.runtime_config,self.region_config,self.f3_bundle,self.clip_weights,self.qwen_model]
