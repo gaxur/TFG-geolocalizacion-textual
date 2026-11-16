@@ -54,6 +54,12 @@ La comparación con el MVP residente identifica las cargas repetidas como cuello
 de botella dominante. No se modificó el backend porque hacerlo invalidaría la
 identidad D098 y la sesión abierta. Véase [APP_PERFORMANCE_AND_UX_AUDIT.md](APP_PERFORMANCE_AND_UX_AUDIT.md).
 
+La sesión se archivó posteriormente, antes del runtime v2, en
+`runtime/freetext-application/superseded-sessions/` con manifest
+`a06e6401baa785582ece933737420fae0e97eacc0fa1dd96b92c2c420f6312e8`.
+El original conserva ranking/eventos y quedó `unknown` por supersession, no por
+fallo de inferencia. No se ejecutaron E1-E3.
+
 ## F4.1b-B: galería visual OSM de Madrid
 
 ### Objetivo y resultado

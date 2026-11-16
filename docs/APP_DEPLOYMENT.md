@@ -166,6 +166,31 @@ identidad, cuotas y restricciones; editar solo el booleano o copiar la plantilla
 no habilita inferencia. No se deben reutilizar autorizaciones científicas ni
 montarlas en este stack.
 
+### Perfil v2 residente
+
+El perfil real se genera dentro de la imagen API final, con los mounts y el
+volumen de estado efectivos:
+
+```bash
+docker compose -f compose.app.yaml build api
+docker compose -f compose.app.yaml run --rm --no-deps \
+  -v "$PWD/runtime/freetext-application:/profile-output" \
+  api python scripts/generate_freetext_application_profile.py \
+  --output /profile-output/freetext-application-pgx-20261116-v2.json
+```
+
+El arranque solo valida identidad y permanece lazy. Una prueba real iniciada por
+el operador debe exigir:
+
+- E0: `cache_hit=false` para Qwen y CT2L, una carga física por modelo y ranking
+  exhaustivo de 253 candidatos 50 m;
+- E1-E3, si se alcanzan: `cache_hit=true` y ninguna carga física adicional;
+- sidecars `eN-qwen-runtime.json` y `eN-crosstext2loc-runtime.json` con latencias;
+- cero retries, estado durable y cierre controlado de ambos modelos.
+
+`/health/ready` confirma perfil/configuración, no que los dos modelos ya se hayan
+cargado o que quepan simultáneamente en memoria.
+
 ## Limitaciones
 
 - El sistema recupera candidatos de una galería de Madrid; no es GPS, no estima
@@ -180,6 +205,6 @@ montarlas en este stack.
   independientes.
 - El healthcheck demuestra disponibilidad técnica, no autorización para ejecutar
   ni validez científica de resultados.
-- El perfil por defecto impide el modo aplicación. La prueba GPU autorizada está
-  registrada en `APP_TEST_RESULTS.md`: falló en el preflight antes de cargar
-  modelos y no se repitió.
+- El perfil por defecto impide el modo aplicación. La prueba v1 y su supersession
+  están registradas en `APP_TEST_RESULTS.md`; v2 residente está aprobado y activo,
+  pero aún no tiene prueba GPU real ni métricas de mejora.

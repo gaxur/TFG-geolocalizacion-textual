@@ -4205,8 +4205,11 @@ aprobación.
 
 ### Aprobación registrada
 
-- `profile_id`: `freetext-application-pgx-20261116-v1`.
-- Vigencia: 90 días desde la generación hash-bound.
+- Perfil v1: `freetext-application-pgx-20261116-v1`, runtime efímero, supersedido
+  tras archivar íntegramente la sesión abierta.
+- Perfil v2 aprobado: `freetext-application-pgx-20261116-v2`, versión `2.0.0`,
+  runtime `resident-sequential-lazy-v1`.
+- Vigencia v2: `2026-11-16T18:34:52Z` a `2027-02-14T18:34:52Z`.
 - Sesiones/descripciones acumuladas: ilimitadas (`null`).
 - Sesiones abiertas: 1.
 - Retención: hasta revisión del TFG.

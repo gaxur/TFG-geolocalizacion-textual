@@ -567,6 +567,21 @@ Las entradas son append-only.
 - **Próximo paso:** decisión humana sobre preservar la sesión o regenerar perfil;
   no ejecutar otra inferencia automáticamente.
 
+### 2026-11-16 — FREETEXT-APPLICATION-RESIDENT-V2-PREPARATION-01
+
+- **Sesión v1:** archivada byte-exacta con manifest `a06e6401…`; original marcado
+  `unknown/runtime_identity_superseded_no_retry`, ranking E0 y eventos conservados.
+- **D098 v2:** perfil `freetext-application-pgx-20261116-v2`, versión 2.0.0,
+  lifecycle residente secuencial lazy y vigencia hasta `2027-02-14T18:34:52Z`.
+- **Runtime:** una carga física lazy por modelo, dos preflights independientes,
+  un único `ModelGate` global, lock residente y cierre best-effort.
+- **Inferencia:** no ejecutada para v2; viabilidad conjunta Qwen+CT2L pendiente de
+  una futura prueba autorizada.
+- **Perfil final v2:** executor `6f7adaab…`, readiness
+  `resident-sequential-lazy-v1`, solo galería 50 m, cero POST/modelos al startup.
+- **Validación:** 83 backend PASS; 48 frontend PASS +1 skip; browser fake E0-E3
+  PASS; Compose/py_compile PASS.
+
 ### 2026-11-06 — P2-04-CONTINUATION-BLOCKED-01
 
 - **Tarea:** registrar aprobación humana de E0 y generar E1–E3 mediante contrato

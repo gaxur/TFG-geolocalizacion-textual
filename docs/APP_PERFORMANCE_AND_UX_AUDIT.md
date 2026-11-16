@@ -41,13 +41,19 @@ La búsqueda exhaustiva residente de CrossText2Loc está históricamente en
 milisegundos; la mayor diferencia actual es la carga/descarga de modelos, no la
 similitud coseno ni el catálogo.
 
-## Decisión de optimización
+## Optimización implementada
 
-No se cambió aún a modelos residentes. Ese cambio afecta memoria, ejecutor e
-identidad hash-bound D098. Requiere instrumentación backend, regenerar el perfil
-y una autorización explícita antes de otra prueba GPU. La opción prioritaria a
-evaluar es un único worker secuencial que reutilice Qwen y CT2L sin concurrencia;
-no se afirmará mejora hasta medirla.
+D098 v2 incorpora un executor residente lazy: Qwen y CT2L se cargan al primer
+uso, no al arrancar Compose, y se reutilizan entre E0-E3 y sesiones. Un único
+`ModelGate`, un lock residente y un worker Uvicorn impiden concurrencia GPU. Cada
+carga física tiene su preflight propio y la telemetría vive en sidecars fuera de
+los rankings científicos. La viabilidad conjunta y la mejora real siguen
+pendientes de la primera sesión del operador; no se ejecutó inferencia v2.
+
+Los máximos de carga del perfil permanecen como unidades conservadoras de
+presupuesto. Las cargas físicas se observan por separado en sidecars
+`eN-qwen-runtime.json` y `eN-crosstext2loc-runtime.json`; normalmente solo E0
+debe cargar y E1-E3 deben registrar `cache_hit=true`.
 
 ## Correcciones funcionales
 

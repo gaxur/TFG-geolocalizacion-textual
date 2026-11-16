@@ -13,7 +13,8 @@ el perfil real aprobado se genera fuera de Git y está ligado al runtime.
 - `compose.app.yaml`: API FastAPI y frontend Nginx.
 - Solo Nginx publica `127.0.0.1:8080`; API en red interna.
 - Imagen API propia derivada de `crosstext2loc-gb10:f511`, sin datos/modelos.
-- Qwen/CT2L efímeros secuenciales y un único `ModelGate`.
+- Qwen/CT2L residentes lazy, estrictamente secuenciales y un único `ModelGate`;
+  no se cargan al arrancar Compose.
 - Policy core application separada sobre la implementación FreeText compartida;
   declara stop temprano sin modificar la policy científica.
 - SQLite WAL/FULL para cuotas, idempotencia y admisión reutilizable.

@@ -1,7 +1,7 @@
 # Resultados de pruebas de la aplicación
 
-- Backend/API/admisión/Compose/regresiones: `79 passed`.
-- Frontend: `45 passed`, `1 skipped` por PMTiles unitario opcional.
+- Backend/API/admisión/Compose/regresiones: `83 passed`.
+- Frontend: `48 passed`, `1 skipped` por PMTiles unitario opcional.
 - Vite build: PASS con warning de chunk MapLibre existente.
 - `APP_DISABLED_BROWSER_PASS`: stack real, perfil pendiente, MapLibre y cero POST.
 - `APP_FLOW_BROWSER_PASS`: API fake, creación, Q1-Q3, E0-E3, mapa estable y recarga.
@@ -25,5 +25,16 @@ Qwen, CrossText2Loc ni VLM en esta integración.
 Una sesión interactiva posterior iniciada por el operador verificó el fix del
 resource monitor y completó E0: 134,813 s, 253 candidatos exhaustivos, Top-10 y
 primera pregunta. Qwen ocupó 119,296 s por eventos (3,046 s de generación) y
-CrossText2Loc 15,491 s. La sesión permanece `waiting_user`; el agente no la
-respondió. E1-E3 no se revalidaron en este lote.
+CrossText2Loc 15,491 s. El agente no la respondió. Antes del runtime residente,
+la sesión se archivó íntegramente (manifest `a06e6401…`) y quedó `unknown` con
+motivo `runtime_identity_superseded_no_retry`; no es completed ni failed. E1-E3
+no se revalidaron.
+
+## Runtime residente v2
+
+- Perfil: `freetext-application-pgx-20261116-v2`.
+- Executor identity SHA-256: `6f7adaab8e667cc66fea0cbd1c43f5e019d478fb3da6faee74a95a0e507048d6`.
+- Startup: readiness `resident-sequential-lazy-v1`, cero POST y cero modelos.
+- CPU: cargas fake Qwen/CT2L únicas, cache hits E1, cierre, contratos CT2L,
+  supersession e idempotencia.
+- GPU: no ejecutada; no se afirma todavía reducción real ni convivencia en RAM.
