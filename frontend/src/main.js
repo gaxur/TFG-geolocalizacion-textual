@@ -63,13 +63,15 @@ const state = {
   },
   openSelect: '',
   dialogue: { catalogue: null, variants:null, mode: 'official', policyId:'legacy-official-v1', queryId: 'H27', variantQueryId:'H27', length:'short', session: null, answer: '', answerKind: 'free_text', status: 'idle', error: null },
-  freetext:{catalogue:null,pilot:null,selectedPolicy:applicationMode?APPLICATION_FREETEXT_POLICY:OPERATIONAL_FREETEXT_POLICY,selectedVariant:'H27-medium',session:null,answer:'',selectedStage:'E0',status:'idle',error:null,progress:null,events:[],streamState:'idle'},
+  freetext:{catalogue:null,pilot:null,selectedPolicy:applicationMode?APPLICATION_FREETEXT_POLICY:OPERATIONAL_FREETEXT_POLICY,selectedVariant:'H27-medium',session:null,answer:'',selectedStage:'E0',status:'idle',error:null,progress:null,events:[],streamState:'idle',panelCollapsed:false,chatPinned:true},
 };
 
 let toastTimer;
 let activeController = null;
 let activeProgressStream = null;
 let activeFreeTextEventSource = null;
+let freeTextReconnectTimer = null;
+let freeTextStreamGeneration = 0;
 let pipelineClockTimer = null;
 let mapHandle = null;
 let mapMountPromise = null;
@@ -180,6 +182,42 @@ function clearResults() {
   state.openSelect = '';
 }
 
+function stopFreeTextEvents() {
+  freeTextStreamGeneration += 1;
+  clearTimeout(freeTextReconnectTimer);
+  freeTextReconnectTimer = null;
+  activeFreeTextEventSource?.close();
+  activeFreeTextEventSource = null;
+}
+
+function safeLocalStorage(action, key, value) {
+  try {
+    if (action === 'set') { localStorage.setItem(key, value); return true; }
+    else if (action === 'remove') {
+      const session=state.freetext.session;
+      if(key===applicationPendingOperationKey&&session){let pointer=null;try{pointer=validateRecoveryPointer(JSON.parse(localStorage.getItem(recoveryStorageKey(session.policy_id))||'null'));}catch{return false;}if(pointer?.session_id!==session.session_id)return false;}
+      localStorage.removeItem(key);return true;
+    }
+    else return localStorage.getItem(key);
+  } catch {
+    toast('La sesión continúa, pero este navegador no puede guardar su recuperación local.');
+    if(action==='set'&&key===applicationPendingOperationKey){state.freetext.status='error';state.freetext.error={code:'LOCAL_RECOVERY_UNAVAILABLE',message:'No se puede iniciar: el navegador no permite guardar una operación recuperable.'};queueMicrotask(render);throw new TypeError(state.freetext.error.message);}
+    return action === 'get' ? null : false;
+  }
+}
+
+function resetFreeTextSession() {
+  const session = state.freetext.session;
+  if (session && ['pending', 'running', 'waiting_user'].includes(normalizeFreeTextStatus(session.status))) return;
+  stopFreeTextEvents();
+  safeLocalStorage('remove', applicationPendingOperationKey);
+  if (session?.policy_id) safeLocalStorage('remove', recoveryStorageKey(session.policy_id));
+  state.freetext = { ...state.freetext, session: null, answer: '', selectedStage: 'E0', status: 'idle', error: null, progress: null, events: [], streamState: 'idle', panelCollapsed: false };
+  clearResults();
+  render();
+  queueMicrotask(() => $('#description')?.focus());
+}
+
 function shell() {
   $('#app').innerHTML = `<div class="app-body">
     <a class="skip-link" href="#main">Saltar al contenido principal</a>
@@ -214,6 +252,26 @@ function shell() {
   loadFreeTextPilot();
 }
 
+function enhanceApplicationPanel() {
+  if (!applicationMode) return;
+  document.body.classList.add('app-mode');
+  const panel = $('.freetext-panel');
+  const searchPanel = $('.search-panel');
+  if (panel && searchPanel) searchPanel.append(panel);
+  if (!panel) return;
+  const sourceText=panel.querySelector('.freetext-source p');if(sourceText&&state.freetext.session?.description_es)sourceText.textContent=state.freetext.session.description_es;
+  panel.classList.toggle('is-collapsed', state.freetext.panelCollapsed);
+  const header = panel.querySelector('.freetext-header');
+  if (header) header.insertAdjacentHTML('beforeend', `<button type="button" class="panel-toggle" data-action="toggle-dialogue" aria-expanded="${!state.freetext.panelCollapsed}">${state.freetext.panelCollapsed ? 'Abrir diálogo' : 'Minimizar'}</button>`);
+  if (state.freetext.error) {
+    panel.insertAdjacentHTML('afterbegin', `<div class="service-state error freetext-error" role="alert"><strong>No se pudo actualizar la sesión</strong><span>${escapeHtml(state.freetext.error.message || 'Error de sesión.')}</span>${state.freetext.error.requestId ? `<small>Referencia: ${escapeHtml(state.freetext.error.requestId)}</small>` : ''}</div>`);
+  }
+  const status = normalizeFreeTextStatus(state.freetext.session?.status);
+  const question=state.freetext.session?.current_question;if(question){const progress=panel.querySelector('.freetext-progress strong');if(progress)progress.textContent=`Pregunta ${question.turn_index} de 3`;}
+  if (['completed', 'failed', 'unknown'].includes(status)) panel.insertAdjacentHTML('beforeend', '<button type="button" class="primary full-width new-search-button" data-action="new-freetext-search">Nueva búsqueda</button>');
+  const chat=panel.querySelector('.freetext-chat');if(chat){chat.addEventListener('scroll',()=>{state.freetext.chatPinned=chat.scrollHeight-chat.scrollTop-chat.clientHeight<48;},{passive:true});if(state.freetext.chatPinned)queueMicrotask(()=>chat.scrollTo({top:chat.scrollHeight,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));}
+}
+
 function navigate(page) {
   state.page = page;
   if (location.hash !== `#${page}`) window.history.replaceState(null, '', `#${page}`);
@@ -223,6 +281,8 @@ function navigate(page) {
 
 function render() {
   const previousMapElement = $('#results-map');
+  const previousChat = $('.freetext-chat');
+  if (previousChat) state.freetext.chatPinned = previousChat.scrollHeight-previousChat.scrollTop-previousChat.clientHeight < 48;
   const preserveMapElement = state.page === 'explore' && Boolean(previousMapElement) && Boolean(mapHandle || mapMountPromise);
   if (state.page !== 'explore') destroyMap();
   document.querySelectorAll('[data-page]').forEach(element => {
@@ -272,7 +332,7 @@ function render() {
     $('#processing')?.closest('.select-field')?.remove();
     $('#freetext-start')?.remove();
     const note=$('#search-form .unknown-note');if(note)note.textContent='Qwen en_cartographic y CrossText2Loc se ejecutan secuencialmente. Después podrás responder hasta tres preguntas.';
-    const button=$('#search-form button[type="submit"]');if(button&&state.request.status!=='loading')button.innerHTML=`${icon('search',18)} Iniciar geolocalización ${icon('arrow',18)}`;
+    const busy=state.freetext.status==='loading',hasSession=Boolean(state.freetext.session);const button=$('#search-form button[type="submit"]');if(button){button.disabled=busy||hasSession||state.capabilities.status!=='ready';button.innerHTML=busy?'<span class="spinner"></span> Procesando etapa…':hasSession?'Sesión activa':`${icon('search',18)} Iniciar geolocalización ${icon('arrow',18)}`;}const input=$('#description');if(input)input.disabled=busy||hasSession;document.querySelectorAll('.example-chip').forEach(chip=>{chip.disabled=busy||hasSession;});enhanceApplicationPanel();
   }
   document.querySelectorAll('[data-freetext-stage]').forEach(button=>button.addEventListener('click',()=>selectFreeTextStage(button.dataset.freetextStage)));
   document.querySelectorAll('.select-trigger').forEach(trigger => trigger.addEventListener('keydown', handleSelectKeydown));
@@ -314,32 +374,32 @@ async function loadDialogueCatalogue() {
 }
 
 async function loadFreeTextPilot(){
- try{const catalogue=validateFreeTextPolicyCatalogue(await getFreeTextPilots({baseUrl:apiBaseUrl,timeoutMs:12000}));state.freetext.catalogue=catalogue;let productPointer=null;const recoveryPolicies=applicationMode?[APPLICATION_FREETEXT_POLICY]:[OPERATIONAL_FREETEXT_POLICY];for(const policyId of recoveryPolicies){try{productPointer=validateRecoveryPointer(JSON.parse(localStorage.getItem(recoveryStorageKey(policyId))||'null'));if(productPointer)break;}catch{/* Puntero corrupto. */}}state.freetext.selectedPolicy=productPointer?.policy_id||selectPrimaryFreeTextPolicy(catalogue);try{state.freetext.pilot=validateFreeTextPilot(await getFreeTextPilot({baseUrl:apiBaseUrl,timeoutMs:12000}));}catch{state.freetext.pilot=null;}const recovered=await recoverFreeTextSession(state.freetext.selectedPolicy);if(applicationMode&&!recovered){const pending=localStorage.getItem(applicationPendingOperationKey);if(pending)try{await reconcileFreeTextAfterLostResponse(pending);localStorage.removeItem(applicationPendingOperationKey);}catch{/* Sigue pendiente o nunca llegó al servidor. */}}}
+ try{const catalogue=validateFreeTextPolicyCatalogue(await getFreeTextPilots({baseUrl:apiBaseUrl,timeoutMs:12000}));state.freetext.catalogue=catalogue;let productPointer=null;const recoveryPolicies=applicationMode?[APPLICATION_FREETEXT_POLICY]:[OPERATIONAL_FREETEXT_POLICY];for(const policyId of recoveryPolicies){try{productPointer=validateRecoveryPointer(JSON.parse(safeLocalStorage('get',recoveryStorageKey(policyId))||'null'));if(productPointer)break;}catch{/* Puntero corrupto. */}}state.freetext.selectedPolicy=productPointer?.policy_id||selectPrimaryFreeTextPolicy(catalogue);try{state.freetext.pilot=validateFreeTextPilot(await getFreeTextPilot({baseUrl:apiBaseUrl,timeoutMs:12000}));}catch{state.freetext.pilot=null;}const recovered=await recoverFreeTextSession(state.freetext.selectedPolicy);if(applicationMode&&!recovered){const pending=safeLocalStorage('get',applicationPendingOperationKey);if(pending)try{await reconcileFreeTextAfterLostResponse(pending);safeLocalStorage('remove',applicationPendingOperationKey);}catch{/* Sigue pendiente o nunca llegó al servidor. */}}}
  catch(error){state.freetext.error={message:error?.message||'FreeText no disponible.'};}
  render();
 }
 async function recoverFreeTextSession(policyId){
- let pointer=null;try{pointer=validateRecoveryPointer(JSON.parse(localStorage.getItem(recoveryStorageKey(policyId))||'null'))||policyId===HISTORICAL_FREETEXT_POLICY&&validateRecoveryPointer(JSON.parse(localStorage.getItem('atlas-dialogue-freetext-active-v2')||'null'));}catch{/* Puntero local corrupto: se descarta. */}
+ let pointer=null;try{pointer=validateRecoveryPointer(JSON.parse(safeLocalStorage('get',recoveryStorageKey(policyId))||'null'))||policyId===HISTORICAL_FREETEXT_POLICY&&validateRecoveryPointer(JSON.parse(safeLocalStorage('get','atlas-dialogue-freetext-active-v2')||'null'));}catch{/* Puntero local corrupto: se descarta. */}
  const recoveryId=pointer?.session_id||(policyId===HISTORICAL_FREETEXT_POLICY?state.freetext.pilot?.session_id:null);if(!recoveryId)return null;
- try{const session=validateFreeTextSession(await getFreeTextSession(recoveryId,{baseUrl:apiBaseUrl,timeoutMs:12000}));if(session.policy_id!==policyId)throw new TypeError('La sesión recuperada pertenece a otra política.');if(pointer?.query_id&&session.experimental_query_id!==pointer.query_id)throw new TypeError('Puntero FreeText divergente.');state.freetext.session=session;persistFreeTextSession(session);if(applicationMode)localStorage.removeItem(applicationPendingOperationKey);await reconcileFreeTextEvents(session);applyFreeTextStage(session.final_stage||session.stage_snapshots.at(-1)?.stage||'E0');return session;}
- catch(error){if([404,410].includes(error?.status)||['FREETEXT_NOT_FOUND','FREETEXT_EXPIRED'].includes(error?.code)){localStorage.removeItem(recoveryStorageKey(policyId));state.freetext.session=null;state.freetext.error={code:error.code,message:'La sesión guardada ya no existe o ha caducado. Puedes iniciar una nueva.'};return null;}throw error;}
+  try{const session=validateFreeTextSession(await getFreeTextSession(recoveryId,{baseUrl:apiBaseUrl,timeoutMs:12000}));if(session.policy_id!==policyId)throw new TypeError('La sesión recuperada pertenece a otra política.');if(pointer?.query_id&&session.experimental_query_id!==pointer.query_id)throw new TypeError('Puntero FreeText divergente.');state.freetext.session=session;persistFreeTextSession(session);if(applicationMode)safeLocalStorage('remove',applicationPendingOperationKey);await reconcileFreeTextEvents(session);applyFreeTextStage(session.final_stage||session.stage_snapshots.at(-1)?.stage||'E0');if(['pending','running'].includes(normalizeFreeTextStatus(session.status)))openFreeTextSessionEvents(session);return session;}
+  catch(error){if([404,410].includes(error?.status)||['FREETEXT_NOT_FOUND','FREETEXT_EXPIRED'].includes(error?.code)){safeLocalStorage('remove',recoveryStorageKey(policyId));state.freetext.session=null;state.freetext.error={code:error.code,message:'La sesión guardada ya no existe o ha caducado. Puedes iniciar una nueva.'};return null;}throw error;}
 }
-function persistFreeTextSession(session){localStorage.setItem(recoveryStorageKey(session.policy_id),JSON.stringify(recoveryPointer(session)));}
+function persistFreeTextSession(session){return safeLocalStorage('set',recoveryStorageKey(session.policy_id),JSON.stringify(recoveryPointer(session)));}
 async function reconcileFreeTextEvents(session){
  state.freetext.streamState='reconciling';
  try{state.freetext.events=normalizeFreeTextEvents(await getFreeTextEvents(session.session_id,{baseUrl:apiBaseUrl,timeoutMs:5000}));state.freetext.streamState='connected';}
  catch(error){state.freetext.streamState=[404,405,501].includes(error?.status)?'unavailable':'disconnected';}
 }
 function openFreeTextSessionEvents(session){
- activeFreeTextEventSource?.close();activeFreeTextEventSource=null;if(![OPERATIONAL_FREETEXT_POLICY,APPLICATION_FREETEXT_POLICY].includes(session.policy_id)||typeof EventSource!=='function')return;const after=state.freetext.events.at(-1)?.id;const source=new EventSource(freeTextEventStreamUrl(session.session_id,{baseUrl:apiBaseUrl,after}));activeFreeTextEventSource=source;source.addEventListener('session',event=>{try{const row=normalizeFreeTextEvents([JSON.parse(event.data)])[0];if(!state.freetext.events.some(x=>x.id===row.id))state.freetext.events.push(row);state.freetext.progress={stage_id:row.stage,state:row.state,message:row.message};state.freetext.streamState='connected';if(['waiting_user','completed','failed','unknown'].includes(row.state)){source.close();activeFreeTextEventSource=null;getFreeTextSession(session.session_id,{baseUrl:apiBaseUrl,timeoutMs:12000}).then(validateFreeTextSession).then(current=>{state.freetext.session=current;persistFreeTextSession(current);state.freetext.status='ready';applyFreeTextStage(current.final_stage||current.stage_snapshots.at(-1)?.stage||'E0');}).catch(()=>{state.freetext.streamState='unknown';render();});}else render();}catch{state.freetext.streamState='unknown';render();}});source.onerror=()=>{state.freetext.streamState='disconnected';source.close();activeFreeTextEventSource=null;getFreeTextSession(session.session_id,{baseUrl:apiBaseUrl,timeoutMs:12000}).then(validateFreeTextSession).then(async current=>{state.freetext.session=current;persistFreeTextSession(current);await reconcileFreeTextEvents(current);const currentStatus=normalizeFreeTextStatus(current.status);if(['pending','running'].includes(currentStatus)){setTimeout(()=>openFreeTextSessionEvents(current),1000);render();return;}state.freetext.status='ready';applyFreeTextStage(current.final_stage||current.stage_snapshots.at(-1)?.stage||'E0');}).catch(()=>{state.freetext.streamState='unknown';render();});};}
+ stopFreeTextEvents();if(![OPERATIONAL_FREETEXT_POLICY,APPLICATION_FREETEXT_POLICY].includes(session.policy_id)||typeof EventSource!=='function')return;const generation=freeTextStreamGeneration,sessionId=session.session_id,active=()=>generation===freeTextStreamGeneration&&state.freetext.session?.session_id===sessionId;const after=state.freetext.events.at(-1)?.id;const source=new EventSource(freeTextEventStreamUrl(sessionId,{baseUrl:apiBaseUrl,after}));activeFreeTextEventSource=source;source.addEventListener('session',event=>{if(!active()){source.close();return;}try{const row=normalizeFreeTextEvents([JSON.parse(event.data)])[0];if(!state.freetext.events.some(x=>x.id===row.id))state.freetext.events.push(row);state.freetext.progress={stage_id:row.stage,state:row.state,message:row.message};state.freetext.streamState='connected';if(['waiting_user','completed','failed','unknown'].includes(row.state)){source.close();activeFreeTextEventSource=null;getFreeTextSession(sessionId,{baseUrl:apiBaseUrl,timeoutMs:12000}).then(validateFreeTextSession).then(current=>{if(!active())return;state.freetext.session=current;persistFreeTextSession(current);state.freetext.status='ready';applyFreeTextStage(current.final_stage||current.stage_snapshots.at(-1)?.stage||'E0');}).catch(()=>{if(active()){state.freetext.streamState='unknown';render();}});}else render();}catch{state.freetext.streamState='unknown';render();}});source.onerror=()=>{if(!active()){source.close();return;}state.freetext.streamState='disconnected';source.close();activeFreeTextEventSource=null;getFreeTextSession(sessionId,{baseUrl:apiBaseUrl,timeoutMs:12000}).then(validateFreeTextSession).then(async current=>{if(!active())return;state.freetext.session=current;persistFreeTextSession(current);await reconcileFreeTextEvents(current);const currentStatus=normalizeFreeTextStatus(current.status);if(['pending','running'].includes(currentStatus)){freeTextReconnectTimer=setTimeout(()=>{if(active())openFreeTextSessionEvents(current);},1000);render();return;}state.freetext.status='ready';applyFreeTextStage(current.final_stage||current.stage_snapshots.at(-1)?.stage||'E0');}).catch(()=>{if(active()){state.freetext.streamState='unknown';render();}});};}
 async function reconcileFreeTextAfterLostResponse(operationId){
- const pointer=validateRecoveryPointer(JSON.parse(localStorage.getItem(recoveryStorageKey(state.freetext.selectedPolicy))||'null'));let session;if(pointer)session=validateFreeTextSession(await getFreeTextSession(pointer.session_id,{baseUrl:apiBaseUrl,timeoutMs:12000}));else if(applicationMode&&operationId)session=validateFreeTextSession(await getApplicationSessionByOperation(operationId,{baseUrl:apiBaseUrl,timeoutMs:12000}));else if(state.freetext.selectedPolicy===HISTORICAL_FREETEXT_POLICY){session=await reconcilePersistedFreeText({getPilot:()=>getFreeTextPilot({baseUrl:apiBaseUrl,timeoutMs:12000}),getSession:id=>getFreeTextSession(id,{baseUrl:apiBaseUrl,timeoutMs:12000})});}else throw new TypeError('El servidor no devolvió todavía un identificador de sesión recuperable.');state.freetext.session=session;persistFreeTextSession(session);await reconcileFreeTextEvents(session);state.freetext.status='ready';applyFreeTextStage(session.final_stage||session.stage_snapshots.at(-1)?.stage||'E0');return session;
+ const pointer=validateRecoveryPointer(JSON.parse(safeLocalStorage('get',recoveryStorageKey(state.freetext.selectedPolicy))||'null'));let session;if(pointer)session=validateFreeTextSession(await getFreeTextSession(pointer.session_id,{baseUrl:apiBaseUrl,timeoutMs:12000}));else if(applicationMode&&operationId)session=validateFreeTextSession(await getApplicationSessionByOperation(operationId,{baseUrl:apiBaseUrl,timeoutMs:12000}));else if(state.freetext.selectedPolicy===HISTORICAL_FREETEXT_POLICY){session=await reconcilePersistedFreeText({getPilot:()=>getFreeTextPilot({baseUrl:apiBaseUrl,timeoutMs:12000}),getSession:id=>getFreeTextSession(id,{baseUrl:apiBaseUrl,timeoutMs:12000})});}else throw new TypeError('El servidor no devolvió todavía un identificador de sesión recuperable.');state.freetext.session=session;if(!persistFreeTextSession(session))throw new TypeError('No se pudo guardar la sesión recuperada en este navegador.');await reconcileFreeTextEvents(session);state.freetext.status='ready';applyFreeTextStage(session.final_stage||session.stage_snapshots.at(-1)?.stage||'E0');return session;
 }
-function applyFreeTextStage(stage){const session=state.freetext.session,row=session&&adaptFreeTextStage(session,stage);state.freetext.selectedStage=stage;if(row){state.results=[row];state.galleryIds=[row.galleryId];state.selected=row.results[0]?.key||'';state.hasRun=true;}render();if(normalizeFreeTextStatus(session?.status)==='waiting_user')queueMicrotask(()=>$('#freetext-answer')?.focus());}
+function applyFreeTextStage(stage){const session=state.freetext.session,row=session&&adaptFreeTextStage(session,stage);state.freetext.selectedStage=stage;if(row){state.results=[row];state.galleryIds=[row.galleryId];state.selected=row.results[0]?.key||'';state.hasRun=true;state.mobileView='results';}render();if(normalizeFreeTextStatus(session?.status)==='waiting_user')queueMicrotask(()=>$('#freetext-answer')?.focus());}
 function selectFreeTextStage(stage){if(state.freetext.session?.stage_snapshots.some(x=>x.stage===stage))applyFreeTextStage(stage);}
-async function freeTextTransition(work,progressId){if(state.freetext.status==='loading')return;state.freetext.status='loading';state.freetext.error=null;state.freetext.progress={stage_id:'request',state:'pending'};render();const existing=state.freetext.session,isProduct=[OPERATIONAL_FREETEXT_POLICY,APPLICATION_FREETEXT_POLICY].includes(existing?.policy_id);if(isProduct)openFreeTextSessionEvents(existing);const stream=isProduct?null:openProgressStream(progressId,{baseUrl:apiBaseUrl,onEvent:event=>{state.freetext.progress=event;render();},onDisconnect:()=>{state.freetext.streamState='disconnected';}});if(stream)await stream.ready;try{const session=validateFreeTextSession(await work());state.freetext.session=session;persistFreeTextSession(session);await reconcileFreeTextEvents(session);openFreeTextSessionEvents(session);state.freetext.status='ready';applyFreeTextStage(session.final_stage||session.stage_snapshots.at(-1)?.stage||'E0');}catch(error){if(error?.code==='UPSTREAM_RESPONSE_LOST'||error?.code==='TIMEOUT'||applicationMode&&error?.code==='NETWORK_ERROR'){try{await reconcileFreeTextAfterLostResponse(progressId);if(applicationMode)localStorage.removeItem(applicationPendingOperationKey);toast('La respuesta se perdió; se reconcilió la sesión sin repetir la operación.');}catch(reconcileError){state.freetext.status='error';state.freetext.error={code:'FREETEXT_RECONCILIATION_FAILED',message:'No se pudo confirmar la operación. No la reenvíes.',detail:reconcileError?.message};render();}}else{if(applicationMode)localStorage.removeItem(applicationPendingOperationKey);state.freetext.status='error';state.freetext.error=normalizeUiError(error);render();}}finally{stream?.close();}}
-async function startFreeTextSession(){if(state.freetext.status==='loading'||state.freetext.session)return;const pilot=state.freetext.pilot,policy=state.freetext.catalogue?.policies?.find(x=>x.policy_id===state.freetext.selectedPolicy);if(!policy)return;if(policy.policy_id===APPLICATION_FREETEXT_POLICY){const request=buildApplicationFreeTextStart({description:state.text});localStorage.setItem(applicationPendingOperationKey,request.client_operation_id);await freeTextTransition(()=>startFreeText(request,{baseUrl:apiBaseUrl,timeoutMs:900000}),request.client_operation_id);return;}if(policy.policy_id===OPERATIONAL_FREETEXT_POLICY){const request=buildOperationalFreeTextStart({description:state.text});await freeTextTransition(()=>startFreeText(request,{baseUrl:apiBaseUrl,timeoutMs:900000}),request.client_operation_id);return;}if(policy.policy_id===HISTORICAL_FREETEXT_POLICY){if(pilot?.authorization_status!=='authorized')return;await freeTextTransition(()=>startFreeText(buildFreeTextStart({queryId:pilot.experimental_query_id,description:pilot.description_es}),{baseUrl:apiBaseUrl,timeoutMs:900000}),pilot.experimental_query_id);return;}if(policy.policy_id===MEDIUM_FREETEXT_POLICY&&policy.available){await freeTextTransition(()=>startFreeText(buildFreeTextPolicyStart({policyId:policy.policy_id,variantId:state.freetext.selectedVariant}),{baseUrl:apiBaseUrl,timeoutMs:900000}),state.freetext.selectedVariant);}}
-async function submitFreeTextAnswer(){const session=state.freetext.session,status=normalizeFreeTextStatus(session?.status);if(!session||status!=='waiting_user'||state.freetext.status==='loading')return;const question=session.current_question;const request=[OPERATIONAL_FREETEXT_POLICY,APPLICATION_FREETEXT_POLICY].includes(session.policy_id)?buildOperationalFreeTextAnswer({literal:state.freetext.answer,turnIndex:question.turn_index,questionId:question.question_id,questionSha256:question.question_sha256}):buildFreeTextAnswer(state.freetext.answer);state.freetext.answer='';await freeTextTransition(()=>answerFreeText(session.session_id,request,{baseUrl:apiBaseUrl,timeoutMs:900000}),request.client_operation_id||session.experimental_query_id);}
+async function freeTextTransition(work,progressId){if(state.freetext.status==='loading')return;state.freetext.status='loading';state.freetext.error=null;state.freetext.progress={stage_id:'request',state:'pending'};render();const existing=state.freetext.session,isProduct=[OPERATIONAL_FREETEXT_POLICY,APPLICATION_FREETEXT_POLICY].includes(existing?.policy_id);if(isProduct)openFreeTextSessionEvents(existing);const stream=isProduct?null:openProgressStream(progressId,{baseUrl:apiBaseUrl,onEvent:event=>{state.freetext.progress=event;render();},onDisconnect:()=>{state.freetext.streamState='disconnected';}});if(stream)await stream.ready;try{const session=validateFreeTextSession(await work());state.freetext.session=session;persistFreeTextSession(session);if(applicationMode)safeLocalStorage('remove',applicationPendingOperationKey);await reconcileFreeTextEvents(session);openFreeTextSessionEvents(session);state.freetext.status='ready';applyFreeTextStage(session.final_stage||session.stage_snapshots.at(-1)?.stage||'E0');}catch(error){if(error?.code==='UPSTREAM_RESPONSE_LOST'||error?.code==='TIMEOUT'||applicationMode&&error?.code==='NETWORK_ERROR'){try{await reconcileFreeTextAfterLostResponse(progressId);if(applicationMode)safeLocalStorage('remove',applicationPendingOperationKey);toast('La respuesta se perdió; se reconcilió la sesión sin repetir la operación.');}catch(reconcileError){state.freetext.status='error';state.freetext.error={code:'FREETEXT_RECONCILIATION_FAILED',message:'No se pudo confirmar la operación. No la reenvíes.',detail:reconcileError?.message};render();}}else{if(applicationMode)safeLocalStorage('remove',applicationPendingOperationKey);state.freetext.status='error';state.freetext.error=normalizeUiError(error);render();}}finally{stream?.close();}}
+async function startFreeTextSession(){if(state.freetext.status==='loading'||state.freetext.session)return;const pilot=state.freetext.pilot,policy=state.freetext.catalogue?.policies?.find(x=>x.policy_id===state.freetext.selectedPolicy);if(!policy)return;if(policy.policy_id===APPLICATION_FREETEXT_POLICY){const request=buildApplicationFreeTextStart({description:state.text});safeLocalStorage('set',applicationPendingOperationKey,request.client_operation_id);await freeTextTransition(()=>startFreeText(request,{baseUrl:apiBaseUrl,timeoutMs:900000}),request.client_operation_id);return;}if(policy.policy_id===OPERATIONAL_FREETEXT_POLICY){const request=buildOperationalFreeTextStart({description:state.text});await freeTextTransition(()=>startFreeText(request,{baseUrl:apiBaseUrl,timeoutMs:900000}),request.client_operation_id);return;}if(policy.policy_id===HISTORICAL_FREETEXT_POLICY){if(pilot?.authorization_status!=='authorized')return;await freeTextTransition(()=>startFreeText(buildFreeTextStart({queryId:pilot.experimental_query_id,description:pilot.description_es}),{baseUrl:apiBaseUrl,timeoutMs:900000}),pilot.experimental_query_id);return;}if(policy.policy_id===MEDIUM_FREETEXT_POLICY&&policy.available){await freeTextTransition(()=>startFreeText(buildFreeTextPolicyStart({policyId:policy.policy_id,variantId:state.freetext.selectedVariant}),{baseUrl:apiBaseUrl,timeoutMs:900000}),state.freetext.selectedVariant);}}
+async function submitFreeTextAnswer(){const session=state.freetext.session,status=normalizeFreeTextStatus(session?.status);if(!session||status!=='waiting_user'||state.freetext.status==='loading')return;try{const question=session.current_question;const request=[OPERATIONAL_FREETEXT_POLICY,APPLICATION_FREETEXT_POLICY].includes(session.policy_id)?buildOperationalFreeTextAnswer({literal:state.freetext.answer,turnIndex:question.turn_index,questionId:question.question_id,questionSha256:question.question_sha256}):buildFreeTextAnswer(state.freetext.answer);await freeTextTransition(()=>answerFreeText(session.session_id,request,{baseUrl:apiBaseUrl,timeoutMs:900000}),request.client_operation_id||session.experimental_query_id);if(state.freetext.status!=='error')state.freetext.answer='';}catch(error){state.freetext.status='error';state.freetext.error=normalizeUiError(error);render();}}
 
 async function startDialogueSession() {
   if (state.dialogue.status==='loading') return;
@@ -541,7 +601,8 @@ function selectControl({ id, label, iconName, disabled, value, options }) {
 
 function explorePage() {
   const ready = state.capabilities.status === 'ready' && (applicationMode?state.freetext.catalogue?.policies?.some(item=>item.policy_id===APPLICATION_FREETEXT_POLICY&&item.available===true):state.capabilities.data?.retrievers?.some(item=>item.id==='crosstext2loc'&&item.available)===true);
-  const loading = state.request.status === 'loading';
+  const loading = applicationMode ? state.freetext.status === 'loading' : state.request.status === 'loading';
+  const searchLocked = loading || applicationMode && Boolean(state.freetext.session);
   const galleries = state.capabilities.data?.galleries || [];
   const count = state.results.reduce((total, row) => total + row.results.length, 0);
   const status = state.capabilities.status === 'loading'
@@ -788,6 +849,8 @@ async function handleClick(event) {
     return;
   }
   switch (data.action) {
+    case 'toggle-dialogue': state.freetext.panelCollapsed=!state.freetext.panelCollapsed;render();break;
+    case 'new-freetext-search': resetFreeTextSession();break;
     case 'close-modal': $('#modal').close(); break;
     case 'cancel': cancelSearch(); render(); toast('Espera cancelada. La inferencia del servidor puede continuar.'); break;
     case 'retry-capabilities': loadCapabilities(); break;

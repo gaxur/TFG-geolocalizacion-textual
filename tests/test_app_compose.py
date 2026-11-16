@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_application_compose_is_loopback_internal_and_fail_closed():
     compose = (ROOT / "compose.app.yaml").read_text(encoding="utf-8")
     entrypoint = (ROOT / "scripts/run_mvp1_api.sh").read_text(encoding="utf-8")
-    assert '"127.0.0.1:${APP_HTTP_PORT:-18085}:8080"' in compose
+    assert '"127.0.0.1:${APP_HTTP_PORT:-8080}:8080"' in compose
     assert "APP_BIND_HOST" not in compose
     assert compose.count("ports:") == 1
     assert "internal: true" in compose

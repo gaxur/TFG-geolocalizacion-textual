@@ -137,18 +137,22 @@ function addBasemapLayers(map, basemap) {
     paint: { 'fill-color': '#cbdfe2', 'fill-opacity': 0.94 },
   });
   if (available.has('building')) {
+    const explicitHeight = ['to-number', ['get', basemap.heightProperty], 0];
+    const levelsHeight = basemap.levelsProperty ? ['*', ['to-number', ['get', basemap.levelsProperty], 0], 3] : 0;
+    const visualHeight = ['case', ['>', explicitHeight, 0], explicitHeight, ['>', levelsHeight, 0], levelsHeight, 9];
+    const visualBase = basemap.baseHeightProperty ? ['max', 0, ['to-number', ['get', basemap.baseHeightProperty], 0]] : 0;
     map.addLayer({
       id: 'madrid-building-footprints', type: 'fill', source: 'madrid-local', 'source-layer': 'building',
       minzoom: 14,
       paint: { 'fill-color': '#d5d0c4', 'fill-outline-color': '#b5afa2', 'fill-opacity': 0.8 },
     });
     map.addLayer({
-      id: 'madrid-buildings-3d', type: 'fill-extrusion', source: 'madrid-local', 'source-layer': 'building', minzoom: 14, filter: ['>', ['to-number',['get',basemap.heightProperty],0],0], layout: { visibility: 'none' },
+      id: 'madrid-buildings-3d', type: 'fill-extrusion', source: 'madrid-local', 'source-layer': 'building', minzoom: 14, filter: ['any', ['has', 'building'], ['has', 'building:part']], layout: { visibility: 'none' },
       paint: {
-        'fill-extrusion-color': '#a79b86',
-        'fill-extrusion-height': ['to-number',['get',basemap.heightProperty],0],
-        'fill-extrusion-base': ['to-number',['get',basemap.baseHeightProperty],0],
-        'fill-extrusion-opacity': 0.82, 'fill-extrusion-vertical-gradient': true,
+        'fill-extrusion-color': ['case', ['>', explicitHeight, 0], '#8f7359', ['>', levelsHeight, 0], '#aa9780', '#c9c0b2'],
+        'fill-extrusion-height': visualHeight,
+        'fill-extrusion-base': ['min', visualBase, visualHeight],
+        'fill-extrusion-opacity': 0.8, 'fill-extrusion-vertical-gradient': true,
       },
     });
   }
@@ -224,6 +228,9 @@ async function inspectLocalBasemap(searchArea, assetManifest) {
   const baseHeightProperty = Object.hasOwn(fields, 'min_height') && /number|integer|string/i.test(String(fields.min_height))
     ? 'min_height'
     : null;
+  const levelsProperty = Object.hasOwn(fields, 'building:levels') && /number|integer|string/i.test(String(fields['building:levels']))
+    ? 'building:levels'
+    : null;
   if (header.tileType !== TileType.Mvt || !layers.length) throw new Error('El archivo local no contiene teselas vectoriales con metadatos de capas.');
   const provenanceResponse = await fetch(`/map-context/${PMTILES_FILE}.provenance.json`, {
     headers: { Accept: 'application/json' },
@@ -258,6 +265,7 @@ async function inspectLocalBasemap(searchArea, assetManifest) {
     layers,
     heightProperty,
     baseHeightProperty,
+    levelsProperty,
     heightAudit: { base: heightAudit, parts: partsAudit, explicitTileFeatures: declaredHeightCount },
     buildings3dAvailable: Boolean(building),
     navigationBounds: [
@@ -440,7 +448,7 @@ export async function createResultsMap({
     return fallback;
   }
 
-  let basemap = { available: false, layers: [], heightProperty: null, baseHeightProperty: null, buildings3dAvailable: false, attribution: '' };
+  let basemap = { available: false, layers: [], heightProperty: null, baseHeightProperty: null, levelsProperty: null, buildings3dAvailable: false, attribution: '' };
   let basemapError = null;
   try {
     basemap = await inspectLocalBasemap(searchArea, assets.assetManifest);
@@ -456,7 +464,7 @@ export async function createResultsMap({
     missingCellCount: 0,
     message: basemap.available
       ? basemap.buildings3dAvailable
-        ? `3D visual: solo se extruyen ${basemap.heightAudit.base.explicit_numeric_metre_height} edificios y ${basemap.heightAudit.parts.explicit_numeric_metre_height} partes con height numérica explícita; no se estiman alturas.`
+        ? `3D visual: height OSM cuando existe; building:levels × 3 m y 9 m por defecto son estimaciones de visualización, no mediciones reales.`
         : 'Base local preparada, pero no ofrece un campo de altura utilizable para extrusión 3D.'
       : 'Falta madrid.pmtiles en los recursos locales. No se solicitan mapas a proveedores externos.',
     detail: assets.error?.message || basemapError?.message || null,
@@ -564,6 +572,11 @@ export async function createResultsMap({
     status.missingCellCount = overlay.missingCellKeys.length;
     if (overlay.missingCellKeys.length) {
       status.message = `Faltan ${overlay.missingCellKeys.length} geometrías canónicas del Top-10; se muestran solo sus centros.`;
+      onStatus?.(status);
+    } else if (basemap.available && status.cells === 'ready') {
+      status.message = basemap.buildings3dAvailable
+        ? 'Mapa local listo. El 3D distingue alturas OSM explícitas de estimaciones visuales por niveles o fallback.'
+        : 'Mapa local y geometrías canónicas disponibles.';
       onStatus?.(status);
     }
     const grid = map.getSource('catalog-cells');

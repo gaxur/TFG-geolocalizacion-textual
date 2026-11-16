@@ -35,7 +35,13 @@ try{
   await send('Page.reload');
   await waitFor(`document.querySelectorAll('[data-freetext-stage]').length===4`);
   assert.equal(await evaluate(`document.querySelectorAll('[data-freetext-stage]').length`),4);
+  await waitFor(`Boolean(document.querySelector('[data-action="new-freetext-search"]'))`);
+  await evaluate(`document.querySelector('[data-action="new-freetext-search"]').click()`);
+  await waitFor(`document.querySelectorAll('[data-freetext-stage]').length===0&&Boolean(document.querySelector('#description:not([disabled])'))`);
+  assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapInstanceId`),instance);
+  await evaluate(`(()=>{const x=document.querySelector('#description');x.value='Otra descripción de prueba';x.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#search-form').requestSubmit()})()`);
+  await waitFor(`document.querySelectorAll('.result-card').length===10`);
   const counters=await(await fetch('http://api:8000/fixture/counters')).json();
-  assert.equal(counters.creates,1);assert.equal(counters.answers,3);assert.ok(counters.gets>=1);
+  assert.equal(counters.creates,2);assert.equal(counters.answers,3);assert.ok(counters.gets>=1);
   console.log('APP_FLOW_BROWSER_PASS');
 }finally{ws?.close();browser.kill('SIGTERM')}
