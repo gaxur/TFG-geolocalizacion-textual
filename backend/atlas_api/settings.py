@@ -39,6 +39,10 @@ class Settings:
     freetext_operational_authorization_root: Path | None = None
     freetext_operational_execution_id: str | None = None
     dialogue_variants_path: Path | None = None
+    freetext_application_enabled: bool = False
+    freetext_application_profile: Path | None = None
+    freetext_application_state_root: Path | None = None
+    freetext_application_session_root: Path | None = None
 
     def region_bbox(self) -> dict[str, float]:
         try:
@@ -88,5 +92,13 @@ class Settings:
         operational_execution_id = os.environ.get("ATLAS_FREETEXT_OPERATIONAL_EXECUTION_ID")
         if operational_enabled and not all((operational_root, operational_authorizations, operational_execution_id)):
             raise ValueError("FreeText operacional requiere session root, authorization root y execution id")
+        application_enabled = os.environ.get("ATLAS_FREETEXT_APPLICATION_ENABLED", "false").casefold() in {"1", "true", "yes"}
+        application_profile = os.environ.get("ATLAS_FREETEXT_APPLICATION_PROFILE")
+        application_state = os.environ.get("ATLAS_FREETEXT_APPLICATION_STATE_ROOT")
+        application_sessions = os.environ.get("ATLAS_FREETEXT_APPLICATION_SESSION_ROOT")
+        if application_enabled and operational_enabled:
+            raise ValueError("FreeText application y operacional científico son mutuamente exclusivos")
+        if application_enabled and not all((application_profile, application_state, application_sessions)):
+            raise ValueError("FreeText application requiere profile, state root y session root")
         variants_path = os.environ.get("ATLAS_DIALOGUE_VARIANTS_PATH")
-        return cls(runtime_config, region_config, cvg_utils_sha256, clip_weights_path, origins, True, Path(qwen_path) if qwen_path else None, os.environ.get("ATLAS_QWEN_MODEL_ID", "Qwen/Qwen3-8B"), os.environ.get("ATLAS_QWEN_MODEL_REVISION", "b968826d9c46dd6066d109eabc6255188de91218"), qwen_required, visual_enabled, Path(visual_policy) if visual_policy else None, Path(visual_bundle) if visual_bundle else None, visual_fallback, visual_required, Path(dialogue_cohort) if dialogue_cohort else None, Path(dialogue_root) if dialogue_root else None, Path(dialogue_images) if dialogue_images else None, dialogue_enabled, completed, Path(dialogue_authorization) if dialogue_authorization else None, operational_enabled, Path(operational_root) if operational_root else None, Path(operational_authorizations) if operational_authorizations else None, operational_execution_id, Path(variants_path) if variants_path else None)
+        return cls(runtime_config, region_config, cvg_utils_sha256, clip_weights_path, origins, True, Path(qwen_path) if qwen_path else None, os.environ.get("ATLAS_QWEN_MODEL_ID", "Qwen/Qwen3-8B"), os.environ.get("ATLAS_QWEN_MODEL_REVISION", "b968826d9c46dd6066d109eabc6255188de91218"), qwen_required, visual_enabled, Path(visual_policy) if visual_policy else None, Path(visual_bundle) if visual_bundle else None, visual_fallback, visual_required, Path(dialogue_cohort) if dialogue_cohort else None, Path(dialogue_root) if dialogue_root else None, Path(dialogue_images) if dialogue_images else None, dialogue_enabled, completed, Path(dialogue_authorization) if dialogue_authorization else None, operational_enabled, Path(operational_root) if operational_root else None, Path(operational_authorizations) if operational_authorizations else None, operational_execution_id, Path(variants_path) if variants_path else None, application_enabled, Path(application_profile) if application_profile else None, Path(application_state) if application_state else None, Path(application_sessions) if application_sessions else None)

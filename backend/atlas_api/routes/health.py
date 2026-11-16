@@ -19,7 +19,11 @@ async def live():
 async def ready(request: Request):
     retriever = getattr(request.app.state, "retriever", None)
     freetext_operational = getattr(request.app.state, "freetext_operational_service", None)
-    if retriever is None and not (freetext_operational and freetext_operational.enabled):
+    freetext_application = getattr(request.app.state, "freetext_application_service", None)
+    application_available = bool(freetext_application and freetext_application.policy()["available"])
+    if freetext_application is not None and not application_available:
+        raise ApiServiceUnavailable("APPLICATION_PROFILE_NOT_APPROVED", "El perfil FreeText application no está aprobado o vigente.")
+    if retriever is None and not (freetext_operational and freetext_operational.enabled) and not application_available:
         raise ApiServiceUnavailable("RUNTIME_NOT_READY", "El recuperador todavía no está disponible.")
     try:
         gallery_ids = list(retriever.gallery_ids)
@@ -42,9 +46,12 @@ async def capabilities(request: Request):
     dialogue = getattr(request.app.state, "dialogue_service", None)
     freetext = getattr(request.app.state, "freetext_service", None)
     freetext_operational = getattr(request.app.state, "freetext_operational_service", None)
+    freetext_application = getattr(request.app.state, "freetext_application_service", None)
     freetext_policies = [] if freetext is None else freetext.policies()["policies"]
     if freetext_operational is not None:
         freetext_policies.append(freetext_operational.policy())
+    if freetext_application is not None:
+        freetext_policies.append(freetext_application.policy())
     return {
         "schema_version": "1.0",
         "api_version": "v3-experimental",
@@ -65,7 +72,7 @@ async def capabilities(request: Request):
                 {"id": "crosstext2loc", "available": retriever is not None, "operation": "text_encoding_and_exhaustive_gallery_ranking"},
                 {"id": "vlm", "available": visual is not None, "source": "precomputed_qwen3_vl" if visual is not None else None, "online_inference": False},
                 {"id": "dialoguevpr", "available": bool(dialogue and dialogue.available), "reason": None if dialogue and dialogue.available else "runtime_or_dataset_not_configured"},
-                {"id": "freetext", "available": bool(freetext is not None or freetext_operational is not None and freetext_operational.policy()["available"]), "operation": "literal_dialogue_e0_e3" if freetext is not None or freetext_operational is not None and freetext_operational.policy()["available"] else None},
+                {"id": "freetext", "available": bool(freetext is not None or freetext_operational is not None and freetext_operational.policy()["available"] or freetext_application is not None and freetext_application.policy()["available"]), "operation": "literal_dialogue_e0_e3" if freetext is not None or freetext_operational is not None and freetext_operational.policy()["available"] or freetext_application is not None and freetext_application.policy()["available"] else None},
             ],
         },
         "galleries": galleries,

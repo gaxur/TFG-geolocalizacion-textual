@@ -1,7 +1,7 @@
 import http from 'node:http';
 
-const policy='dialogue-vpr-freetext-v1-operational';
-const sessionId='freetext-operational-00000000-0000-0000-0000-000000000001';
+const policy='dialogue-vpr-freetext-v1-application';
+const sessionId='freetext-application-00000000-0000-0000-0000-000000000001';
 const stats={createPosts:0,descriptionLength:0,sessionGets:0,eventStreams:[],probeConnections:0};
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const results=()=>Array.from({length:10},(_,index)=>({rank:index+1,candidate_id:`fixture-${index+1}`,latitude:40.41+index/10000,longitude:-3.7-index/10000,cosine_similarity:0.9-index/100}));
@@ -12,7 +12,7 @@ const events=[
 ];
 
 function json(response,status,body){response.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});response.end(JSON.stringify(body));}
-function session(status){return{schema_version:'1.0',contract_version:'atlas-dialogue-freetext-operational-session-public-v1',session_id:sessionId,policy_id:policy,status,turns:[],stage_snapshots:[{stage:'E0',gallery_id:'madrid-50m',candidate_count:253,results:results()}],current_question:status==='waiting_user'?{turn_index:1,question_id:'fixture-question-1',question:'¿Ves una fuente en el centro?',question_sha256:'a'.repeat(64)}:null,updated_at_utc:'2026-11-16T00:00:00Z'};}
+function session(status){return{schema_version:'1.0',contract_version:'atlas-dialogue-freetext-application-session-public-v1',session_id:sessionId,policy_id:policy,status,turns:[],stage_snapshots:[{stage:'E0',gallery_id:'madrid-50m',candidate_count:253,results:results()}],current_question:status==='waiting_user'?{turn_index:1,question_id:'fixture-question-1',question:'¿Ves una fuente en el centro?',question_sha256:'a'.repeat(64)}:null,updated_at_utc:'2026-11-16T00:00:00Z'};}
 async function body(request){let value='';for await(const chunk of request)value+=chunk;return value?JSON.parse(value):{};}
 function sse(response,event){response.write(`id: ${event.id}\nevent: session\ndata: ${JSON.stringify(event)}\n\n`);}
 

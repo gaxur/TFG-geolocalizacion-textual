@@ -113,6 +113,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D095 | Diálogo adaptativo de hasta tres preguntas en contrato v2 | ACEPTADA | DialogueVPR / orquestación |
 | D096 | Evidencia visual opcional y no vinculante en DialogueVPR | ACEPTADA | DialogueVPR / VLM / provenance |
 | D097 | Perfil Python local para preparar PMTiles de D004 desde PBF F4 | PROPUESTA | Cartografía / frontend |
+| D098 | Separar admisión reutilizable de aplicación de la autorización científica FreeText | PROPUESTA | MVP / FreeText |
 
 ## D053 — API HTTP interna del MVP
 
@@ -4181,3 +4182,32 @@ fake; no valida FastAPI ni Compose/Nginx real.
 Esta propuesta no se promueve a `ACEPTADA` sin aprobación expresa. Antes de
 distribuir el archive debe revisarse el paquete derivado conforme a ODbL. La
 validación en PGX/ARM64, Docker Compose/Nginx y hardware objetivo sigue pendiente.
+
+## D098 — Modo aplicación FreeText reutilizable y separado
+
+**Estado:** PROPUESTA / DEFAULT OFF POR PERFIL
+**Componente:** Aplicación integrada / FreeText-v1
+**Fecha:** 2026-11-16
+
+### Propuesta
+
+Mantener intacta la autorización científica one-shot y añadir una policy distinta,
+`dialogue-vpr-freetext-v1-application`, para uso local reutilizable. Un perfil
+aprobado fija identidad, expiry, máximo total de sesiones y máximo de sesiones
+abiertas. Cada sesión reserva 4 Qwen, 4 CT2L, 3 preguntas y cero retries; cuotas
+inciertas no se devuelven.
+
+El despliegue queda ligado a `127.0.0.1`, con una sola operación de modelo,
+FastAPI/Nginx app-only, SQLite durable, modelos/datos read-only y sin GT, VLM,
+referencias ni H38-H61. Cambiar perfil, cuotas, expiry o identidad exige otra
+aprobación.
+
+### Pendiente de aprobación
+
+- `profile_id`.
+- Fecha/hora UTC de expiración.
+- `maximum_sessions_total`.
+- `maximum_open_sessions`.
+- Retención y revocación del volumen `atlas-app-state`.
+
+La plantilla permanece `PENDING_APPROVAL`; arrancar Compose no habilita inferencia.

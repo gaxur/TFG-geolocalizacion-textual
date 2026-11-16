@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 
 import anyio
@@ -12,6 +13,7 @@ from backend.atlas_api.freetext_operational import OperationalFreeTextExpired
 from backend.atlas_api.freetext_sessions import FreeTextConflict, FreeTextUnavailable
 from backend.atlas_api.models import (
     FreeTextAnswerRequest,
+    ApplicationFreeTextStartRequest,
     FreeTextPolicyStartRequest,
     FreeTextStartRequest,
     OperationalFreeTextAnswerRequest,
@@ -28,6 +30,25 @@ def historical(request: Request):
 
 def operational(request: Request):
     return getattr(request.app.state, "freetext_operational_service", None)
+
+
+def application(request: Request):
+    return getattr(request.app.state, "freetext_application_service", None)
+
+
+def require_loopback(request: Request) -> None:
+    host = request.client.host if request.client else ""
+    try:
+        allowed = ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        allowed = host in {"localhost", "testclient"}
+    proxy_marked = request.headers.get("X-Atlas-App-Loopback") == "1"
+    try:
+        proxy_private = ipaddress.ip_address(host).is_private
+    except ValueError:
+        proxy_private = False
+    if not allowed and not (proxy_marked and proxy_private):
+        raise HTTPException(status_code=403, detail={"code": "FREETEXT_LOOPBACK_ONLY", "message": "FreeText application solo admite acceso loopback."})
 
 
 def fail(error):
@@ -96,6 +117,9 @@ async def pilots(request: Request):
     operational_service = operational(request)
     if operational_service is not None:
         catalogue["policies"].append(operational_service.policy())
+    application_service = application(request)
+    if application_service is not None:
+        catalogue["policies"].append(application_service.policy())
     return catalogue
 
 
@@ -111,15 +135,51 @@ async def image(request: Request):
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, no-store"})
 
 
+@router.get("/application/operations/{client_operation_id}")
+async def application_operation(client_operation_id: str, request: Request):
+    require_loopback(request)
+    service = application(request)
+    if service is None:
+        raise HTTPException(status_code=404, detail={"code":"NOT_FOUND","message":"Modo application no configurado."})
+    try:
+        return service.public(service.session_for_create_operation(client_operation_id))
+    except (FreeTextConflict, FreeTextUnavailable) as error:
+        fail(error)
+
+
 @router.post("/sessions")
 async def start(
-    payload: FreeTextStartRequest | FreeTextPolicyStartRequest | OperationalFreeTextStartRequest,
+    payload: FreeTextStartRequest | FreeTextPolicyStartRequest | OperationalFreeTextStartRequest | ApplicationFreeTextStartRequest,
     request: Request,
     background_tasks: BackgroundTasks,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
     gate = request.app.state.dialogue_gate
     try:
+        if isinstance(payload, ApplicationFreeTextStartRequest):
+            require_loopback(request)
+            service = application(request)
+            if service is None:
+                raise FreeTextUnavailable("servicio FreeText application no configurado")
+            if not gate.try_acquire():
+                raise HTTPException(status_code=409, detail={"code": "FREETEXT_BUSY", "message": "Otra transición está en curso."})
+            try:
+                document, execute = await anyio.to_thread.run_sync(service.prepare_start, payload.description_es, payload.client_operation_id, idempotency_key or "")
+            except Exception:
+                gate.release()
+                raise
+
+            async def run_application_start():
+                try:
+                    await anyio.to_thread.run_sync(service.run_start, document["session_id"])
+                finally:
+                    gate.release()
+
+            if execute:
+                background_tasks.add_task(run_application_start)
+            else:
+                gate.release()
+            return service.public(document)
         if isinstance(payload, OperationalFreeTextStartRequest):
             service = operational(request)
             if service is None:
@@ -173,6 +233,12 @@ async def start(
 @router.get("/sessions/{session_id}")
 async def get(session_id: str, request: Request):
     try:
+        if session_id.startswith("freetext-application-"):
+            require_loopback(request)
+            service = application(request)
+            if service is None:
+                raise FreeTextUnavailable("servicio FreeText application no configurado")
+            return service.public(service.load(session_id))
         if session_id.startswith("freetext-operational-"):
             service = operational(request)
             if service is None:
@@ -196,6 +262,32 @@ async def answer(
 ):
     gate = request.app.state.dialogue_gate
     try:
+        if session_id.startswith("freetext-application-"):
+            require_loopback(request)
+            service = application(request)
+            if service is None:
+                raise FreeTextUnavailable("servicio FreeText application no configurado")
+            if not isinstance(payload, OperationalFreeTextAnswerRequest):
+                raise FreeTextConflict("contrato de respuesta application requerido")
+            if not gate.try_acquire():
+                raise HTTPException(status_code=409, detail={"code": "FREETEXT_BUSY", "message": "Otra transición está en curso."})
+            try:
+                document, execute = await anyio.to_thread.run_sync(service.prepare_answer, session_id, payload.answer_literal, payload.turn_index, payload.question_id, payload.question_sha256, payload.client_operation_id, idempotency_key or "")
+            except Exception:
+                gate.release()
+                raise
+
+            async def run_application_answer():
+                try:
+                    await anyio.to_thread.run_sync(service.run_answer, session_id)
+                finally:
+                    gate.release()
+
+            if execute:
+                background_tasks.add_task(run_application_answer)
+            else:
+                gate.release()
+            return service.public(document)
         if session_id.startswith("freetext-operational-"):
             service = operational(request)
             if service is None:
@@ -251,7 +343,9 @@ async def answer(
 @router.get("/sessions/{session_id}/events")
 async def event_history(session_id: str, request: Request):
     try:
-        service = operational(request)
+        service = application(request) if session_id.startswith("freetext-application-") else operational(request)
+        if session_id.startswith("freetext-application-"):
+            require_loopback(request)
         if service is None:
             raise FreeTextUnavailable("servicio FreeText operacional no configurado")
         return {
@@ -275,7 +369,9 @@ async def event_stream(
     if after is not None:
         last_event_id = after
     try:
-        service = operational(request)
+        service = application(request) if session_id.startswith("freetext-application-") else operational(request)
+        if session_id.startswith("freetext-application-"):
+            require_loopback(request)
         if service is None:
             raise FreeTextUnavailable("servicio FreeText operacional no configurado")
         events = service.events(session_id, last_event_id)

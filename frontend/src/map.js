@@ -143,11 +143,11 @@ function addBasemapLayers(map, basemap) {
       paint: { 'fill-color': '#d5d0c4', 'fill-outline-color': '#b5afa2', 'fill-opacity': 0.8 },
     });
     map.addLayer({
-      id: 'madrid-buildings-3d', type: 'fill-extrusion', source: 'madrid-local', 'source-layer': 'building', minzoom: 14, layout: { visibility: 'none' },
+      id: 'madrid-buildings-3d', type: 'fill-extrusion', source: 'madrid-local', 'source-layer': 'building', minzoom: 14, filter: ['>', ['to-number',['get',basemap.heightProperty],0],0], layout: { visibility: 'none' },
       paint: {
-        'fill-extrusion-color': ['case',['>', ['to-number',['get',basemap.heightProperty],0],0],'#a79b86',['>', ['to-number',['get','building:levels'],0],0],'#c8bfae','#d7d1c5'],
-        'fill-extrusion-height': ['case',['>', ['to-number',['get',basemap.heightProperty],0],0],['to-number',['get',basemap.heightProperty],9],['>', ['to-number',['get','building:levels'],0],0],['*',['min',['to-number',['get','building:levels'],3],30],3],9],
-        'fill-extrusion-base': ['case',['>', ['to-number',['get',basemap.heightProperty],0],0],['to-number',['get',basemap.baseHeightProperty],0],0],
+        'fill-extrusion-color': '#a79b86',
+        'fill-extrusion-height': ['to-number',['get',basemap.heightProperty],0],
+        'fill-extrusion-base': ['to-number',['get',basemap.baseHeightProperty],0],
         'fill-extrusion-opacity': 0.82, 'fill-extrusion-vertical-gradient': true,
       },
     });
@@ -456,7 +456,7 @@ export async function createResultsMap({
     missingCellCount: 0,
     message: basemap.available
       ? basemap.buildings3dAvailable
-        ? `3D visual: ${basemap.heightAudit.base.explicit_numeric_metre_height}/${basemap.heightAudit.base.denominator} edificios y ${basemap.heightAudit.parts.explicit_numeric_metre_height}/${basemap.heightAudit.parts.denominator} partes usan height explícita. El resto se estima con building:levels × 3 m o 9 m por defecto; las estimaciones no son medidas reales.`
+        ? `3D visual: solo se extruyen ${basemap.heightAudit.base.explicit_numeric_metre_height} edificios y ${basemap.heightAudit.parts.explicit_numeric_metre_height} partes con height numérica explícita; no se estiman alturas.`
         : 'Base local preparada, pero no ofrece un campo de altura utilizable para extrusión 3D.'
       : 'Falta madrid.pmtiles en los recursos locales. No se solicitan mapas a proveedores externos.',
     detail: assets.error?.message || basemapError?.message || null,

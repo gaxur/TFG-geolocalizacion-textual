@@ -14,6 +14,7 @@
     "test:browser:freetext-operational": "node scripts/browser-freetext-operational-check.mjs",
     "test:integration:freetext-nginx": "node scripts/browser-freetext-nginx-integration.mjs",
     "test:browser:freetext-real": "node scripts/browser-freetext-real-smoke.mjs"
+    ,"test:browser:app-disabled": "node scripts/browser-app-disabled-check.mjs"
   },
   "devDependencies": {
     "vite": "7.3.7"

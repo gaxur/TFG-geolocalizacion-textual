@@ -14,7 +14,11 @@ const configuredMapAssets = process.env.MVP_MAP_ASSETS_DIR || './data/processed/
 const mapAssetsRoot = path.isAbsolute(configuredMapAssets)
   ? configuredMapAssets
   : path.resolve(projectRoot, configuredMapAssets);
-const localPmtilesPath = path.join(mapAssetsRoot, 'madrid.pmtiles');
+const configuredMapContext = process.env.MVP_MAP_CONTEXT_DIR || './results/generated/map-assets-context-2000m';
+const mapContextRoot = path.isAbsolute(configuredMapContext)
+  ? configuredMapContext
+  : path.resolve(projectRoot, configuredMapContext);
+const localPmtilesPath = path.join(mapContextRoot, 'madrid-context-2000m.pmtiles');
 const localPmtilesProvenancePath = `${localPmtilesPath}.provenance.json`;
 const hasLocalPmtiles = fs.existsSync(localPmtilesPath) && fs.statSync(localPmtilesPath).isFile();
 const localPmtilesTileDataOffset = hasLocalPmtiles
@@ -28,6 +32,7 @@ const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const apiRequests = [];
 const externalMapRequests = [];
 const pmtilesRangeRequests = [];
+const mapContextRequests = [];
 const progressConnections = new Map();
 const progressSequences = new Map();
 const cellCollections = new Map();
@@ -98,6 +103,43 @@ const mapAssets = realMapManifest || syntheticMapAssets;
 const candidateAt = (galleryId, index) => cellsForGallery(galleryId).features[index];
 const candidateKeyAt = (galleryId, index) => `${galleryId}:${candidateAt(galleryId, index).properties.candidate_id}`;
 
+const freeTextSessionId = 'freetext-operational-00000000-0000-0000-0000-000000000001';
+let freeTextStage = 0;
+function freeTextSession() {
+  const snapshots = Array.from({ length: freeTextStage + 1 }, (_, stageIndex) => {
+    const collection = cellsForGallery('madrid-50m');
+    const offset = stageIndex * 10;
+    return {
+      stage: `E${stageIndex}`,
+      gallery_id: 'madrid-50m',
+      candidate_count: mapAssets.galleries['madrid-50m'].candidate_count,
+      ranking_sha256: String(stageIndex + 1).repeat(64),
+      results: Array.from({ length: 10 }, (_, index) => {
+        const properties = collection.features[offset + index].properties;
+        return {
+          rank: index + 1,
+          candidate_id: properties.candidate_id,
+          latitude: properties.center_latitude,
+          longitude: properties.center_longitude,
+          cosine_similarity: .9 - index * .01,
+        };
+      }),
+    };
+  });
+  const completed = freeTextStage === 3;
+  return {
+    schema_version: '1.0', contract_version: 'atlas-dialogue-freetext-operational-session-public-v1',
+    session_id: freeTextSessionId, policy_id: 'dialogue-vpr-freetext-v1-operational',
+    status: completed ? 'completed' : 'waiting_user', final_stage: `E${freeTextStage}`,
+    turns: Array.from({ length: freeTextStage + (completed ? 0 : 1) }, (_, index) => ({
+      index: index + 1, question: `Pregunta ${index + 1}`,
+      answer_literal: index < freeTextStage ? `Respuesta ${index + 1}` : null,
+    })),
+    current_question: completed ? null : { turn_index: freeTextStage + 1, question_id: `q${freeTextStage + 1}`, question: `Pregunta ${freeTextStage + 1}`, question_sha256: 'e'.repeat(64) },
+    stage_snapshots: snapshots,
+  };
+}
+
 function publishProgress(queryId, eventType, stageId, status, message, extra = {}) {
   const response = progressConnections.get(queryId);
   if (!response || response.destroyed || response.writableEnded) return;
@@ -165,6 +207,7 @@ function fakeRetrieval(body) {
 
 const server = http.createServer((request, response) => {
   const url = new URL(request.url, 'http://localhost');
+  if (url.pathname.startsWith('/map-context/')) mapContextRequests.push(url.pathname);
   if (url.pathname === '/map-assets/map-assets.json') {
     response.writeHead(200, { 'Content-Type': 'application/json' });
     response.end(JSON.stringify(mapAssets));
@@ -177,7 +220,7 @@ const server = http.createServer((request, response) => {
     response.end(JSON.stringify(cellsForGallery(galleryId)));
     return;
   }
-  if (url.pathname === '/map-assets/madrid.pmtiles') {
+  if (url.pathname === '/map-context/madrid-context-2000m.pmtiles') {
     if (!hasLocalPmtiles) {
       response.writeHead(404, { 'Content-Type': 'text/plain' });
       response.end('PMTiles real ausente; prueba limitada a la ruta sin basemap');
@@ -210,7 +253,7 @@ const server = http.createServer((request, response) => {
     else fs.createReadStream(localPmtilesPath, { start, end }).pipe(response);
     return;
   }
-  if (url.pathname === '/map-assets/madrid.pmtiles.provenance.json') {
+  if (url.pathname === '/map-context/madrid-context-2000m.pmtiles.provenance.json') {
     if (!hasLocalPmtiles || !fs.existsSync(localPmtilesProvenancePath)) {
       response.writeHead(404, { 'Content-Type': 'text/plain' });
       response.end('Provenance PMTiles no incluida en fixture de navegador');
@@ -238,6 +281,51 @@ const server = http.createServer((request, response) => {
   if (url.pathname === '/api/v1/capabilities') {
     response.writeHead(200, { 'Content-Type': 'application/json' });
      response.end(JSON.stringify({ schema_version: '1.0', api_version: 'v3-experimental', retrievers: [{ id: 'crosstext2loc', available: true, scores_are_probabilities: false }], processing_modes:[{id:'no_llm',available:true,variant:'es_original'},{id:'with_llm',available:true,variant:'en_cartographic',experimental:true}], postprocessing_capabilities:[{id:'topn_visual_promotion',available:false,enabled:false,source:null,online_inference:false}], pipeline_progress:{transport:'sse',endpoint_template:'/api/v1/progress/{query_id}',stages:[{id:'llm',available:true},{id:'crosstext2loc',available:true},{id:'vlm',available:false,online_inference:false},{id:'dialoguevpr',available:false,reason:'not_integrated_in_mvp_endpoint'}]}, galleries: [{ gallery_id: 'madrid-50m', candidate_count: 253 }, { gallery_id: 'madrid-25m', candidate_count: 1115 }], search_area: { region_id: 'madrid_pilot', crs: 'EPSG:4326', bbox: { north: 40.42, south: 40.412, east: -3.699, west: -3.709 } }, supported_languages: { policy_status: 'experimental', accepted_codes: ['es'] } }));
+    return;
+  }
+  if (url.pathname === '/api/v1/dialogue/queries') {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ available: false, queries: [], adaptive_sessions: [] }));
+    return;
+  }
+  if (url.pathname === '/api/v1/dialogue/variants') {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ contract_version: 'description-length-experiments-v1', variant_count: 0, condition_count: 0, scope_query_ids: [], variants: [] }));
+    return;
+  }
+  if (url.pathname === '/api/v1/dialogue-freetext/pilots') {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ contract_version: 'atlas-dialogue-freetext-policy-catalogue-v1', policies: [{ policy_id: 'dialogue-vpr-freetext-v1-operational', available: true, enabled: true }] }));
+    return;
+  }
+  if (url.pathname === '/api/v1/dialogue-freetext/pilot') {
+    response.writeHead(404, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ error: { code: 'NOT_FOUND', message: 'Sin piloto histórico.' } }));
+    return;
+  }
+  if (url.pathname === '/api/v1/dialogue-freetext/sessions' && request.method === 'POST') {
+    freeTextStage = 0;
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify(freeTextSession()));
+    return;
+  }
+  const freeTextEventsPath = new RegExp(`^/api/v1/dialogue-freetext/sessions/${freeTextSessionId}/events$`);
+  if (freeTextEventsPath.test(url.pathname)) {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ events: [{ event_id: freeTextStage + 1, stage: `E${freeTextStage}`, status: freeTextStage === 3 ? 'completed' : 'waiting_user' }] }));
+    return;
+  }
+  const freeTextSessionPath = new RegExp(`^/api/v1/dialogue-freetext/sessions/${freeTextSessionId}$`);
+  if (freeTextSessionPath.test(url.pathname) && request.method === 'GET') {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify(freeTextSession()));
+    return;
+  }
+  const freeTextAnswerPath = new RegExp(`^/api/v1/dialogue-freetext/sessions/${freeTextSessionId}/answers$`);
+  if (freeTextAnswerPath.test(url.pathname) && request.method === 'POST') {
+    freeTextStage = Math.min(3, freeTextStage + 1);
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify(freeTextSession()));
     return;
   }
   if (url.pathname === '/api/v1/retrievals' && request.method === 'POST') {
@@ -312,10 +400,16 @@ try {
    };
    const waitFor = async expression => { for (let i = 0; i < 120; i++) { if (await evaluate(expression)) return; await delay(100); } throw new Error(`Timeout: ${expression}`); };
    await send('Runtime.enable'); await send('Page.enable'); await send('Network.enable');
-  await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1080, deviceScaleFactor: 1, mobile: false });
-  await send('Page.navigate', { url: baseUrl });
-  await waitFor(`!!document.querySelector('#description') && !document.querySelector('[data-dropdown="gallery"]').disabled`);
-  assert.match(await evaluate(`document.querySelector('.service-badge').textContent`), /CrossText2Loc/);
+   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1080, deviceScaleFactor: 1, mobile: false });
+   await send('Page.navigate', { url: baseUrl });
+   await waitFor(`!!document.querySelector('#description') && !document.querySelector('[data-dropdown="gallery"]').disabled`);
+   await waitFor(`document.querySelector('#results-map')?.dataset.renderer === 'maplibre' && document.querySelectorAll('#results-map canvas.maplibregl-canvas').length === 1`);
+   const initialMapInstance = await evaluate(`document.querySelector('#results-map').dataset.mapInstanceId`);
+    assert.equal(await evaluate(`document.querySelectorAll('#results-map canvas').length`), 1, 'la aplicación principal monta un solo canvas MapLibre');
+    assert.ok(mapContextRequests.includes('/map-context/madrid-context-2000m.pmtiles'), 'MapLibre solicita la ruta PMTiles local exacta');
+    assert.deepEqual([...new Set(mapContextRequests)].filter(route => route !== '/map-context/madrid-context-2000m.pmtiles.provenance.json'), ['/map-context/madrid-context-2000m.pmtiles'], 'no se solicitan rutas de contexto cartográfico inesperadas');
+   if (hasLocalPmtiles) assert.ok(mapContextRequests.includes('/map-context/madrid-context-2000m.pmtiles.provenance.json'), 'se solicita la provenance local exacta');
+   assert.match(await evaluate(`document.querySelector('.service-badge').textContent`), /CrossText2Loc/);
   assert.equal(await evaluate(`document.querySelectorAll('.result-card').length`), 0);
   await fill('Una plaza amplia rodeada de edificios y calles estrechas');
    await click('.search-button');
@@ -329,8 +423,10 @@ try {
     assert.equal(await evaluate(`document.querySelector('[data-stage="llm"]').classList.contains('state-skipped')`), true);
     assert.equal(await evaluate(`document.querySelector('[data-stage="crosstext2loc"]').classList.contains('state-completed')`), true);
     assert.equal(await evaluate(`document.querySelector('[data-stage="dialoguevpr"]').classList.contains('state-unavailable')`), true);
-   await waitFor(`document.querySelectorAll('.map-result-marker').length === 10`);
-   assert.ok(['maplibre', 'leaflet-2d'].includes(await evaluate(`document.querySelector('#results-map').dataset.renderer`)));
+      await waitFor(`document.querySelectorAll('.map-result-marker').length === 10`);
+    assert.equal(await evaluate(`document.querySelector('#results-map').dataset.renderer`), 'maplibre');
+    assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapInstanceId`), initialMapInstance, 'la primera búsqueda actualiza la instancia ya montada');
+    assert.equal(await evaluate(`document.querySelectorAll('#results-map canvas.maplibregl-canvas').length`), 1);
    assert.equal(await evaluate(`document.querySelectorAll('.map-result-marker').length`), 10);
    assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapCandidateCount`), '10');
     assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapCellCount`), '10');
@@ -417,18 +513,41 @@ try {
    const latestQueryId = await evaluate(`document.querySelector('.pipeline-panel')?.dataset.queryId`);
    assert.notEqual(latestQueryId, slowQueryId, 'una consulta nueva obtiene su propio identificador');
    await delay(8200);
-   assert.equal(await evaluate(`document.querySelector('.pipeline-panel')?.dataset.queryId`), latestQueryId, 'la respuesta/evento tardío anterior no cambia la consulta nueva');
-   assert.equal(await evaluate(`document.querySelector('.pipeline-panel')?.dataset.pipelineOverall`), 'failed');
-   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-   await delay(250);
+    assert.equal(await evaluate(`document.querySelector('.pipeline-panel')?.dataset.queryId`), latestQueryId, 'la respuesta/evento tardío anterior no cambia la consulta nueva');
+    assert.equal(await evaluate(`document.querySelector('.pipeline-panel')?.dataset.pipelineOverall`), 'failed');
+     await waitFor(`!!document.querySelector('#freetext-start:not([disabled])')`);
+    await click('#freetext-start');
+    await waitFor(`document.querySelector('[data-freetext-stage="E0"]')?.getAttribute('aria-current') === 'true' && document.querySelectorAll('.result-card').length === 10`);
+    const freeTextMapInstance = await evaluate(`document.querySelector('#results-map').dataset.mapInstanceId`);
+    assert.equal(freeTextMapInstance, initialMapInstance, 'E0 conserva la instancia MapLibre principal');
+    for (let stage = 0; stage <= 3; stage += 1) {
+      const topKey = candidateKeyAt('madrid-50m', stage * 10);
+      await waitFor(`document.querySelector('[data-freetext-stage="E${stage}"]')?.getAttribute('aria-current') === 'true' && document.querySelector('#results-map').dataset.selectedKey === ${JSON.stringify(topKey)}`);
+      assert.equal(await evaluate(`document.querySelectorAll('.result-card').length`), 10, `E${stage} muestra Top-10`);
+      assert.equal(await evaluate(`document.querySelector('.result-card .rank-badge').textContent`), '01', `E${stage} mantiene Top-1 primero`);
+      assert.equal(await evaluate(`document.querySelector('.result-card').classList.contains('selected')`), true, `E${stage} selecciona Top-1`);
+      assert.equal(await evaluate(`document.querySelector('.map-result-marker.is-top-result.is-selected')?.dataset.candidateKey`), topKey, `E${stage} sincroniza Top-1 en mapa`);
+      assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapInstanceId`), freeTextMapInstance, `E${stage} actualiza sin reconstruir MapLibre`);
+      assert.equal(await evaluate(`document.querySelectorAll('#results-map canvas.maplibregl-canvas').length`), 1, `E${stage} conserva un canvas`);
+      if (stage < 3) {
+        await waitFor(`!!document.querySelector('#freetext-answer')`);
+        await evaluate(`document.querySelector('#freetext-answer').value='Respuesta ${stage + 1}';document.querySelector('#freetext-answer').dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#freetext-answer-form').requestSubmit()`);
+      }
+    }
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await delay(250);
    assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
     assert.equal(await evaluate(`document.querySelector('[data-mobile="results"]').getAttribute('aria-pressed')`), 'true', 'la consulta abre el panel de progreso/mapa en móvil');
     assert.equal(await evaluate(`document.querySelectorAll('.pipeline-step').length`), 4);
     assert.equal(await evaluate(`getComputedStyle(document.querySelector('.pipeline-steps')).gridTemplateColumns.split(' ').length`), 1, 'la cronología compacta móvil mantiene una columna legible');
-    await click('[data-mobile="description"]');
-    assert.equal(await evaluate(`document.querySelector('[data-mobile="description"]').getAttribute('aria-pressed')`), 'true');
-    await click('[data-mobile="results"]');
-    assert.equal(await evaluate(`document.querySelector('[data-mobile="results"]').getAttribute('aria-pressed')`), 'true');
+     await click('[data-mobile="description"]');
+     assert.equal(await evaluate(`document.querySelector('[data-mobile="description"]').getAttribute('aria-pressed')`), 'true');
+     assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapInstanceId`), freeTextMapInstance, 'ocultar el mapa en móvil conserva su instancia');
+     await click('[data-mobile="results"]');
+     assert.equal(await evaluate(`document.querySelector('[data-mobile="results"]').getAttribute('aria-pressed')`), 'true');
+     await waitFor(`document.querySelector('#results-map canvas.maplibregl-canvas')?.width > 0 && document.querySelector('#results-map canvas.maplibregl-canvas')?.clientWidth === document.querySelector('#results-map').clientWidth`);
+     assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapInstanceId`), freeTextMapInstance, 'mostrar y redimensionar el mapa móvil no lo reconstruye');
+     assert.equal(await evaluate(`document.querySelectorAll('#results-map canvas.maplibregl-canvas').length`), 1, 'el toggle móvil conserva un solo canvas');
    const renderer = await evaluate(`document.querySelector('#results-map').dataset.renderer`);
    const localBasemap = await evaluate(`document.querySelector('#results-map').dataset.mapBasemap`);
   await send('Page.navigate', { url: `${baseUrl}/?legacy=1#explore` });

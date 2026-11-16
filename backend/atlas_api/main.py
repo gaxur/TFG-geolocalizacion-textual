@@ -24,12 +24,17 @@ from .settings import Settings
 from .dialogue_freetext_executor import FreeTextRuntimeExecutor
 from .dialogue_executor import SequentialDialogueExecutor
 from .freetext_operational import OperationalFreeTextSessionService
+from .freetext_application import ApplicationFreeTextSessionService
 from .dialogue_sessions import sha256_file
 from .model_gate import ModelGate
 
 
-def create_app(*, settings: Settings | None = None, retriever_factory: Callable | None = None, transformer_factory: Callable | None = None, visual_factory: Callable | None = None, dialogue_executor=None, freetext_service=None, freetext_operational_service=None, operational_retriever_factory: Callable | None = None, operational_transformer_factory: Callable | None = None) -> FastAPI:
+def create_app(*, settings: Settings | None = None, retriever_factory: Callable | None = None, transformer_factory: Callable | None = None, visual_factory: Callable | None = None, dialogue_executor=None, freetext_service=None, freetext_operational_service=None, freetext_application_service=None, operational_retriever_factory: Callable | None = None, operational_transformer_factory: Callable | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
+    if settings.freetext_operational_enabled and settings.freetext_application_enabled:
+        raise ValueError("FreeText application y operacional científico son mutuamente exclusivos")
+    if freetext_operational_service is not None and freetext_application_service is not None:
+        raise ValueError("los servicios FreeText application y operacional científico son mutuamente exclusivos")
     factory = retriever_factory or default_retriever_factory
     qwen_factory = transformer_factory or default_transformer_factory
     from .lifespan import default_visual_factory
@@ -63,6 +68,31 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
         core_policy = root / "config/interactive_dialogue_freetext_v1.json"
         freetext_operational_service = OperationalFreeTextSessionService(session_root=settings.freetext_operational_session_root, executor=executor, enabled=True, authorization_root=settings.freetext_operational_authorization_root, execution_id=settings.freetext_operational_execution_id, policy_identity={"operational_policy_id":"dialogue-vpr-freetext-v1-operational","operational_policy_version":"1.0.0","operational_policy_sha256":sha256_file(operational_policy),"core_policy_id":"dialogue-vpr-freetext-v1","core_policy_version":"1.0.0","core_policy_sha256":sha256_file(core_policy)})
     app.state.freetext_operational_service = freetext_operational_service
+    if freetext_application_service is None and settings.freetext_application_enabled:
+        required = ("ATLAS_QWEN_MODEL_PATH", "ATLAS_DIALOGUE_F3_BUNDLE", "ATLAS_OLLAMA_PS_URL")
+        missing = [name for name in required if not os.environ.get(name)]
+        if missing:
+            raise ValueError(f"FreeText application requiere: {', '.join(missing)}")
+        executor = FreeTextRuntimeExecutor(qwen_model=Path(os.environ["ATLAS_QWEN_MODEL_PATH"]), runtime_config=settings.runtime_config, region_config=settings.region_config, f3_bundle=Path(os.environ["ATLAS_DIALOGUE_F3_BUNDLE"]), clip_weights=Path(settings.clip_weights_path), cvg_utils_sha256=settings.cvg_utils_sha256, ollama_ps_url=os.environ["ATLAS_OLLAMA_PS_URL"])
+        root = Path(__file__).resolve().parents[2]
+        application_policy = root / "config/dialogue_freetext_application_v1.json"
+        core_policy = root / "config/interactive_dialogue_freetext_v1.json"
+        freetext_application_service = ApplicationFreeTextSessionService(
+            session_root=settings.freetext_application_session_root,
+            state_root=settings.freetext_application_state_root,
+            profile_path=settings.freetext_application_profile,
+            executor=executor,
+            enabled=True,
+            policy_identity={
+                "application_policy_id": "dialogue-vpr-freetext-v1-application",
+                "application_policy_version": "1.0.0",
+                "application_policy_sha256": sha256_file(application_policy),
+                "core_policy_id": "dialogue-vpr-freetext-v1",
+                "core_policy_version": "1.0.0",
+                "core_policy_sha256": sha256_file(core_policy),
+            },
+        )
+    app.state.freetext_application_service = freetext_application_service
     app.state.dialogue_variants = json.loads(settings.dialogue_variants_path.read_text()) if settings.dialogue_variants_path and settings.dialogue_variants_path.is_file() else {"schema_version":"1.0","contract_version":"description-length-experiments-v1","status":"not_configured","variant_count":0,"condition_count":0,"variants":[],"conditions":[]}
     if settings.allowed_origins:
         app.add_middleware(CORSMiddleware, allow_origins=list(settings.allowed_origins), allow_credentials=False, allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-Request-ID", "Idempotency-Key", "Last-Event-ID"], expose_headers=["X-Request-ID"])
@@ -76,12 +106,13 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
 
     install_error_handlers(app)
 
-    @app.get("/api/v1/dialogue/variants")
-    async def dialogue_variants():
-        return app.state.dialogue_variants
     app.include_router(health_router)
-    app.include_router(progress_router)
-    app.include_router(dialogue_router)
-    app.include_router(retrieval_router)
-    if freetext_service is not None or freetext_operational_service is not None: app.include_router(freetext_router)
+    if not settings.freetext_application_enabled and freetext_application_service is None:
+        @app.get("/api/v1/dialogue/variants")
+        async def dialogue_variants():
+            return app.state.dialogue_variants
+        app.include_router(progress_router)
+        app.include_router(dialogue_router)
+        app.include_router(retrieval_router)
+    if freetext_service is not None or freetext_operational_service is not None or freetext_application_service is not None: app.include_router(freetext_router)
     return app

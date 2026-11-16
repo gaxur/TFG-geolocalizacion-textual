@@ -463,6 +463,59 @@ Si una tarea falla:
 
 Las entradas son append-only.
 
+### 2026-11-16 — APP-DEPLOYMENT-PREPARATION-01
+
+- **Tarea:** preparar el despliegue aislado de la aplicación integrada sin
+  ejecutar contenedores, modelos ni inferencias.
+- **Resultado:** Compose autónomo con API GPU interna, frontend Nginx en loopback,
+  mounts de modelos/datos solo lectura, estado persistente y perfil fail-closed;
+  guía operativa y tests estáticos añadidos.
+- **Evidencia:** `compose.app.yaml`, `.env.app.example`,
+  `docs/APP_DEPLOYMENT.md`,
+  `config/freetext_application_profile.template.json` y
+  `tests/test_app_compose.py`.
+- **Decisiones:** el modo aplicación permanece desactivado y la plantilla no está
+  aprobada; no se montan cohortes, autorizaciones científicas, imágenes ni VLM.
+- **Bloqueos:** activación condicionada a perfil aprobado, hashes/identidad reales
+  y revisión explícita de recursos y limitaciones.
+- **Próximo paso:** revisar y aprobar un perfil de aplicación separado; no
+  habilitar ni ejecutar inferencia automáticamente. La próxima tarea científica
+  recomendada del roadmap no cambia.
+
+### 2026-11-16 — FREETEXT-APPLICATION-ADMISSION-01
+
+- **Tarea:** implementar un modo de admisión reutilizable para la aplicación,
+  separado de la autorización científica FreeText por ejecución.
+- **Resultado:** modo deshabilitado por defecto, perfil aprobado fail-closed,
+  ledger SQLite `FULL`/WAL, límites transaccionales, cuotas E0-E3 4/4/3,
+  idempotencia durable y acceso solo loopback implementados con tests fake.
+- **Evidencia:** `backend/atlas_api/freetext_application.py`,
+  `schemas/atlas-dialogue-freetext-application-profile-v1.schema.json`,
+  `config/freetext_application_profile.template.json` y
+  `tests/test_freetext_application.py`.
+- **Decisiones:** D098 se registra como `PROPUESTA`; no modifica ni aprueba el
+  flujo científico existente.
+- **Bloqueos:** falta crear y aprobar un perfil real con hashes exactos; no se
+  ejecutaron modelos ni se habilitó el modo.
+- **Próximo paso:** revisión humana de D098 y del perfil antes de cualquier
+  activación; no crear ni aprobar el perfil automáticamente.
+
+### 2026-11-16 — INTEGRATED-APPLICATION-COMPOSE-01
+
+- **Compose:** comando autónomo, loopback 18085, API interna, imágenes app propias,
+  datos/modelos read-only y estado SQLite persistente.
+- **Frontend:** MapLibre principal montado, E0-E3 incremental, PMTiles local, 3D
+  solo con `height` explícita, UI app-only y recovery por sesión/operation ID.
+- **Backend:** policy application separada, cuotas globales/per-session, no refunds,
+  una operación global, rutas científicas ausentes, GT/VLM/H38 prohibidos.
+- **Validación:** backend 72 PASS; frontend 45 PASS +1 skip; build/Compose/Nginx;
+  `APP_DISABLED_BROWSER_PASS`, `APP_FLOW_BROWSER_PASS` y SSE integration PASS.
+- **Runtime:** stack pendiente activo en `127.0.0.1:18085`; readiness 503 esperado,
+  cero POST de inferencia y cero modelos residentes.
+- **Estado:** `APP_INTEGRATED_PENDING_D098_PROFILE_APPROVAL_AND_REAL_GPU_TEST`.
+- **Próximo paso:** aprobar D098/perfil concreto; no activar inferencia ni VLM
+  automáticamente.
+
 ### 2026-11-06 — P2-04-CONTINUATION-BLOCKED-01
 
 - **Tarea:** registrar aprobación humana de E0 y generar E1–E3 mediante contrato

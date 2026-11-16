@@ -160,6 +160,14 @@ class OperationalFreeTextStartRequest(StrictModel):
     description_es: Annotated[str, StringConstraints(min_length=3, max_length=2400)]
     client_operation_id: NonEmpty
 
+
+class ApplicationFreeTextStartRequest(StrictModel):
+    schema_version: Literal["1.0"]
+    contract_version: Literal["atlas-dialogue-freetext-start-request-v2"]
+    policy_id: Literal["dialogue-vpr-freetext-v1-application"]
+    description_es: Annotated[str, StringConstraints(min_length=3, max_length=2400)]
+    client_operation_id: NonEmpty
+
 class FreeTextAnswerRequest(StrictModel):
     schema_version: Literal["1.0"]
     contract_version: Literal["atlas-dialogue-freetext-answer-request-v1"]

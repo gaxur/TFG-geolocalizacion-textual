@@ -85,6 +85,7 @@ export function getFreeTextPilot(options={}){return fetchJson('/dialogue-freetex
 export function getFreeTextPilots(options={}){return fetchJson('/dialogue-freetext/pilots',options);}
 export function startFreeText(request,options={}){const operationId=request?.client_operation_id;return fetchJson('/dialogue-freetext/sessions',{...options,method:'POST',body:request,headers:{...(options.headers||{}),...(operationId?{'Idempotency-Key':operationId}:{})}});}
 export function getFreeTextSession(sessionId,options={}){return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}`,options);}
+export function getApplicationSessionByOperation(operationId,options={}){return fetchJson(`/dialogue-freetext/application/operations/${encodeURIComponent(operationId)}`,options);}
 export function answerFreeText(sessionId,request,options={}){const operationId=request?.client_operation_id;return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/answers`,{...options,method:'POST',body:request,headers:{...(options.headers||{}),...(operationId?{'Idempotency-Key':operationId}:{})}});}
 export function getFreeTextEvents(sessionId,options={}){return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/events`,options);}
 export function freeTextEventStreamUrl(sessionId,{baseUrl=DEFAULT_BASE_URL,after}={}){const suffix=after?`&after=${encodeURIComponent(after)}`:'';return `${String(baseUrl).replace(/\/$/,'')}/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/events/stream?follow=true${suffix}`;}

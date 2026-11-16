@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {
+  APPLICATION_FREETEXT_POLICY,
   OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH,
   OPERATIONAL_FREETEXT_POLICY,
   adaptFreeTextStage,
   buildOperationalFreeTextAnswer,
   buildOperationalFreeTextStart,
+  buildApplicationFreeTextStart,
   compareFreeTextStages,
   normalizeFreeTextEvents,
   normalizeFreeTextStatus,
@@ -44,4 +47,10 @@ test('recovery queda aislada por policy y prefijo operacional',()=>{
 });
 test('un puntero operacional sigue siendo recuperable tras consumir autorización',()=>{
  const pointer=recoveryPointer({session_id:'freetext-operational-00000000-0000-0000-0000-000000000000',policy_id:OPERATIONAL_FREETEXT_POLICY,updated_at_utc:'2026-11-15T00:00:00Z'}),catalogue=validateFreeTextPolicyCatalogue({contract_version:'atlas-dialogue-freetext-policy-catalogue-v1',policies:[{policy_id:OPERATIONAL_FREETEXT_POLICY,available:false,enabled:true,authorization_status:'consumed'},{policy_id:'dialogue-vpr-freetext-v1',available:true}]});assert.equal(selectPrimaryFreeTextPolicy(catalogue),'dialogue-vpr-freetext-v1');assert.equal(validateRecoveryPointer(pointer).policy_id,OPERATIONAL_FREETEXT_POLICY);
+});
+test('application usa contrato y recovery propios',()=>{
+ const catalogue=validateFreeTextPolicyCatalogue({contract_version:'atlas-dialogue-freetext-policy-catalogue-v1',policies:[{policy_id:APPLICATION_FREETEXT_POLICY,available:true,enabled:true},{policy_id:OPERATIONAL_FREETEXT_POLICY,available:true,enabled:true}]});assert.equal(selectPrimaryFreeTextPolicy(catalogue),APPLICATION_FREETEXT_POLICY);const start=buildApplicationFreeTextStart({description:'Una plaza',clientOperationId:'app-1'});assert.equal(start.policy_id,APPLICATION_FREETEXT_POLICY);const session=validateFreeTextSession({contract_version:'atlas-dialogue-freetext-application-session-public-v1',session_id:'freetext-application-00000000-0000-0000-0000-000000000000',policy_id:APPLICATION_FREETEXT_POLICY,status:'pending',turns:[],stage_snapshots:[]}),pointer=recoveryPointer(session);assert.deepEqual(validateRecoveryPointer(pointer),pointer);assert.equal(validateRecoveryPointer({...pointer,session_id:'freetext-operational-00000000-0000-0000-0000-000000000000'}),null);
+});
+test('application persiste operation id y reconcilia errores de red ambiguos',async()=>{
+ const source=await readFile(new URL('../src/main.js',import.meta.url),'utf8');assert.match(source,/applicationPendingOperationKey/);assert.match(source,/NETWORK_ERROR/);assert.match(source,/getApplicationSessionByOperation/);assert.match(source,/localStorage\.setItem\(applicationPendingOperationKey,request\.client_operation_id\)/);
 });

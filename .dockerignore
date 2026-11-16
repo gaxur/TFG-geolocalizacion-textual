@@ -1,0 +1,17 @@
+.git
+.gitignore
+.env*
+data
+external
+checkpoints
+results
+runtime
+frontend/node_modules
+frontend/dist
+**/__pycache__
+**/.pytest_cache
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.sqlite*

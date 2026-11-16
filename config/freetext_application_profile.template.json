@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "atlas-dialogue-freetext-application-profile-v1",
+  "profile_id": "REPLACE_WITH_PROFILE_ID",
+  "profile_version": "1.0.0",
+  "status": "PENDING_APPROVAL",
+  "approved": false,
+  "approved_at": "1970-01-01T00:00:00Z",
+  "valid_from": "1970-01-01T00:00:00Z",
+  "expires_at": "1970-01-01T00:00:00Z",
+  "application_policy_id": "dialogue-vpr-freetext-v1-application",
+  "application_policy_version": "1.0.0",
+  "application_policy_sha256": "REPLACE_WITH_SHA256",
+  "core_policy_id": "dialogue-vpr-freetext-v1",
+  "core_policy_version": "1.0.0",
+  "core_policy_sha256": "REPLACE_WITH_SHA256",
+  "executor_identity": {},
+  "executor_identity_sha256": "REPLACE_WITH_SHA256",
+  "max_sessions_total": 1,
+  "max_open_sessions": 1,
+  "global_quotas": {
+    "maximum_qwen_units": 4,
+    "maximum_ct2l_units": 4,
+    "maximum_questions": 3
+  },
+  "per_session_quotas": {
+    "maximum_qwen_loads": 4,
+    "maximum_qwen_calls": 4,
+    "maximum_ct2l_loads": 4,
+    "maximum_ct2l_calls": 4,
+    "maximum_questions": 3,
+    "automatic_retries": 0
+  },
+  "constraints": {
+    "access_mode": "loopback",
+    "network_permitted": false,
+    "ground_truth_permitted": false,
+    "references_permitted": false,
+    "vlm_permitted": false
+    ,"h38_h61_permitted": false
+  }
+}

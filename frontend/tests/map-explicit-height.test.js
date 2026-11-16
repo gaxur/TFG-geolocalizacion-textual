@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from'node:assert/strict';import{readFile}from'node:fs/promises';
+test('la capa 3D exige height explícita y no estima niveles',async()=>{const source=await readFile(new URL('../src/map.js',import.meta.url),'utf8');assert.match(source,/filter: \['>', \['to-number',\['get',basemap\.heightProperty\],0\],0\]/);assert.doesNotMatch(source,/fill-extrusion-height'.*building:levels/);assert.match(source,/no se estiman alturas/);});

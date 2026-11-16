@@ -40,7 +40,7 @@ def build_lifespan(settings: Settings, retriever_factory: Callable[[Settings], o
         app.state.retriever = None
         app.state.transformer = None
         app.state.visual_promoter = None
-        if settings.freetext_operational_enabled:
+        if settings.freetext_operational_enabled or settings.freetext_application_enabled:
             app.state.retriever = await anyio.to_thread.run_sync(operational_retriever_factory, settings)
             try:
                 app.state.transformer = await anyio.to_thread.run_sync(operational_transformer_factory, settings)

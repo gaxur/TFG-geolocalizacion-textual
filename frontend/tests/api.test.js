@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AtlasApiError, answerFreeText, getCapabilities, parseJsonResponse, retrieve, startFreeText } from '../src/api.js';
+import { AtlasApiError, answerFreeText, getApplicationSessionByOperation, getCapabilities, parseJsonResponse, retrieve, startFreeText } from '../src/api.js';
 import { adaptRetrievalResponse, buildRetrievalRequest, createQueryId, createRequestGuard } from '../src/retrieval.js';
 
 const response = (body, status = 200, headers = {}) => ({ ok: status >= 200 && status < 300, status, headers: { get: key => headers[key.toLowerCase()] || null }, json: async () => body });
@@ -107,4 +107,7 @@ test('el guard impide que respuestas canceladas u obsoletas publiquen estado', (
 });
 test('FreeText operacional envía la misma clave idempotente en body y cabecera',async()=>{
  const calls=[];const fetchImpl=async(url,options)=>{calls.push({url,options});return response({ok:true});};const start={client_operation_id:'op-start',description_es:'Una plaza'},answer={client_operation_id:'op-answer',answer_literal:'Sí'};await startFreeText(start,{fetchImpl});await answerFreeText('dialogue-freetext-id',answer,{fetchImpl});assert.deepEqual(calls.map(x=>x.options.headers['Idempotency-Key']),['op-start','op-answer']);assert.equal(JSON.parse(calls[1].options.body).client_operation_id,'op-answer');assert.equal(calls[1].url,'/api/v1/dialogue-freetext/sessions/dialogue-freetext-id/answers');
+});
+test('application recupera una creación perdida por operación sin repetir POST',async()=>{
+ const calls=[];const fetchImpl=async(url,options)=>{calls.push({url,options});return response({ok:true})};await getApplicationSessionByOperation('app-create-1',{fetchImpl});assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/v1/dialogue-freetext/application/operations/app-create-1');assert.equal(calls[0].options.method,'GET');
 });

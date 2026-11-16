@@ -1,0 +1,20 @@
+services:
+  api:
+    build: ./frontend/tests/app-fixture
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.app
+    depends_on: [api]
+    volumes:
+      - /home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual-maplibre-pgx/data/processed/map-assets:/usr/share/nginx/map-assets:ro
+      - /home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual-maplibre-pgx/results/generated/map-assets-context-2000m:/usr/share/nginx/map-context:ro
+  browser-check:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.browser
+    environment:
+      CHROME_PATH: /usr/bin/chromium
+      APP_BASE_URL: http://frontend:8080
+    depends_on: [frontend]
+    command: ["node","scripts/browser-app-flow-check.mjs"]
