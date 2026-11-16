@@ -582,6 +582,19 @@ Las entradas son append-only.
 - **Validación:** 83 backend PASS; 48 frontend PASS +1 skip; browser fake E0-E3
   PASS; Compose/py_compile PASS.
 
+### 2026-11-16 — FREETEXT-APPLICATION-SSE-BOUNDARIES-01
+
+- **Defecto:** el frontend cerraba SSE ante `E0_qwen: completed`, antes de CT2L y
+  del límite global E0 `waiting_user`.
+- **Corrección:** clasificación explícita componente/sesión, reconexión por cursor,
+  guards de generación/session ID y doble reconciliación ante carrera terminal.
+- **Pruebas:** 50 frontend PASS +1 skip; app browser reload durante E0/E2 y E0-E3
+  PASS; Nginx desconexión/replay PASS; fallo E1 conserva Top-10 E0.
+- **Despliegue:** solo frontend recreado; API ID/start time y sesión/hash intactos,
+  contador POST 2→2, ninguna inferencia nueva.
+- **Estado real:** sesión v2 terminó posteriormente `failed` en E1 Qwen por una
+  respuesta externa; frontend final recupera E0 y muestra el fallo sin responder.
+
 ### 2026-11-06 — P2-04-CONTINUATION-BLOCKED-01
 
 - **Tarea:** registrar aprobación humana de E0 y generar E1–E3 mediante contrato

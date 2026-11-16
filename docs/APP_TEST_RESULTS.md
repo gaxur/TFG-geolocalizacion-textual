@@ -1,7 +1,7 @@
 # Resultados de pruebas de la aplicación
 
 - Backend/API/admisión/Compose/regresiones: `83 passed`.
-- Frontend: `48 passed`, `1 skipped` por PMTiles unitario opcional.
+- Frontend: `50 passed`, `1 skipped` por PMTiles unitario opcional.
 - Vite build: PASS con warning de chunk MapLibre existente.
 - `APP_DISABLED_BROWSER_PASS`: stack real, perfil pendiente, MapLibre y cero POST.
 - `APP_FLOW_BROWSER_PASS`: API fake, creación, Q1-Q3, E0-E3, mapa estable y recarga.
@@ -38,3 +38,17 @@ no se revalidaron.
 - CPU: cargas fake Qwen/CT2L únicas, cache hits E1, cierre, contratos CT2L,
   supersession e idempotencia.
 - GPU: no ejecutada; no se afirma todavía reducción real ni convivencia en RAM.
+
+## Corrección SSE de subcomponentes
+
+- Causa: `E0_qwen: completed` se trataba como fin global y cerraba EventSource.
+- Corrección: eventos `E0-E3_(qwen|crosstext2loc)` nunca cierran SSE; solo límites
+  globales de sesión reconcilian y publican snapshots/preguntas.
+- GET `pending/running`: reabre SSE con el último event ID.
+- Carrera GET-running/historial-terminal: segundo GET antes de reabrir.
+- `APP_FLOW_BROWSER_PASS`: recarga durante E0 y E2, E0-E3, nueva búsqueda y fallo
+  E1 posterior conservando exactamente el Top-10 previo.
+- `FREETEXT_NGINX_INTEGRATION_PASS`: Qwen completed → CT2L running/completed →
+  E0 waiting_user, desconexión y reanudación `after=2`, sin POST duplicado.
+- Chromium real: sesión final `failed` recuperada con 10 candidatos E0, último
+  evento E1 failed y cero POST.
