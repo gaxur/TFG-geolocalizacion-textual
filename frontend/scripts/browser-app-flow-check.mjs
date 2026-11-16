@@ -23,12 +23,16 @@ try{
   await waitFor(`Boolean(document.querySelector('#search-form button:not([disabled])')&&document.querySelector('.maplibregl-canvas'))`);
   const instance=await evaluate(`document.querySelector('#results-map').dataset.mapInstanceId`);
   await evaluate(`(()=>{const x=document.querySelector('#description');x.value='Una plaza y una torre';x.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#search-form').requestSubmit()})()`);
+  await waitFor(`document.querySelector('.freetext-progress small')?.textContent.includes('qwen E0: completed')&&document.querySelectorAll('.result-card').length===0`);
+  await send('Page.reload');
+  await waitFor(`document.querySelectorAll('.result-card').length===10&&Boolean(document.querySelector('#freetext-answer'))`);
   for(let stage=0;stage<4;stage++){
     await waitFor(`Boolean(document.querySelector('[data-freetext-stage="E${stage}"]')&&document.querySelectorAll('.result-card').length===10)`);
     assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapInstanceId`),instance);
     if(stage<3){
       await waitFor(`Boolean(document.querySelector('#freetext-answer'))`);
       await evaluate(`(()=>{const x=document.querySelector('#freetext-answer');x.value='Respuesta ${stage+1}';x.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#freetext-answer-form').requestSubmit()})()`);
+      if(stage===1){await waitFor(`document.querySelector('.freetext-progress small')?.textContent.includes('crosstext2loc E2: running')`);await send('Page.reload');}
     }
   }
   await waitFor(`!document.querySelector('#freetext-answer')`);
@@ -40,8 +44,12 @@ try{
   await waitFor(`document.querySelectorAll('[data-freetext-stage]').length===0&&Boolean(document.querySelector('#description:not([disabled])'))`);
   assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapInstanceId`),instance);
   await evaluate(`(()=>{const x=document.querySelector('#description');x.value='Otra descripción de prueba';x.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#search-form').requestSubmit()})()`);
-  await waitFor(`document.querySelectorAll('.result-card').length===10`);
+  await waitFor(`document.querySelectorAll('.result-card').length===10&&Boolean(document.querySelector('#freetext-answer'))`);
+  const preserved=await evaluate(`JSON.stringify([...document.querySelectorAll('.result-card .card-title h3')].map(x=>x.textContent))`);
+  await evaluate(`(()=>{const x=document.querySelector('#freetext-answer');x.value='FALLAR';x.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#freetext-answer-form').requestSubmit()})()`);
+  await waitFor(`document.querySelector('.freetext-status')?.textContent.includes('Fallida')`);
+  assert.equal(await evaluate(`JSON.stringify([...document.querySelectorAll('.result-card .card-title h3')].map(x=>x.textContent))`),preserved);
   const counters=await(await fetch('http://api:8000/fixture/counters')).json();
-  assert.equal(counters.creates,2);assert.equal(counters.answers,3);assert.ok(counters.gets>=1);
+  assert.equal(counters.creates,2);assert.equal(counters.answers,4);assert.ok(counters.gets>=3);assert.ok(counters.streams>=4);
   console.log('APP_FLOW_BROWSER_PASS');
 }finally{ws?.close();browser.kill('SIGTERM')}

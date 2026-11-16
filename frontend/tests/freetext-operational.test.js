@@ -10,6 +10,8 @@ import {
   buildOperationalFreeTextStart,
   buildApplicationFreeTextStart,
   compareFreeTextStages,
+  isFreeTextComponentEvent,
+  isFreeTextSessionBoundaryEvent,
   normalizeFreeTextEvents,
   normalizeFreeTextStatus,
   recoveryPointer,
@@ -41,6 +43,19 @@ test('acepta descripciones operacionales hasta 2400 y mantiene respuestas en 120
 test('normaliza eventos y compara rankings sin afirmar mejora geográfica',()=>{
  const session={stage_snapshots:[{stage:'E0',results:[{rank:1,candidate_id:'a'},{rank:2,candidate_id:'b'}]},{stage:'E1',results:[{rank:1,candidate_id:'b'},{rank:2,candidate_id:'a'}]}]};assert.equal(normalizeFreeTextStatus('awaiting_answer'),'waiting_user');assert.deepEqual(compareFreeTextStages(session,'E1').map(x=>x.rank_change),[1,-1]);assert.equal(normalizeFreeTextEvents({events:[{event_id:4,stage:'E1',status:'waiting_user'}]})[0].state,'waiting_user');
 });
+test('distingue subcomponentes de límites globales SSE en E0-E3',()=>{
+ for(const stage of ['E0','E1','E2','E3']){
+  for(const component of ['qwen','crosstext2loc']){
+   const completed={stage:`${stage}_${component}`,state:'completed'};assert.equal(isFreeTextComponentEvent(completed),true);assert.equal(isFreeTextSessionBoundaryEvent(completed),false);
+   assert.equal(isFreeTextSessionBoundaryEvent({...completed,state:'running'}),false);
+  }
+  assert.equal(isFreeTextSessionBoundaryEvent({stage,state:'waiting_user'}),true);
+  assert.equal(isFreeTextSessionBoundaryEvent({stage,state:'completed'}),true);
+ }
+ assert.equal(isFreeTextSessionBoundaryEvent({stage:'E0',state:'running'}),false);
+ assert.equal(isFreeTextSessionBoundaryEvent({stage:'E2',state:'failed'}),true);
+ assert.equal(isFreeTextSessionBoundaryEvent({stage:'reconciliation',state:'unknown'}),true);
+});
 
 test('recovery queda aislada por policy y prefijo operacional',()=>{
  const session={session_id:'freetext-operational-00000000-0000-0000-0000-000000000000',policy_id:OPERATIONAL_FREETEXT_POLICY,updated_at_utc:'2026-11-15T00:00:00Z'},pointer=recoveryPointer(session);assert.equal(pointer.version,3);assert.deepEqual(validateRecoveryPointer(pointer),pointer);assert.equal(validateRecoveryPointer({...pointer,session_id:'dialogue-freetext-00000000-0000-0000-0000-000000000000'}),null);assert.notEqual(recoveryStorageKey(OPERATIONAL_FREETEXT_POLICY),recoveryStorageKey('dialogue-vpr-freetext-v1'));
@@ -58,8 +73,11 @@ test('waiting_user exige una pregunta identificada',()=>{
  const base={contract_version:'atlas-dialogue-freetext-application-session-public-v1',session_id:'freetext-application-00000000-0000-0000-0000-000000000000',policy_id:APPLICATION_FREETEXT_POLICY,status:'waiting_user',turns:[{index:1,question:'Pregunta',answer_literal:null}],stage_snapshots:[{stage:'E0',gallery_id:'madrid-50m',candidate_count:253,results:results()}]};assert.throws(()=>validateFreeTextSession(base),/Pregunta FreeText incompatible/);assert.throws(()=>validateFreeTextSession({...base,current_question:{turn_index:1,question:'Pregunta'}}),/Pregunta FreeText incompatible/);
 });
 test('application reabre SSE al recuperar y permite nueva búsqueda terminal',async()=>{
- const source=await readFile(new URL('../src/main.js',import.meta.url),'utf8');assert.match(source,/\['pending','running'\]\.includes\(normalizeFreeTextStatus\(session\.status\)\).*openFreeTextSessionEvents/);assert.match(source,/function resetFreeTextSession/);assert.match(source,/new-freetext-search/);assert.match(source,/safeLocalStorage\('remove',applicationPendingOperationKey\)/);
+ const source=await readFile(new URL('../src/main.js',import.meta.url),'utf8');assert.match(source,/async function adoptFreeTextSession/);assert.match(source,/isFreeTextSessionBoundaryEvent\(latest\).*getFreeTextSession/);assert.match(source,/\['pending','running'\]\.includes\(status\).*openFreeTextSessionEvents/);assert.match(source,/function resetFreeTextSession/);assert.match(source,/new-freetext-search/);assert.match(source,/safeLocalStorage\('remove',applicationPendingOperationKey\)/);
 });
 test('application falla antes del POST si no puede persistir la operación',async()=>{
  const source=await readFile(new URL('../src/main.js',import.meta.url),'utf8');assert.match(source,/LOCAL_RECOVERY_UNAVAILABLE/);assert.match(source,/key===applicationPendingOperationKey.*throw new TypeError/);assert.match(source,/pointer\?\.session_id!==session\.session_id/);
+});
+test('una respuesta ambigua exige avance durable antes de reconciliar',async()=>{
+ const source=await readFile(new URL('../src/main.js',import.meta.url),'utf8');assert.match(source,/answerOperation=.*freetext-answer-/);assert.match(source,/stage_snapshots\.length>previous\.stage_snapshots\.length/);assert.match(source,/answerOperation&&!advanced/);
 });

@@ -6,9 +6,10 @@ const stats={createPosts:0,descriptionLength:0,sessionGets:0,eventStreams:[],pro
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const results=()=>Array.from({length:10},(_,index)=>({rank:index+1,candidate_id:`fixture-${index+1}`,latitude:40.41+index/10000,longitude:-3.7-index/10000,cosine_similarity:0.9-index/100}));
 const events=[
- {id:'1',stage:'E0',state:'running',message:'Codificando descripción'},
- {id:'2',stage:'E0',state:'running',message:'Ordenando candidatos'},
- {id:'3',stage:'E0',state:'waiting_user',message:'Esperando aclaración'},
+ {id:'1',stage:'E0_qwen',state:'completed',message:'qwen E0: completed'},
+ {id:'2',stage:'E0_crosstext2loc',state:'running',message:'crosstext2loc E0: running'},
+ {id:'3',stage:'E0_crosstext2loc',state:'completed',message:'crosstext2loc E0: completed'},
+ {id:'4',stage:'E0',state:'waiting_user',message:'E0 persistido; espera respuesta.'},
 ];
 
 function json(response,status,body){response.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});response.end(JSON.stringify(body));}
@@ -30,12 +31,12 @@ const server=http.createServer(async(request,response)=>{
  if(url.pathname==='/api/v1/dialogue-freetext/sessions'&&request.method==='POST'){
   const payload=await body(request);stats.createPosts+=1;stats.descriptionLength=payload.description_es?.length||0;json(response,201,session('running'));return;
  }
- if(url.pathname===`/api/v1/dialogue-freetext/sessions/${sessionId}/events`){json(response,200,{events:stats.eventStreams.length===0?[]:stats.eventStreams.length===1?events.slice(0,2):events});return;}
+  if(url.pathname===`/api/v1/dialogue-freetext/sessions/${sessionId}/events`){json(response,200,{events:stats.eventStreams.length===0?[]:stats.eventStreams.length===1?events.slice(0,2):events});return;}
  if(url.pathname===`/api/v1/dialogue-freetext/sessions/${sessionId}`){stats.sessionGets+=1;json(response,200,session(stats.sessionGets<2?'running':'waiting_user'));return;}
  if(url.pathname===`/api/v1/dialogue-freetext/sessions/${sessionId}/events/stream`){
   const after=url.searchParams.get('after');stats.eventStreams.push({after});response.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache','X-Accel-Buffering':'no'});
   if(!after){sse(response,events[0]);await delay(120);response.write(': keepalive\n\n');await delay(120);sse(response,events[1]);response.socket.destroy();return;}
-  if(after==='2'){await delay(80);sse(response,events[2]);response.end();return;}
+  if(after==='2'){await delay(80);sse(response,events[2]);await delay(80);sse(response,events[3]);response.end();return;}
   response.end();return;
  }
  json(response,404,{error:{code:'NOT_FOUND',message:'Fixture endpoint not found'}});

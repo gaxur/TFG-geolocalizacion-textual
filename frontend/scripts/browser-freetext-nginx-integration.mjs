@@ -27,12 +27,14 @@ try{
  const probe=await evaluate(`(async()=>{const response=await fetch('/api/v1/dialogue-freetext/nginx-probe');const reader=response.body.getReader(),decoder=new TextDecoder(),chunks=[],started=performance.now();for(;;){const {done,value}=await reader.read();if(done)break;chunks.push({at:performance.now()-started,text:decoder.decode(value)});}return chunks;})()`);
  assert.ok(probe.length>=2,`Nginx agrupó todo el SSE: ${JSON.stringify(probe)}`);
  assert.match(probe.map(row=>row.text).join(''),/: keepalive/);
- assert.ok(probe[0].at<100&&probe[1].at>=100,'el primer evento no llegó incrementalmente antes del keepalive');
+ assert.ok(probe[0].at<300&&probe[1].at-probe[0].at>=80,'Nginx no entregó el primer evento antes del keepalive posterior');
  const ui=await evaluate(`(()=>{const input=document.querySelector('#description');input.value='x'.repeat(2400);input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#freetext-start').click();return{maxLength:input.maxLength,counter:document.querySelector('#char-count').textContent};})()`);
  assert.equal(ui.maxLength,2400);assert.match(ui.counter,/2[.\s]?400 \/ 2[.\s]?400/);
  let reconciled=false;
  for(let i=0;i<120;i++){await delay(100);reconciled=await evaluate(`Boolean(document.querySelector('#freetext-answer')&&document.querySelector('[data-freetext-stage="E0"]'))`);if(reconciled)break;}
  assert.ok(reconciled,'la UI no reconcilió la desconexión SSE mediante GET');
+  assert.match(await evaluate(`document.querySelector('.freetext-progress small')?.textContent||''`),/E0 persistido|estado final/i);
+  assert.equal(await evaluate(`document.querySelectorAll('.result-card').length`),10);
  const stats=await(await fetch(`${base}/api/v1/dialogue-freetext/test-stats`)).json();
  assert.equal(stats.createPosts,1,'la reconciliación no debe repetir el POST de creación');
  assert.equal(stats.descriptionLength,2400);
