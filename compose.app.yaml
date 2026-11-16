@@ -45,12 +45,12 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=${APP_API_TMPFS_SIZE:-2g}
     volumes:
-      - ${APP_CLIP_CACHE_DIR:-/home/dataai/.cache/clip}:/root/.cache/clip:ro
-      - ${APP_QWEN_MODEL_DIR:-/home/dataai/models/hf/Qwen3-8B-b968826d9c46}:/models/Qwen3-8B:ro
-      - ${APP_PROCESSED_DATA_DIR:-/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual/data/processed}:/workspace/project/data/processed:ro
-      - ${APP_EMBEDDINGS_DIR:-/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual/data/embeddings}:/workspace/project/data/embeddings:ro
-      - ${APP_EXTERNAL_DIR:-/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual/external}:/workspace/project/external:ro
-      - ${APP_CHECKPOINT_DIR:-/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual/checkpoints/CrossText2Loc}:/workspace/project/checkpoints/CrossText2Loc:ro
+      - ${APP_CLIP_CACHE_DIR:-./models/clip}:/root/.cache/clip:ro
+      - ${APP_QWEN_MODEL_DIR:-./models/Qwen3-8B}:/models/Qwen3-8B:ro
+      - ${APP_PROCESSED_DATA_DIR:-./data/processed}:/workspace/project/data/processed:ro
+      - ${APP_EMBEDDINGS_DIR:-./data/embeddings}:/workspace/project/data/embeddings:ro
+      - ${APP_EXTERNAL_DIR:-./external}:/workspace/project/external:ro
+      - ${APP_CHECKPOINT_DIR:-./checkpoints/CrossText2Loc}:/workspace/project/checkpoints/CrossText2Loc:ro
       - ${APP_PROFILE_FILE:-./config/freetext_application_profile.template.json}:/application-config/profile.json:ro
       - app-state:/application-state
     working_dir: /workspace/project
@@ -92,8 +92,8 @@ services:
       - /var/cache/nginx:rw,noexec,nosuid,size=32m
       - /var/run:rw,noexec,nosuid,size=1m
     volumes:
-      - ${APP_MAP_ASSETS_DIR:-/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual-maplibre-pgx/data/processed/map-assets}:/usr/share/nginx/map-assets:ro
-      - ${APP_MAP_CONTEXT_DIR:-/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual-maplibre-pgx/results/generated/map-assets-context-2000m}:/usr/share/nginx/map-context:ro
+      - ${APP_MAP_ASSETS_DIR:-./data/processed/map-assets}:/usr/share/nginx/map-assets:ro
+      - ${APP_MAP_CONTEXT_DIR:-./results/generated/map-assets-context-2000m}:/usr/share/nginx/map-context:ro
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 10s

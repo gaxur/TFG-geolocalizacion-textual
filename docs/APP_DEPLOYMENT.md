@@ -37,20 +37,19 @@ Hugging Face/Transformers. No descarga modelos, datos ni mapas al arrancar.
 
 ## Rutas de la PGX
 
-`.env.app.example` contiene las rutas reales observadas en este host el
-2026-11-16. Son configuración, no rutas portables; deben revisarse si cambia el
-checkout o se copia el despliegue a otra máquina.
+`.env.app.example` contiene rutas relativas portables. Los modelos o artefactos
+que residan fuera del checkout deben configurarse en el `.env.app` local.
 
 | Variable | Ruta actual del host | Montaje |
 |---|---|---|
-| `APP_PROCESSED_DATA_DIR` | `/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual/data/processed` | Catálogos, visuales OSM y F3, solo lectura |
-| `APP_EMBEDDINGS_DIR` | `/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual/data/embeddings` | Embeddings, solo lectura |
-| `APP_EXTERNAL_DIR` | `/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual/external` | CVG-Text, solo lectura |
-| `APP_CHECKPOINT_DIR` | `/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual/checkpoints/CrossText2Loc` | Checkpoint, solo lectura |
-| `APP_CLIP_CACHE_DIR` | `/home/dataai/.cache/clip` | Pesos CLIP, solo lectura |
-| `APP_QWEN_MODEL_DIR` | `/home/dataai/models/hf/Qwen3-8B-b968826d9c46` | Snapshot Qwen, solo lectura |
-| `APP_MAP_ASSETS_DIR` | `/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual/data/processed/map-assets` | Mapa local, solo lectura |
-| `APP_MAP_CONTEXT_DIR` | `/home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual-maplibre-pgx/results/generated/map-assets-context-2000m` | Contexto PMTiles, solo lectura |
+| `APP_PROCESSED_DATA_DIR` | `./data/processed` | Catálogos, visuales OSM y F3, solo lectura |
+| `APP_EMBEDDINGS_DIR` | `./data/embeddings` | Embeddings, solo lectura |
+| `APP_EXTERNAL_DIR` | `./external` | CVG-Text, solo lectura |
+| `APP_CHECKPOINT_DIR` | `./checkpoints/CrossText2Loc` | Checkpoint, solo lectura |
+| `APP_CLIP_CACHE_DIR` | `./models/clip` | Pesos CLIP, solo lectura |
+| `APP_QWEN_MODEL_DIR` | `./models/Qwen3-8B` | Snapshot Qwen, solo lectura |
+| `APP_MAP_ASSETS_DIR` | `./data/processed/map-assets` | Mapa local, solo lectura |
+| `APP_MAP_CONTEXT_DIR` | `./results/generated/map-assets-context-2000m` | Contexto PMTiles, solo lectura |
 
 La imagen API se construye localmente con `docker/app-api.Dockerfile`; solo
 incorpora código propio, configuración y schemas. Modelos, datos, embeddings,
@@ -73,11 +72,12 @@ cp .env.app.example .env.app
 Revisar las rutas sin crear directorios vacíos para ocultar artefactos ausentes:
 
 ```bash
-test -f /home/dataai/.cache/clip/ViT-L-14-336px.pt
-test -f /home/dataai/models/hf/Qwen3-8B-b968826d9c46/config.json
-test -f /home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual/checkpoints/CrossText2Loc/long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth
-test -f /home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual/data/processed/map-assets/madrid.pmtiles
-test -f /home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual-maplibre-pgx/results/generated/map-assets-context-2000m/madrid-context-2000m.pmtiles
+set -a; . ./.env.app; set +a
+test -f "$APP_CLIP_CACHE_DIR/ViT-L-14-336px.pt"
+test -f "$APP_QWEN_MODEL_DIR/config.json"
+test -f "$APP_CHECKPOINT_DIR/long_model_NewYork-mixed_1e-05_128_osm_epoch30_59.08.pth"
+test -f "$APP_MAP_ASSETS_DIR/madrid.pmtiles"
+test -f "$APP_MAP_CONTEXT_DIR/madrid-context-2000m.pmtiles"
 ```
 
 Validar la interpolación de Compose sin arrancar contenedores:

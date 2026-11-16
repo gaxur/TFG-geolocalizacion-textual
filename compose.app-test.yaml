@@ -7,8 +7,8 @@ services:
       dockerfile: Dockerfile.app
     depends_on: [api]
     volumes:
-      - /home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual-maplibre-pgx/data/processed/map-assets:/usr/share/nginx/map-assets:ro
-      - /home/dataai/Projects/TFG_Marcos/TFG-geolocalizacion-textual-maplibre-pgx/results/generated/map-assets-context-2000m:/usr/share/nginx/map-context:ro
+      - ${APP_MAP_ASSETS_DIR:-./data/processed/map-assets}:/usr/share/nginx/map-assets:ro
+      - ${APP_MAP_CONTEXT_DIR:-./results/generated/map-assets-context-2000m}:/usr/share/nginx/map-context:ro
   browser-check:
     build:
       context: ./frontend
