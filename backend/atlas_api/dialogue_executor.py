@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import ctypes
 import json
 import os
 from pathlib import Path
@@ -68,7 +69,9 @@ class SequentialDialogueExecutor:
         if not passed:raise RuntimeError('stable-swap-v2 bloquea la sesión')
 
     def _run(self, command:list[str], root:Path, name:str, timeout:int) -> None:
-        result=subprocess.run(command,capture_output=True,text=True,timeout=timeout);atomic_write(root/f'{name}-supervisor.json',{'returncode':result.returncode,'stdout':result.stdout[-4000:],'stderr':result.stderr[-4000:]})
+        def parent_death_signal():
+            if ctypes.CDLL(None).prctl(1,9,0,0,0)!=0 or os.getppid()==1:os._exit(137)
+        result=subprocess.run(command,capture_output=True,text=True,timeout=timeout,preexec_fn=parent_death_signal);atomic_write(root/f'{name}-supervisor.json',{'returncode':result.returncode,'stdout':result.stdout[-4000:],'stderr':result.stderr[-4000:]})
         if result.returncode:raise RuntimeError(f'{name} falló')
 
     def _qwen(self, *, query_id:str, round_index:int, spanish_text:str, root:Path) -> dict[str,Any]:

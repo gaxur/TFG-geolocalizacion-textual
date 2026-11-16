@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "dialogue-freetext-operational-policy-identity-v1",
+  "policy_id": "dialogue-vpr-freetext-v1-operational",
+  "version": "1.0.0",
+  "enabled_by_default": false,
+  "input": "arbitrary_spanish_description",
+  "maximum_questions": 3,
+  "stages": ["E0", "E1", "E2", "E3"],
+  "retriever": "CrossText2Loc",
+  "vlm": false,
+  "ground_truth": false
+}

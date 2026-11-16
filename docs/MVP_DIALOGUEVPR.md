@@ -37,6 +37,18 @@ máximo tres preguntas, tres cargas/llamadas Qwen y tres CT2L, cero retries,
 `stable-swap-v2`, sin red, GT, referencias de evaluación, VLM o H38–H61. No se
 reutiliza para otra sesión ni para consultas exploratorias.
 
+Las autorizaciones oficiales se montan como directorio y siguen el nombre
+`dialogue_<hxx>_session_authorization.request.json`. El backend selecciona por
+`query_id`, comprueba todos los hashes en cada inicio y detecta consumo mediante
+la sesión persistida. No hace falta reiniciar entre HXX ni después de editar un
+documento dentro del bind mount. Una HXX con cualquier sesión oficial persistida
+no puede volver a iniciarse.
+
+El catálogo expone `pending`, `authorized`, `consumed`, `missing` o `invalid`,
+además del texto oficial. El frontend no habilita Inicio si el estado no es
+`authorized`. Una parada contractual terminal permite seleccionar la siguiente
+HXX; un estado `failed` queda consumido y exige revisión técnica.
+
 ## Runtime secuencial integrado en PGX
 
 El modo `dialogue-only` ejecuta una API ligera sin Qwen ni CT2L residentes. Cada
@@ -93,3 +105,127 @@ la respuesta pública del navegador contiene pregunta actual, estado y hashes, n
 scores o coordenadas. Al congelar la cohorte se exportarán los estados internos a
 un manifest de evaluación content-addressed y se aplicarán los evaluadores ya
 existentes sin reabrir o editar sesiones.
+
+## Política adaptativa experimental
+
+`post-final-answer-retrieval-v1` es una política nueva y separada. No modifica ni
+reinterpreta las sesiones oficiales. Sus componentes son:
+
+- parser `deterministic-structured-answer-v1` para polaridad y observaciones
+  adicionales;
+- observaciones con entidad, polaridad, incertidumbre, nombre, dirección
+  egocéntrica, distancia y evidencia literal;
+- selector `deterministic-grounded-hybrid-v1`, que filtra intenciones usadas
+  antes de ordenar alternativas;
+- preguntas cerradas, abiertas espaciales y aclaraciones, siempre con grounding
+  explícito y auditoría de descartes;
+- recuperación opcional E3 después de A3 cuando existe información nueva y
+  elegible;
+- máximo tres preguntas humanas y cuatro llamadas Qwen/CT2L;
+- cero retries, `stable-swap-v2`, sin GT, VLM o H38–H61.
+
+Las relaciones izquierda/derecha/delante/detrás se conservan como relaciones
+visuales egocéntricas; nunca se convierten en puntos cardinales sin orientación
+fiable. F3 fundamenta presencia positiva por hipótesis, no visibilidad, ausencia
+ni orientación del observador.
+
+La política solo admite sesiones exploratorias y requiere
+`atlas-dialogue-adaptive-authorization-v1`. La solicitud incluida permanece
+`PENDING_OPERATOR_AUTHORIZATION`; por tanto, la UI la muestra pero no permite
+iniciarla. El modo oficial continúa usando el contrato v1 y la parada previa a
+EN3/E3.
+# MVP operativo FreeText-v1
+
+La política de producto `dialogue-vpr-freetext-v1-operational` acepta una
+descripción española libre y no depende de cohortes, imágenes o respuestas
+pregrabadas. Está separada de los pilotos históricos y de la candidata medium
+provisional, que permanece deshabilitada.
+
+## Flujo unificado
+
+```mermaid
+sequenceDiagram
+    participant U as Navegador
+    participant A as FastAPI unificada
+    participant Q as Worker Qwen3-8B
+    participant C as Worker CrossText2Loc
+    U->>A: POST sesión + Idempotency-Key
+    A-->>U: sesión pending + session_id
+    U->>A: SSE durable de sesión
+    A->>Q: prompt FreeText-v1 E0
+    Q-->>A: inglés cartográfico + hashes
+    A->>C: retrieval exhaustivo 253
+    C-->>A: ranking E0
+    A-->>U: waiting_user + Top-10
+    loop Hasta 3 respuestas
+      U->>A: respuesta literal + Idempotency-Key
+      A-->>U: estado running persistido
+      A->>Q: transcript acumulativo E1-E3
+      A->>C: ranking exhaustivo actualizado
+      A-->>U: pregunta siguiente o completed
+    end
+```
+
+Qwen y CT2L se ejecutan secuencialmente mediante workers efímeros. En modo
+FreeText operacional el lifespan no mantiene ambos modelos residentes. Los
+rankings completos de 253 candidatos permanecen en la sesión; la API pública
+expone Top-10 por etapa para MapLibre.
+
+## Contratos operativos
+
+- Política: `dialogue-vpr-freetext-v1-operational`, versión 1.0.0.
+- Entrada: descripción española arbitraria, 3-2400 caracteres.
+- Etapas: E0-E3; máximo tres preguntas.
+- Preguntas: selector determinista FreeText-v1.
+- Transcript: literal, cronológico y acumulativo.
+- Retries: cero.
+- GT, referencias, VLM y H38-H61: prohibidos.
+- `Idempotency-Key`: obligatorio en creación y respuestas.
+- Una reserva incierta no se reinfiere automáticamente.
+
+### Autorización fail-closed
+
+`ATLAS_FREETEXT_OPERATIONAL_ENABLED=true` solo carga la capacidad; no autoriza
+una inferencia. Para publicar la política como disponible debe existir el archivo
+read-only `<execution_id>.json` indicado por
+`ATLAS_FREETEXT_OPERATIONAL_EXECUTION_ID` y debe validar:
+
+- IDs, versiones y hashes de policy wrapper/core;
+- identidad canónica del executor, modelo, workers, configuración, CLIP y F3;
+- alcance único E0-E3;
+- cuatro loads/calls Qwen, cuatro CT2L, tres preguntas y cero retries;
+- aprobación, ventana temporal y prohibiciones GT/VLM/H38-H61/red/referencias.
+
+El servidor persiste un receipt de consumo antes de crear la sesión. Una
+autorización se consume para una sola sesión y no se libera tras fallo, timeout,
+reinicio o expiración. Cada etapa vuelve a comprobar autorización, receipt,
+identidad y presupuesto. Las respuestas públicas no exponen autorización,
+receipt, execution ID ni paths.
+
+## API unificada y memoria
+
+En modo operacional `/retrievals` usa proveedores efímeros: `with_llm` ejecuta
+Qwen, termina el proceso y después ejecuta CT2L; `no_llm` ejecuta solo CT2L. Las
+sesiones FreeText usan el mismo gate de modelo que retrieval, por lo que ambas
+rutas permanecen disponibles sin residencia concurrente. El despliegue conserva
+un solo worker Uvicorn; múltiples replicas requieren un lock host-wide adicional.
+
+## Progreso y recuperación
+
+La sesión persiste eventos antes de publicarlos. Cada evento contiene
+`session_id`, `event_id`, `stage`, `status`, `timestamp`, `message` y `error`.
+Estados: `pending`, `running`, `waiting_user`, `completed`, `failed`, `unknown`.
+
+Rutas:
+
+- `GET /api/v1/dialogue-freetext/sessions/{id}/events`
+- `GET /api/v1/dialogue-freetext/sessions/{id}/events/stream?follow=true`
+
+SSE admite `Last-Event-ID`; ante desconexión, el frontend reconcilia con GET sin
+repetir POST. Tras reinicio, una sesión `running` sin evidencia terminal pasa a
+`unknown` y no se reintenta.
+
+Nginx publica `/api/v1/dialogue-freetext/` con HTTP/1.1, `Connection ""`,
+buffering/cache deshabilitados y timeout de lectura de 900 s. El límite de la
+descripción operacional es 2.400 caracteres en FastAPI, JavaScript y UI; las
+respuestas permanecen limitadas a 1.200.

@@ -293,3 +293,43 @@ byte-exacta de descripciones oficiales, imagen original, respuestas, persistenci
 atómica y reanudación. `ATLAS_DIALOGUE_ENABLED` continúa desactivado hasta integrar
 y versionar el ejecutor secuencial HXX validado. Véase
 [MVP_DIALOGUEVPR.md](MVP_DIALOGUEVPR.md).
+# Activación del FreeText operacional
+
+La política de producto está deshabilitada por defecto. Para una ejecución
+autorizada en PGX:
+
+```bash
+ATLAS_FREETEXT_OPERATIONAL_ENABLED=true
+MVP_FREETEXT_OPERATIONAL_SESSION_DIR=./runtime/freetext-operational-sessions
+MVP_FREETEXT_OPERATIONAL_AUTHORIZATION_DIR=./config/freetext-operational-authorizations
+ATLAS_FREETEXT_OPERATIONAL_EXECUTION_ID=<execution-id-autorizado>
+ATLAS_QWEN_REQUIRED=false
+docker compose -f compose.mvp.yaml up --build
+```
+
+`ATLAS_QWEN_REQUIRED=false` evita mantener Qwen residente junto a CT2L. El
+servicio FreeText lanza workers secuenciales y aplica los gates existentes antes
+de cada carga. Los artefactos host necesarios siguen montados read-only; solo el
+directorio de sesiones operativas es writable.
+
+La variable `ATLAS_FREETEXT_OPERATIONAL_ENABLED` no sustituye una autorización.
+El directorio de autorizaciones se monta read-only y debe contener exactamente
+`<execution-id>.json`, generado a partir de
+`config/freetext_operational_authorization.template.json`, aprobado, vigente y
+ligado a hashes actuales. El receipt consumible se guarda bajo el session root
+y nunca se elimina para reutilizar una autorización.
+
+Antes de activar:
+
+1. comprobar snapshot Qwen y revisión;
+2. comprobar checkpoint/CLIP/CVG-Text/embeddings;
+3. verificar espacio, GPU, Ollama, RAM, PSI y swap;
+4. usar un solo worker Uvicorn;
+5. conservar `stable-swap-v2` y cero retries;
+6. no montar GT o H38-H61 en el contenedor.
+7. conservar `uvicorn --workers 1`; no replicar la API sin lock host-wide.
+8. comprobar `/retrievals` en ambos modos y el catálogo FreeText antes de abrir
+   el frontend.
+
+La candidata medium provisional no se activa mediante esta variable y requiere
+una autorización distinta.

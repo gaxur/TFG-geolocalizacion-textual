@@ -14,6 +14,7 @@ from src.tfg_phase0.f5_text_transform import QwenTransformersAdapter
 from src.tfg_phase0.visual_postprocessor import PrecomputedVisualPostprocessor
 
 from .settings import ROOT, Settings
+from .ephemeral_retrieval import ephemeral_retriever_factory, ephemeral_transformer_factory
 
 
 def default_retriever_factory(settings: Settings) -> CrossText2LocRetriever:
@@ -33,12 +34,25 @@ def default_visual_factory(settings: Settings):
     return PrecomputedVisualPostprocessor(settings.visual_precomputed_bundle_path, fallback=settings.visual_promotion_fallback)
 
 
-def build_lifespan(settings: Settings, retriever_factory: Callable[[Settings], object], transformer_factory: Callable[[Settings], object | None], visual_factory: Callable[[Settings], object | None] = default_visual_factory):
+def build_lifespan(settings: Settings, retriever_factory: Callable[[Settings], object], transformer_factory: Callable[[Settings], object | None], visual_factory: Callable[[Settings], object | None] = default_visual_factory, operational_retriever_factory: Callable[[Settings], object] = ephemeral_retriever_factory, operational_transformer_factory: Callable[[Settings], object | None] = ephemeral_transformer_factory):
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.retriever = None
         app.state.transformer = None
         app.state.visual_promoter = None
+        if settings.freetext_operational_enabled:
+            app.state.retriever = await anyio.to_thread.run_sync(operational_retriever_factory, settings)
+            try:
+                app.state.transformer = await anyio.to_thread.run_sync(operational_transformer_factory, settings)
+                app.state.visual_promoter = await anyio.to_thread.run_sync(visual_factory, settings)
+                yield
+            finally:
+                for name in ("visual_promoter", "transformer", "retriever"):
+                    value = getattr(app.state, name, None)
+                    if value is not None:
+                        await anyio.to_thread.run_sync(value.close)
+                        setattr(app.state, name, None)
+            return
         app.state.retriever = await anyio.to_thread.run_sync(retriever_factory, settings)
         try:
             app.state.transformer = await anyio.to_thread.run_sync(transformer_factory, settings)

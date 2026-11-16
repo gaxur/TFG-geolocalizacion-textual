@@ -12,12 +12,14 @@ export class AtlasApiError extends Error {
 
 const trimSlash = value => String(value || DEFAULT_BASE_URL).replace(/\/$/, '');
 
-async function parseJsonResponse(response) {
+export async function parseJsonResponse(response) {
   const requestId = response.headers?.get?.('x-request-id') || '';
   let body;
+  const contentType=String(response.headers?.get?.('content-type')||'').toLowerCase();
   try { body = await response.json(); }
   catch (cause) {
-    throw new AtlasApiError('El servicio devolvió una respuesta que no es JSON válido.', { code: 'INVALID_API_RESPONSE', status: response.status, requestId, cause });
+    const proxyLike=[502,503,504].includes(response.status)||contentType.includes('text/html');
+    throw new AtlasApiError(proxyLike?'El proxy perdió la respuesta del backend; se comprobará si la operación quedó persistida.':'El servicio devolvió una respuesta que no es JSON válido.', { code:proxyLike?'UPSTREAM_RESPONSE_LOST':'INVALID_API_RESPONSE', status: response.status, requestId, cause });
   }
   if (!response.ok) {
     const error = body?.error || body?.detail;
@@ -30,7 +32,7 @@ async function parseJsonResponse(response) {
   return body;
 }
 
-async function fetchJson(path, { baseUrl = DEFAULT_BASE_URL, method = 'GET', body, signal, timeoutMs = 20000, fetchImpl = fetch } = {}) {
+async function fetchJson(path, { baseUrl = DEFAULT_BASE_URL, method = 'GET', body, headers = {}, signal, timeoutMs = 20000, fetchImpl = fetch } = {}) {
   const timeout = new AbortController();
   const timer = setTimeout(() => timeout.abort('timeout'), timeoutMs);
   const combined = signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal;
@@ -38,7 +40,7 @@ async function fetchJson(path, { baseUrl = DEFAULT_BASE_URL, method = 'GET', bod
     const response = await fetchImpl(`${trimSlash(baseUrl)}${path}`, {
       method,
       signal: combined,
-      headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     return await parseJsonResponse(response);
@@ -79,6 +81,13 @@ export function getDialogueSession(sessionId, options = {}) {
 export function answerDialogue(sessionId, request, options = {}) {
   return fetchJson(`/dialogue/sessions/${encodeURIComponent(sessionId)}/answers`, { ...options, method: 'POST', body: request });
 }
+export function getFreeTextPilot(options={}){return fetchJson('/dialogue-freetext/pilot',options);}
+export function getFreeTextPilots(options={}){return fetchJson('/dialogue-freetext/pilots',options);}
+export function startFreeText(request,options={}){const operationId=request?.client_operation_id;return fetchJson('/dialogue-freetext/sessions',{...options,method:'POST',body:request,headers:{...(options.headers||{}),...(operationId?{'Idempotency-Key':operationId}:{})}});}
+export function getFreeTextSession(sessionId,options={}){return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}`,options);}
+export function answerFreeText(sessionId,request,options={}){const operationId=request?.client_operation_id;return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/answers`,{...options,method:'POST',body:request,headers:{...(options.headers||{}),...(operationId?{'Idempotency-Key':operationId}:{})}});}
+export function getFreeTextEvents(sessionId,options={}){return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/events`,options);}
+export function freeTextEventStreamUrl(sessionId,{baseUrl=DEFAULT_BASE_URL,after}={}){const suffix=after?`&after=${encodeURIComponent(after)}`:'';return `${String(baseUrl).replace(/\/$/,'')}/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/events/stream?follow=true${suffix}`;}
 
 export const apiBaseUrl = import.meta.env?.VITE_ATLAS_API_BASE_URL || DEFAULT_BASE_URL;
 

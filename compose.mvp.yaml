@@ -21,7 +21,7 @@ services:
       ATLAS_QWEN_MODEL_PATH: /models/Qwen3-8B
       ATLAS_QWEN_MODEL_ID: Qwen/Qwen3-8B
       ATLAS_QWEN_MODEL_REVISION: b968826d9c46dd6066d109eabc6255188de91218
-      ATLAS_QWEN_REQUIRED: "true"
+      ATLAS_QWEN_REQUIRED: ${ATLAS_QWEN_REQUIRED:-false}
       ATLAS_VISUAL_PROMOTION_ENABLED: ${ATLAS_VISUAL_PROMOTION_ENABLED:-false}
       ATLAS_VISUAL_PRECOMPUTED_BUNDLE: ${ATLAS_VISUAL_PRECOMPUTED_BUNDLE_CONTAINER:-}
       ATLAS_VISUAL_PROMOTION_FALLBACK: baseline
@@ -31,8 +31,19 @@ services:
       ATLAS_DIALOGUE_SESSION_ROOT: /dialogue-sessions
       ATLAS_DIALOGUE_IMAGE_ROOT: /dialogue-images
       ATLAS_DIALOGUE_COMPLETED_QUERY_IDS: ${ATLAS_DIALOGUE_COMPLETED_QUERY_IDS:-H26}
-      ATLAS_DIALOGUE_AUTHORIZATION_PATH: /dialogue-inputs/session-authorization.json
+      ATLAS_DIALOGUE_AUTHORIZATION_PATH: /dialogue-authorizations
+      ATLAS_DIALOGUE_ADAPTIVE_AUTHORIZATION_FILE: ${ATLAS_DIALOGUE_ADAPTIVE_AUTHORIZATION_FILE:-dialogue_adaptive_h28_v2_authorization.request.json}
+      ATLAS_DIALOGUE_ADAPTIVE_AUTHORIZATION_PATTERN: ${ATLAS_DIALOGUE_ADAPTIVE_AUTHORIZATION_PATTERN:-}
+      ATLAS_DIALOGUE_ADAPTIVE_ENABLED: ${ATLAS_DIALOGUE_ADAPTIVE_ENABLED:-false}
       ATLAS_DIALOGUE_VARIANTS_PATH: /dialogue-inputs/description-length-manifest.json
+      ATLAS_FREETEXT_ENABLED: ${ATLAS_FREETEXT_ENABLED:-false}
+      ATLAS_FREETEXT_AUTHORIZATION_PATH: /freetext-authorizations
+      ATLAS_FREETEXT_AUTHORIZATION_FILE: ${ATLAS_FREETEXT_AUTHORIZATION_FILE:-freetext_h27_authorization.request.json}
+      ATLAS_FREETEXT_SESSION_ROOT: /freetext-sessions
+      ATLAS_FREETEXT_OPERATIONAL_ENABLED: ${ATLAS_FREETEXT_OPERATIONAL_ENABLED:-false}
+      ATLAS_FREETEXT_OPERATIONAL_SESSION_ROOT: /freetext-operational-sessions
+      ATLAS_FREETEXT_OPERATIONAL_AUTHORIZATION_ROOT: /freetext-operational-authorizations
+      ATLAS_FREETEXT_OPERATIONAL_EXECUTION_ID: ${ATLAS_FREETEXT_OPERATIONAL_EXECUTION_ID:-}
       ATLAS_DIALOGUE_F3_BUNDLE: ${ATLAS_DIALOGUE_F3_BUNDLE_CONTAINER:-/workspace/project/data/processed/osm/osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141/f3-madrid-pilot-associations-sha256-5f4af89b9349de792d3a60752a15f227d49b96cdb688a671504e4cf30bf68453}
       ATLAS_OLLAMA_PS_URL: ${ATLAS_OLLAMA_PS_URL:-http://host.docker.internal:11434/api/ps}
     tmpfs:
@@ -43,9 +54,13 @@ services:
       - ${MVP_QWEN_MODEL_DIR:-${HOME}/models/hf/Qwen3-8B-b968826d9c46}:/models/Qwen3-8B:ro
       - ${MVP_VISUAL_BUNDLE_DIR:-./config}:/visual-bundles:ro
       - ${MVP_DIALOGUE_COHORT_FILE:-./config/dialogue_development_h26_h37_cohort.json}:/dialogue-inputs/cohort.json:ro
-      - ${MVP_DIALOGUE_AUTHORIZATION_FILE:-./config/dialogue_h27_session_authorization.request.json}:/dialogue-inputs/session-authorization.json:ro
+      - ${MVP_DIALOGUE_AUTHORIZATION_DIR:-./config}:/dialogue-authorizations:ro
       - ${MVP_DIALOGUE_VARIANTS_FILE:-./results/generated/description-length-experiments/manifest.json}:/dialogue-inputs/description-length-manifest.json:ro
       - ${MVP_DIALOGUE_SESSION_DIR:-./results/generated/mvp-dialogue-sessions}:/dialogue-sessions:rw
+      - ${MVP_FREETEXT_AUTHORIZATION_DIR:-./results/generated/dialogue-vpr-freetext-v1-h27-comparison-design}:/freetext-authorizations:ro
+      - ${MVP_FREETEXT_SESSION_DIR:-./results/generated/mvp-freetext-sessions}:/freetext-sessions:rw
+      - ${MVP_FREETEXT_OPERATIONAL_SESSION_DIR:-./runtime/freetext-operational-sessions}:/freetext-operational-sessions:rw
+      - ${MVP_FREETEXT_OPERATIONAL_AUTHORIZATION_DIR:-./config/freetext-operational-authorizations}:/freetext-operational-authorizations:ro
       - ${MVP_DIALOGUE_IMAGE_DIR:-./data/cache/mapillary/images}:/dialogue-images:ro
       - ${MVP_PROCESSED_DATA_DIR:-./data/processed}:/workspace/project/data/processed:ro
       - ${MVP_EMBEDDINGS_DIR:-./data/embeddings}:/workspace/project/data/embeddings:ro
@@ -60,9 +75,7 @@ services:
       - >-
         export ATLAS_CVG_UTILS_SHA256=$$(sha256sum
         /workspace/project/external/CVG-Text/utils.py | cut -d' ' -f1) &&
-        if [ "$${ATLAS_DIALOGUE_ENABLED}" = "true" ]; then
-          exec python -m uvicorn backend.atlas_api.dialogue_main:app --host 0.0.0.0 --port 8000 --workers 1;
-        else exec /workspace/project/scripts/run_mvp1_api.sh; fi
+        exec /workspace/project/scripts/run_mvp1_api.sh
     expose:
       - "8000"
     healthcheck:
