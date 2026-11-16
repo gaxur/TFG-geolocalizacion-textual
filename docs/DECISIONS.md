@@ -115,6 +115,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D097 | Perfil Python local para preparar PMTiles de D004 desde PBF F4 | PROPUESTA | Cartografía / frontend |
 | D098 | Separar admisión reutilizable de aplicación de la autorización científica FreeText | ACEPTADA | MVP / FreeText |
 | D099 | Completar edificios mediante alturas estimadas solo en MapLibre | ACEPTADA | Aplicación / cartografía visual |
+| D100 | Validador FreeText específico y sidecars de outputs rechazados | PROPUESTA | Aplicación / robustez |
 
 ## D053 — API HTTP interna del MVP
 
@@ -4235,3 +4236,14 @@ La regla vive únicamente en expresiones `fill-extrusion` del navegador. No
 modifica PMTiles, geometrías OSM, catálogo F1, asociaciones F3, embeddings,
 CrossText2Loc ni evaluación. `min_height` se respeta cuando existe y se usa una
 sola capa de extrusión para no duplicar capas base/partes.
+
+## D100 — Validador específico y evidencia de rechazos FreeText
+
+**Estado:** PROPUESTA
+**Componente:** Aplicación / Qwen textual
+**Fecha:** 2026-11-16
+
+Separar la validación DialogueVPR del contrato histórico F5 para distinguir
+incapacidad, negación factual, entidades, direcciones y números/unidades. Ante
+rechazo se conservaría un sidecar diagnóstico excluido de retrieval. La propuesta
+mantiene cero retries y requiere nueva identidad/perfil D098 antes de activarse.

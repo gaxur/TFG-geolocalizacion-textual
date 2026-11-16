@@ -610,6 +610,19 @@ Las entradas son append-only.
 - **Bloqueo:** output/validation issues rechazados no se persistían; propuesta de
   sidecar diagnóstico pendiente de aprobación antes de cambiar runtime/D098.
 
+### 2026-11-16 — FREETEXT-FAILURE-MODES-AUDIT-01
+
+- **Auditoría:** rutas `failed/unknown`, reservas, persistencia, Qwen, CT2L,
+  ModelGate, SSE y recovery inventariadas.
+- **Causa intermitente demostrada:** validación post-Qwen en E1/E3; existen otras
+  sesiones v2 E3 completadas, por lo que no es un fallo global de residencia.
+- **Propuesta:** validador específico y sidecar de rechazo diseñados, pero no
+  conservados en código tras revisión de alcance/privacidad; cero GPU.
+- **Frontend:** mensajes de validación/CT2L/unknown contextuales; último ranking y
+  acción Nueva búsqueda conservados. Desplegado solo frontend, API no reiniciada.
+- **Decisión:** D100 permanece `PROPUESTA`; runtime autorizado restaurado byte a
+  byte, D098 no regenerado. Requiere aprobación de alcance y retención.
+
 ### 2026-11-06 — P2-04-CONTINUATION-BLOCKED-01
 
 - **Tarea:** registrar aprobación humana de E0 y generar E1–E3 mediante contrato
