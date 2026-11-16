@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timedelta, timezone
+import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
+import sqlite3
 import sys
 
 from jsonschema import Draft202012Validator, FormatChecker
@@ -31,12 +33,22 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    state_root = Path(os.environ["ATLAS_FREETEXT_APPLICATION_STATE_ROOT"])
+    state_root.mkdir(parents=True,exist_ok=True)
+    profile_lock=(state_root/"freetext-application-profile.lock").open("a+b")
+    fcntl.flock(profile_lock,fcntl.LOCK_EX)
+    ledger = state_root / "freetext-application.sqlite3"
+    if ledger.is_file():
+        with sqlite3.connect(ledger) as connection:
+            open_sessions = connection.execute("SELECT COUNT(*) FROM sessions WHERE status IN ('pending','running','waiting_user')").fetchone()[0]
+        if open_sessions:
+            parser.error("existen sesiones abiertas; deben archivarse/supersederse antes de generar el perfil")
 
     approval_path = ROOT / "config/freetext_application_approval_d098.json"
     approval = json.loads(approval_path.read_text(encoding="utf-8"))
     expected_approval = {
         "schema_version": "1.0", "contract_version": "atlas-dialogue-freetext-application-approval-v1", "decision_id": "D098",
-        "profile_id": "freetext-application-pgx-20261116-v1", "status": "OPERATOR_APPROVED", "approved": True,
+        "profile_id": "freetext-application-pgx-20261116-v2", "profile_version": "2.0.0", "status": "OPERATOR_APPROVED", "approved": True, "runtime_lifecycle":"resident-sequential-lazy-v1",
         "max_sessions_total": None, "max_open_sessions": 1, "retention": "until_tfg_review",
         "per_session_maximums": {"qwen": 4, "crosstext2loc": 4, "questions": 3, "automatic_retries": 0},
         "constraints": {"access_mode": "loopback_ssh", "gpu_sequential": True, "ground_truth_permitted": False, "references_permitted": False, "vlm_permitted": False, "h38_h61_permitted": False},
@@ -64,13 +76,14 @@ def main() -> int:
         ollama_ps_url=os.environ["ATLAS_OLLAMA_PS_URL"],
         policy_config=ROOT / "config/interactive_dialogue_freetext_application_v1.json",
         ollama_status_config=Path(os.environ["ATLAS_OLLAMA_STATUS_CONFIG"]),
+        resident_models=True,
     )
     identity = executor.identity
     document = {
         "schema_version": "1.0",
         "contract_version": "atlas-dialogue-freetext-application-profile-v1",
         "profile_id": approval["profile_id"],
-        "profile_version": "1.0.0",
+        "profile_version": approval["profile_version"],
         "approval_reference": f"D098:{sha256_file(approval_path)}",
         "status": "APPROVED",
         "approved": True,

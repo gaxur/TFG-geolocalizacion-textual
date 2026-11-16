@@ -75,7 +75,7 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
             raise ValueError(f"FreeText application requiere: {', '.join(missing)}")
         application_core_policy = Path(__file__).resolve().parents[2] / "config/interactive_dialogue_freetext_application_v1.json"
         approval = Path(__file__).resolve().parents[2] / "config/freetext_application_approval_d098.json"
-        executor = FreeTextRuntimeExecutor(qwen_model=Path(os.environ["ATLAS_QWEN_MODEL_PATH"]), runtime_config=settings.runtime_config, region_config=settings.region_config, f3_bundle=Path(os.environ["ATLAS_DIALOGUE_F3_BUNDLE"]), clip_weights=Path(settings.clip_weights_path), cvg_utils_sha256=settings.cvg_utils_sha256, ollama_ps_url=os.environ["ATLAS_OLLAMA_PS_URL"], policy_config=application_core_policy, ollama_status_config=Path(os.environ["ATLAS_OLLAMA_STATUS_CONFIG"]))
+        executor = FreeTextRuntimeExecutor(qwen_model=Path(os.environ["ATLAS_QWEN_MODEL_PATH"]), runtime_config=settings.runtime_config, region_config=settings.region_config, f3_bundle=Path(os.environ["ATLAS_DIALOGUE_F3_BUNDLE"]), clip_weights=Path(settings.clip_weights_path), cvg_utils_sha256=settings.cvg_utils_sha256, ollama_ps_url=os.environ["ATLAS_OLLAMA_PS_URL"], policy_config=application_core_policy, ollama_status_config=Path(os.environ["ATLAS_OLLAMA_STATUS_CONFIG"]), resident_models=True)
         root = Path(__file__).resolve().parents[2]
         application_policy = root / "config/dialogue_freetext_application_v1.json"
         core_policy = application_core_policy

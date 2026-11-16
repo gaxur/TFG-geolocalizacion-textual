@@ -35,23 +35,43 @@ def default_visual_factory(settings: Settings):
 
 
 def build_lifespan(settings: Settings, retriever_factory: Callable[[Settings], object], transformer_factory: Callable[[Settings], object | None], visual_factory: Callable[[Settings], object | None] = default_visual_factory, operational_retriever_factory: Callable[[Settings], object] = ephemeral_retriever_factory, operational_transformer_factory: Callable[[Settings], object | None] = ephemeral_transformer_factory):
+    async def close_all(app: FastAPI, names: tuple[str, ...], executor=None) -> None:
+        errors = []
+        resources = ([executor] if executor is not None else []) + [getattr(app.state, name, None) for name in names]
+        for resource in resources:
+            if resource is None or not hasattr(resource, "close"):
+                continue
+            try:
+                await anyio.to_thread.run_sync(resource.close)
+            except Exception as error:
+                errors.append(error)
+        for name in names:
+            setattr(app.state, name, None)
+        if errors:
+            raise RuntimeError("falló el cierre de uno o más recursos") from errors[0]
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.retriever = None
         app.state.transformer = None
         app.state.visual_promoter = None
-        if settings.freetext_operational_enabled or settings.freetext_application_enabled:
+        if settings.freetext_application_enabled:
+            try:
+                yield
+            finally:
+                application = getattr(app.state, "freetext_application_service", None)
+                await close_all(app, (), getattr(application, "executor", None))
+            return
+        if settings.freetext_operational_enabled:
             app.state.retriever = await anyio.to_thread.run_sync(operational_retriever_factory, settings)
             try:
                 app.state.transformer = await anyio.to_thread.run_sync(operational_transformer_factory, settings)
                 app.state.visual_promoter = await anyio.to_thread.run_sync(visual_factory, settings)
                 yield
             finally:
-                for name in ("visual_promoter", "transformer", "retriever"):
-                    value = getattr(app.state, name, None)
-                    if value is not None:
-                        await anyio.to_thread.run_sync(value.close)
-                        setattr(app.state, name, None)
+                application = getattr(app.state, "freetext_application_service", None)
+                executor = getattr(application, "executor", None)
+                await close_all(app, ("visual_promoter", "transformer", "retriever"), executor)
             return
         app.state.retriever = await anyio.to_thread.run_sync(retriever_factory, settings)
         try:
@@ -68,16 +88,5 @@ def build_lifespan(settings: Settings, retriever_factory: Callable[[Settings], o
         try:
             yield
         finally:
-            visual = app.state.visual_promoter
-            if visual is not None:
-                await anyio.to_thread.run_sync(visual.close)
-                app.state.visual_promoter = None
-            transformer = app.state.transformer
-            if transformer is not None:
-                await anyio.to_thread.run_sync(transformer.close)
-                app.state.transformer = None
-            retriever = app.state.retriever
-            if retriever is not None:
-                await anyio.to_thread.run_sync(retriever.close)
-                app.state.retriever = None
+            await close_all(app, ("visual_promoter", "transformer", "retriever"))
     return lifespan

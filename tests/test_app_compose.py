@@ -58,4 +58,4 @@ def test_application_core_is_separate_from_scientific_core():
 
 
 def test_d098_approval_has_exact_unlimited_scope():
-    approval=json.loads((ROOT/'config/freetext_application_approval_d098.json').read_text());assert approval['status']=='OPERATOR_APPROVED' and approval['max_sessions_total'] is None and approval['max_open_sessions']==1;assert approval['per_session_maximums']=={'qwen':4,'crosstext2loc':4,'questions':3,'automatic_retries':0};assert approval['constraints']['vlm_permitted'] is False and approval['constraints']['h38_h61_permitted'] is False
+    approval=json.loads((ROOT/'config/freetext_application_approval_d098.json').read_text());assert approval['status']=='OPERATOR_APPROVED' and approval['profile_version']=='2.0.0' and approval['runtime_lifecycle']=='resident-sequential-lazy-v1' and approval['max_sessions_total'] is None and approval['max_open_sessions']==1;assert approval['per_session_maximums']=={'qwen':4,'crosstext2loc':4,'questions':3,'automatic_retries':0};assert approval['constraints']['vlm_permitted'] is False and approval['constraints']['h38_h61_permitted'] is False

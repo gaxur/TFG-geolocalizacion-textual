@@ -38,10 +38,21 @@ def _psi() -> dict[str,float]:
     return rows
 
 
-def _gpu_processes() -> list[str]:
+def _gpu_processes() -> list[dict[str,str]]:
     result=subprocess.run(['nvidia-smi','--query-compute-apps=pid,process_name','--format=csv,noheader,nounits'],capture_output=True,text=True)
-    if result.returncode: return ['NOT_VERIFIED']
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    if result.returncode: return [{'pid':'NOT_VERIFIED','process_name':'NOT_VERIFIED'}]
+    rows=[]
+    for line in result.stdout.splitlines():
+        if not line.strip():continue
+        pid,name=(part.strip() for part in line.split(',',1));rows.append({'pid':pid,'process_name':name})
+    return rows
+
+
+def _own_namespace_pids() -> set[str]:
+    result={str(os.getpid())}
+    for line in Path('/proc/self/status').read_text().splitlines():
+        if line.startswith('NSpid:'):result.update(line.split()[1:])
+    return result
 
 
 class SequentialDialogueExecutor:
@@ -64,8 +75,8 @@ class SequentialDialogueExecutor:
             ollama=json.loads(urllib.request.urlopen(self.ollama_ps_url,timeout=3).read()).get('models',[])
         except Exception as error:
             ollama=[{'status':'NOT_VERIFIED','error':type(error).__name__}]
-        ram=[row['memory']['available'] for row in samples];psi=max(max(row['psi'].values()) for row in samples);gpu=any(row['gpu'] for row in samples);passed=not blocking and not ollama and not gpu and min(ram)>=40*1024**3 and max(ram)-min(ram)<=1024**3 and psi<.10
-        document={'schema_version':'1.0','contract_version':'atlas-dialogue-stable-swap-v2','label':label,'samples':samples,'deltas':deltas,'blocking_deltas':blocking,'ollama_models':ollama,'passed':passed};atomic_write(root/f'{label}-resource-gate.json',document)
+        own_pids=_own_namespace_pids();foreign_gpu=any(process['pid'] not in own_pids for row in samples for process in row['gpu']);ram=[row['memory']['available'] for row in samples];psi=max(max(row['psi'].values()) for row in samples);passed=not blocking and not ollama and not foreign_gpu and min(ram)>=40*1024**3 and max(ram)-min(ram)<=1024**3 and psi<.10
+        document={'schema_version':'1.0','contract_version':'atlas-dialogue-stable-swap-v2','label':label,'samples':samples,'deltas':deltas,'blocking_deltas':blocking,'ollama_models':ollama,'own_namespace_pids':sorted(own_pids),'foreign_gpu_process':foreign_gpu,'passed':passed};atomic_write(root/f'{label}-resource-gate.json',document)
         if not passed:raise RuntimeError('stable-swap-v2 bloquea la sesión')
 
     def _run(self, command:list[str], root:Path, name:str, timeout:int) -> None:

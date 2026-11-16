@@ -26,18 +26,21 @@ async def ready(request: Request):
     if retriever is None and not (freetext_operational and freetext_operational.enabled) and not application_available:
         raise ApiServiceUnavailable("RUNTIME_NOT_READY", "El recuperador todavía no está disponible.")
     try:
-        gallery_ids = list(retriever.gallery_ids)
+        gallery_ids = ["madrid-50m"] if application_available else list(retriever.gallery_ids)
     except Exception as error:
         raise ApiInternalError("readiness failure") from error
     ephemeral = bool(getattr(retriever, "ephemeral", False))
-    return {"status": "ready", "runtime": "ephemeral-sequential-workers" if ephemeral else "crosstext2loc", "gallery_ids": gallery_ids, "processing_modes": {"no_llm": True, "with_llm": getattr(request.app.state, "transformer", None) is not None}}
+    runtime = "resident-sequential-lazy-v1" if application_available else "ephemeral-sequential-workers" if ephemeral else "crosstext2loc"
+    return {"status": "ready", "runtime": runtime, "gallery_ids": gallery_ids, "processing_modes": {"no_llm": not application_available, "with_llm": application_available or getattr(request.app.state, "transformer", None) is not None}}
 
 
 @router.get("/capabilities", responses={500: {"model": ErrorResponse}})
 async def capabilities(request: Request):
     retriever = getattr(request.app.state, "retriever", None)
+    freetext_application = getattr(request.app.state, "freetext_application_service", None)
+    application_available = bool(freetext_application and freetext_application.policy()["available"])
     try:
-        galleries = ([{"gallery_id": "madrid-50m", "candidate_count": 253}] if retriever is None and getattr(request.app.state, "freetext_operational_service", None) is not None else [] if retriever is None else [{"gallery_id": gallery_id, "candidate_count": retriever.gallery_count(gallery_id)} for gallery_id in retriever.gallery_ids])
+        galleries = ([{"gallery_id": "madrid-50m", "candidate_count": 253}] if application_available or retriever is None and getattr(request.app.state, "freetext_operational_service", None) is not None else [] if retriever is None else [{"gallery_id": gallery_id, "candidate_count": retriever.gallery_count(gallery_id)} for gallery_id in retriever.gallery_ids])
     except Exception as error:
         raise ApiInternalError("capabilities failure") from error
     qwen = getattr(request.app.state, "transformer", None)
@@ -46,7 +49,6 @@ async def capabilities(request: Request):
     dialogue = getattr(request.app.state, "dialogue_service", None)
     freetext = getattr(request.app.state, "freetext_service", None)
     freetext_operational = getattr(request.app.state, "freetext_operational_service", None)
-    freetext_application = getattr(request.app.state, "freetext_application_service", None)
     freetext_policies = [] if freetext is None else freetext.policies()["policies"]
     if freetext_operational is not None:
         freetext_policies.append(freetext_operational.policy())
@@ -55,10 +57,10 @@ async def capabilities(request: Request):
     return {
         "schema_version": "1.0",
         "api_version": "v3-experimental",
-        "retrievers": [{"id": "crosstext2loc", "available": retriever is not None, "scores_are_probabilities": False}],
+        "retrievers": [{"id": "crosstext2loc", "available": application_available or retriever is not None, "scores_are_probabilities": False}],
         "processing_modes": [
-            {"id": "no_llm", "available": retriever is not None, "variant": "es_original", "resident": False if getattr(retriever, "ephemeral", False) else None},
-            {"id": "with_llm", "available": retriever is not None and qwen is not None, "variant": "en_cartographic", "experimental": True, "resident": False if getattr(qwen, "resource_usage", {}).get("ephemeral") else None},
+            {"id": "no_llm", "available": not application_available and retriever is not None, "variant": "es_original", "resident": False if getattr(retriever, "ephemeral", False) else None},
+            {"id": "with_llm", "available": application_available or retriever is not None and qwen is not None, "variant": "en_cartographic", "experimental": True, "resident": True if application_available else False if getattr(qwen, "resource_usage", {}).get("ephemeral") else None},
         ],
         "postprocessing_capabilities": [
             {"id": "topn_visual_promotion", "available": visual is not None, "enabled": visual is not None, "experimental": True, "source": "precomputed_qwen3_vl" if visual is not None else None, "online_inference": False, "supported_reserve_k": [10, 20, 50, 100, 200, 500, "full"], "output_top_k": 10, "fallback": "baseline"},
@@ -68,8 +70,8 @@ async def capabilities(request: Request):
             "transport": "sse" if progress_available else "none",
             "endpoint_template": "/api/v1/progress/{query_id}" if progress_available else None,
             "stages": [
-                {"id": "llm", "available": qwen is not None, "operation": "optional_en_cartographic_transform"},
-                {"id": "crosstext2loc", "available": retriever is not None, "operation": "text_encoding_and_exhaustive_gallery_ranking"},
+                {"id": "llm", "available": application_available or qwen is not None, "operation": "en_cartographic_transform" if application_available else "optional_en_cartographic_transform"},
+                {"id": "crosstext2loc", "available": application_available or retriever is not None, "operation": "text_encoding_and_exhaustive_gallery_ranking"},
                 {"id": "vlm", "available": visual is not None, "source": "precomputed_qwen3_vl" if visual is not None else None, "online_inference": False},
                 {"id": "dialoguevpr", "available": bool(dialogue and dialogue.available), "reason": None if dialogue and dialogue.available else "runtime_or_dataset_not_configured"},
                 {"id": "freetext", "available": bool(freetext is not None or freetext_operational is not None and freetext_operational.policy()["available"] or freetext_application is not None and freetext_application.policy()["available"]), "operation": "literal_dialogue_e0_e3" if freetext is not None or freetext_operational is not None and freetext_operational.policy()["available"] or freetext_application is not None and freetext_application.policy()["available"] else None},

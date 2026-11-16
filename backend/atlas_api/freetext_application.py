@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import fcntl
 import hashlib
 import json
 import re
@@ -227,9 +228,12 @@ class ApplicationFreeTextSessionService(OperationalFreeTextSessionService):
             raise FreeTextConflict("description_es debe contener entre 3 y 2400 caracteres")
         if idempotency_key != client_operation_id or not idempotency_key or len(idempotency_key) > 200:
             raise FreeTextConflict("Idempotency-Key y client_operation_id deben coincidir")
-        profile = self._profile()
-        body = {"policy_id": POLICY_ID, "description_es": description, "client_operation_id": client_operation_id}
-        with self._connect() as connection:
+        profile_lock = self.state_root / "freetext-application-profile.lock"
+        with profile_lock.open("a+b") as lock:
+         fcntl.flock(lock,fcntl.LOCK_SH)
+         profile = self._profile()
+         body = {"policy_id": POLICY_ID, "description_es": description, "client_operation_id": client_operation_id}
+         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = self._lookup_idempotency(connection, "create", "", idempotency_key, body)
             if existing is not None:
@@ -294,6 +298,12 @@ class ApplicationFreeTextSessionService(OperationalFreeTextSessionService):
         return result
 
     def prepare_answer(self, session_id: str, answer: str, turn_index: int, question_id: str | None, question_sha256: str | None, client_operation_id: str, idempotency_key: str) -> tuple[dict[str, Any], bool]:
+        lock_path = self.session_root / session_id / ".transition.lock"
+        with lock_path.open("a+b") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            return self._prepare_answer_locked(session_id, answer, turn_index, question_id, question_sha256, client_operation_id, idempotency_key)
+
+    def _prepare_answer_locked(self, session_id: str, answer: str, turn_index: int, question_id: str | None, question_sha256: str | None, client_operation_id: str, idempotency_key: str) -> tuple[dict[str, Any], bool]:
         if idempotency_key != client_operation_id or not idempotency_key or len(idempotency_key) > 200:
             raise FreeTextConflict("Idempotency-Key y client_operation_id deben coincidir")
         body = {"turn_index": turn_index, "question_id": question_id, "question_sha256": question_sha256, "answer_literal": answer, "human_attested": True, "external_context_used": False, "client_operation_id": client_operation_id}

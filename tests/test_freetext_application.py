@@ -235,6 +235,7 @@ def test_application_api_contract_metadata_and_shared_gate(tmp_path):
     app = create_app(settings=settings, retriever_factory=lambda _: Retriever(), transformer_factory=lambda _: None, freetext_application_service=instance)
     payload = {"schema_version": "1.0", "contract_version": "atlas-dialogue-freetext-start-request-v2", "policy_id": "dialogue-vpr-freetext-v1-application", "description_es": "Una descripción libre de la plaza", "client_operation_id": "api-start"}
     with TestClient(app) as client:
+        assert client.get("/api/v1/health/ready").json()["runtime"] == "resident-sequential-lazy-v1"
         policies = client.get("/api/v1/dialogue-freetext/policies").json()["policies"]
         public = next(row for row in policies if row["policy_id"] == "dialogue-vpr-freetext-v1-application")
         assert public["available"] is True and public["profile"]["access_mode"] == "loopback"
