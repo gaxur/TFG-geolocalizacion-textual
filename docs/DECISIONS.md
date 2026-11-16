@@ -116,6 +116,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D098 | Separar admisión reutilizable de aplicación de la autorización científica FreeText | ACEPTADA | MVP / FreeText |
 | D099 | Completar edificios mediante alturas estimadas solo en MapLibre | ACEPTADA | Aplicación / cartografía visual |
 | D100 | Validador FreeText específico y sidecars de outputs rechazados | PROPUESTA | Aplicación / robustez |
+| D101 | Separar intención grounded y formulación lingüística controlada | PROPUESTA | DialogueVPR / preguntas |
 
 ## D053 — API HTTP interna del MVP
 
@@ -4247,3 +4248,16 @@ Separar la validación DialogueVPR del contrato histórico F5 para distinguir
 incapacidad, negación factual, entidades, direcciones y números/unidades. Ante
 rechazo se conservaría un sidecar diagnóstico excluido de retrieval. La propuesta
 mantiene cero retries y requiere nueva identidad/perfil D098 antes de activarse.
+
+## D101 — Selección grounded y formulación controlada separadas
+
+**Estado:** PROPUESTA
+**Componente:** DialogueVPR / preguntas
+**Fecha:** 2026-11-16
+
+Mantener el selector determinista actual como nivel semántico y estudiar variantes
+lingüísticas controladas, reproducibles y auditables como nivel de presentación.
+El contrato transporta intención, evidencia, hipótesis, utilidad y pregunta
+canónica sin mutarlas; la equivalencia del texto visible queda pendiente de
+revisión humana. El estudio vive fuera del runtime; cualquier activación exige
+policy versionada y regeneración D098.

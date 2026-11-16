@@ -623,6 +623,19 @@ Las entradas son append-only.
 - **Decisión:** D100 permanece `PROPUESTA`; runtime autorizado restaurado byte a
   byte, D098 no regenerado. Requiere aprobación de alcance y retención.
 
+### 2026-11-16 — DIALOGUEVPR-SCIENTIFIC-AUDIT-01
+
+- **Implementación real:** selector propio determinista sobre Top-20, clusters 75 m
+  y evidencia F3; DQ-pilot no implementado; Qwen no selecciona preguntas.
+- **Adaptatividad CPU:** ranking distinto cambia intención; scores reescalados sin
+  cambio de orden no; familias usadas se bloquean; shared feature produce stop.
+- **Naturalidad:** estudio determinista bajo `research/`, no importado ni desplegado;
+  7 tests nuevos de auditoría/wording y 43 regresiones relacionadas dentro de un
+  comando de 50 PASS, sin GPU y sin tocar sesión activa.
+- **Limitaciones:** utilidad heurística, unión de features por cluster, ausencia F3
+  unknown, sin entropía/visibilidad/parser semántico o convergencia.
+- **Decisión:** D101 `PROPUESTA`; no cambia policy, preguntas reales ni D098.
+
 ### 2026-11-06 — P2-04-CONTINUATION-BLOCKED-01
 
 - **Tarea:** registrar aprobación humana de E0 y generar E1–E3 mediante contrato
