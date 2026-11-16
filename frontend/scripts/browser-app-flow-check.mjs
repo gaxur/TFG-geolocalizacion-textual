@@ -56,6 +56,7 @@ try{
   const preserved=await evaluate(`JSON.stringify([...document.querySelectorAll('.result-card .card-title h3')].map(x=>x.textContent))`);
   await evaluate(`(()=>{const x=document.querySelector('#freetext-answer');x.value='FALLAR';x.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#freetext-answer-form').requestSubmit()})()`);
   await waitFor(`document.querySelector('.freetext-status')?.textContent.includes('Fallida')`);
+  assert.match(await evaluate(`document.querySelector('.session-outcome')?.textContent||''`),/reformulación automática no pudo completarse/);
   assert.equal(await evaluate(`JSON.stringify([...document.querySelectorAll('.result-card .card-title h3')].map(x=>x.textContent))`),preserved);
   const counters=await(await fetch('http://api:8000/fixture/counters')).json();
   assert.equal(counters.creates,2);assert.equal(counters.answers,4);assert.ok(counters.gets>=3);assert.ok(counters.streams>=4);

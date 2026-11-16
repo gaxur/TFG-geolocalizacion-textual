@@ -147,6 +147,8 @@ textarea::placeholder { color: #89938e; }
 .freetext-panel.is-collapsed > :not(.freetext-header):not(.freetext-error) { display:none; }
 .freetext-error { margin:0 0 12px; }
 .new-search-button { margin-top:14px; }
+.session-outcome { display:grid; gap:5px; margin-top:12px; padding:12px 13px; border-radius:10px; font-size:11px; }
+.session-outcome p { line-height:1.5; }.outcome-failed { border:1px solid #ecd4cf; background:#fff3f0; color:#793b34; }.outcome-unknown { border:1px solid #eadfbf; background:#fff9ea; color:#705923; }
 .service-state { display: grid; gap: 6px; padding: 12px; margin-top: 16px; border-radius: 9px; background: #edf4f0; color: #48665a; font-size: 11px; line-height: 1.5; }
 .service-state.error { background: #fff1ee; color: #8b3f34; }
 .service-state .secondary { margin-top: 4px; width: max-content; min-height: 34px; padding: 7px 10px; }
