@@ -21,3 +21,9 @@ Qwen, CrossText2Loc ni VLM en esta integración.
 - Corrección posterior: sidecar allowlist `resource-monitor` para `/api/ps`.
 - Repetición automatizada por el agente: no ejecutada; requiere autorización
   nueva. El uso interactivo iniciado por el operador sigue cubierto por D098.
+
+Una sesión interactiva posterior iniciada por el operador verificó el fix del
+resource monitor y completó E0: 134,813 s, 253 candidatos exhaustivos, Top-10 y
+primera pregunta. Qwen ocupó 119,296 s por eventos (3,046 s de generación) y
+CrossText2Loc 15,491 s. La sesión permanece `waiting_user`; el agente no la
+respondió. E1-E3 no se revalidaron en este lote.

@@ -36,6 +36,24 @@ interna. Después se añadió un sidecar allowlist para `/api/ps` y se verificó
 automatizado requiere autorización nueva. D098 sí mantiene autorizado el uso
 interactivo iniciado por el operador.
 
+## Auditoría de latencia E0 de aplicación 2026-11-16
+
+Se inspeccionó en lectura la sesión iniciada por el operador
+`freetext-application-599db399-b8d3-48bd-a172-0fd7628d342a`. El agente no la
+inició, no respondió su pregunta y no ejecutó modelos adicionales.
+
+- E0 completo: 134,813 s.
+- Qwen por eventos: 119,296 s.
+- Generación interna Qwen: 3,046 s.
+- Supervisor Qwen: carga visible de 399 pesos durante aproximadamente 93 s.
+- CrossText2Loc por eventos: 15,491 s.
+- Resultado: 253 candidatos exhaustivos, Top-10 público y primera pregunta.
+- Estado al cerrar esta auditoría: `waiting_user`.
+
+La comparación con el MVP residente identifica las cargas repetidas como cuello
+de botella dominante. No se modificó el backend porque hacerlo invalidaría la
+identidad D098 y la sesión abierta. Véase [APP_PERFORMANCE_AND_UX_AUDIT.md](APP_PERFORMANCE_AND_UX_AUDIT.md).
+
 ## F4.1b-B: galería visual OSM de Madrid
 
 ### Objetivo y resultado

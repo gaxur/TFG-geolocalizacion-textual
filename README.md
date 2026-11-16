@@ -55,10 +55,11 @@ carga una vez en GPU.
 
 La modernización mantiene ese despliegue y utiliza MapLibre, GeoJSON F1 y el
 PMTiles local `data/processed/map-assets/madrid.pmtiles`, servido por el mismo
-Nginx. F2/F4 se verificaron por hash/provenance; el mapa vectorial local se
-construyó desde el PBF F4 con un buffer cartográfico de 250 m. Las extrusiones
-solo usan alturas OSM numéricas explícitas; la cobertura es parcial y los niveles
-no se convierten a metros. La auditoría, el esquema y la validación están en
+Nginx. F2/F4 se verificaron por hash/provenance. El PMTiles no convierte niveles
+a metros; el estilo del navegador usa `height` explícita y, solo para completar
+la visualización, estima `building:levels × 3 m` o 9 m por defecto con colores
+diferenciados. Estas estimaciones no entran en CrossText2Loc ni en datos
+científicos. La auditoría, el esquema y la validación están en
 [FRONTEND_MAPLIBRE.md](docs/FRONTEND_MAPLIBRE.md).
 
 ## Ejecutar el MVP

@@ -11,7 +11,7 @@ el perfil real aprobado se genera fuera de Git y está ligado al runtime.
 ## Arquitectura
 
 - `compose.app.yaml`: API FastAPI y frontend Nginx.
-- Solo Nginx publica `127.0.0.1:18085`; API en red interna.
+- Solo Nginx publica `127.0.0.1:8080`; API en red interna.
 - Imagen API propia derivada de `crosstext2loc-gb10:f511`, sin datos/modelos.
 - Qwen/CT2L efímeros secuenciales y un único `ModelGate`.
 - Policy core application separada sobre la implementación FreeText compartida;
@@ -26,7 +26,8 @@ el perfil real aprobado se genera fuera de Git y está ligado al runtime.
 - Formulario principal inicia FreeText application.
 - Chat, progreso, recovery y rankings E0-E3.
 - MapLibre montado en la app principal y actualizado sin recrear instancia.
-- PMTiles/celdas locales; 3D solo con `height` numérica explícita.
+- PMTiles/celdas locales; 3D con `height` explícita y estimaciones visuales
+  diferenciadas (`levels × 3 m` o 9 m), nunca usadas por retrieval.
 - Controles científicos/raw ocultos.
 
 ## Seguridad y cuotas

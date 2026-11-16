@@ -547,6 +547,26 @@ Las entradas son append-only.
 - **Validación final CPU/contratos:** 79 backend PASS; frontend 45 PASS +1 skip;
   browser app fake PASS; Compose/py_compile/diff PASS; revisión final 0 blockers.
 
+### 2026-11-16 — INTEGRATED-APP-UX-PERFORMANCE-01
+
+- **Infraestructura:** `atlas-mvp` y `atlas-historical-view` detenidos con
+  `compose stop`; contenedores, redes, imágenes, sesiones, volúmenes y evidencia
+  conservados. La app principal publica solo `127.0.0.1:8080`.
+- **Diagnóstico real:** E0 134,813 s; Qwen 119,296 s (3,046 s generación,
+  ~93 s carga); CT2L 15,491 s. Top-10 y pregunta existían en backend.
+- **Frontend:** recovery SSE de sesiones activas, errores visibles, nueva búsqueda
+  terminal, operation ID segura, mapa dominante, sidebar/drawer responsive y
+  conservación del último ranking válido.
+- **MapLibre:** D099 aplica `height`, niveles ×3 m y fallback 9 m solo en estilo;
+  Chromium observó 4.800 extrusiones y 8.031 features fuente en la cámara final;
+  el recuento depende del encuadre y no es un censo.
+- **Validación:** 48 frontend PASS +1 skip, 79 backend/regresión PASS,
+  `APP_FLOW_BROWSER_PASS`, sesión real Top-10/pregunta PASS y cero POST.
+- **Bloqueo:** modelos residentes requieren cambiar backend, regenerar perfil D098
+  y decidir el tratamiento de la sesión abierta `freetext-application-599d…`.
+- **Próximo paso:** decisión humana sobre preservar la sesión o regenerar perfil;
+  no ejecutar otra inferencia automáticamente.
+
 ### 2026-11-06 — P2-04-CONTINUATION-BLOCKED-01
 
 - **Tarea:** registrar aprobación humana de E0 y generar E1–E3 mediante contrato

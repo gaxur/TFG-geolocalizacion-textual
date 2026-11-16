@@ -45,9 +45,9 @@ El checkout local conserva el snapshot F2 y la fuente PBF F4 bajo las rutas
 `raw/osm/f4_sources/madrid-geofabrik-20261014/`, ambos fuera de Git. El PMTiles
 `processed/map-assets/madrid.pmtiles` se genera offline desde el PBF F4 y su
 provenance está en `madrid.pmtiles.provenance.json`. Usa OSM/ODbL 1.0, bbox D004
-con 250 m de margen proyectado y solo etiquetas numéricas `height` explícitas
-para extrusiones; `building:levels` no se convierte a metros. Nginx sirve el
-archive por Range desde el volumen read-only existente.
+con 250 m de margen proyectado y etiquetas `height`/`building:levels` sin
+conversión persistida. El frontend puede estimar niveles ×3 m o 9 m únicamente
+en el estilo visual. Nginx sirve el archive por Range desde el volumen read-only.
 
 ## Bundles obligatorios del MVP
 

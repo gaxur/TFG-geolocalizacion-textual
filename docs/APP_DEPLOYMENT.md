@@ -5,7 +5,7 @@
 `compose.app.yaml` construye `atlas-app-api:local` desde la imagen base local
 `crosstext2loc-gb10:f511`, construye el frontend Vite con su Dockerfile y lo
 sirve mediante Nginx. Solo Nginx publica un puerto y, por defecto, queda limitado
-a `127.0.0.1:18085`; la API solo existe en la red interna de Compose.
+a `127.0.0.1:8080`; la API solo existe en la red interna de Compose.
 
 El perfil distribuido en
 `config/freetext_application_profile.template.json` está deliberadamente en
@@ -101,12 +101,12 @@ docker compose --env-file .env.app -f compose.app.yaml ps
 docker compose --env-file .env.app -f compose.app.yaml logs -f api frontend
 ```
 
-Abrir `http://127.0.0.1:18085/` en la PGX. Comprobaciones sin inferencia:
+Abrir `http://127.0.0.1:8080/` en la PGX. Comprobaciones sin inferencia:
 
 ```bash
-curl --fail http://127.0.0.1:18085/healthz
-curl --fail http://127.0.0.1:18085/api/v1/health/live
-curl -i http://127.0.0.1:18085/api/v1/health/ready
+curl --fail http://127.0.0.1:8080/healthz
+curl --fail http://127.0.0.1:8080/api/v1/health/live
+curl -i http://127.0.0.1:8080/api/v1/health/ready
 ```
 
 Parar sin borrar el estado persistente:
@@ -126,10 +126,10 @@ tras fallos o reinicios del daemon, excepto cuando se hayan detenido manualmente
 Mantener Nginx ligado a loopback. Desde PowerShell o Windows Terminal:
 
 ```powershell
-ssh -N -L 18085:127.0.0.1:18085 dataai@192.168.12.219
+ssh -N -L 8080:127.0.0.1:8080 dataai@192.168.12.219
 ```
 
-Con el túnel activo, abrir `http://127.0.0.1:18085/` en Windows. El Compose fija
+Con el túnel activo, abrir `http://127.0.0.1:8080/` en Windows. El Compose fija
 el bind a loopback y no ofrece una variable para ampliarlo a LAN.
 
 ## Memoria y GPU

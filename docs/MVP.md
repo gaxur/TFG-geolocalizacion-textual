@@ -170,8 +170,8 @@ El estilo local consume `madrid.pmtiles` con esquema MVT
 read-only `MVP_MAP_ASSETS_DIR`; no se genera cartografía durante el arranque.
 MapLibre comprueba header, bounds, capas, provenance y tamaño del archive. La
 capa `fill-extrusion` utiliza `height` numérico explícito y `min_height` como
-base solo si es menor que esa altura. `building:levels` no se convierte a metros
-y no se asignan alturas a edificios desconocidos.
+base. El PMTiles no convierte `building:levels`; el estilo del navegador puede
+usar niveles ×3 m o 9 m exclusivamente como estimación visual diferenciada.
 
 La fuente de mapa es el PBF F4 regional Geofabrik, SHA-256
 `9ef85f5c728a26995712a835a68f0cb30e01a32af6d2a7facd6744f3a3840db8`, ODbL 1.0,

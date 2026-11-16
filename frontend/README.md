@@ -3,8 +3,8 @@
 Interfaz web en español conectada a la API MVP.1. Está implementada con
 JavaScript, CSS y Vite. MapLibre GL JS usa un PMTiles local generado desde la
 fuente OSM F4 validada; Leaflet queda como fallback 2D si WebGL2 no está
-disponible. La capa 3D solo extruye edificios con alturas numéricas explícitas
-de OSM. Las geometrías de las celdas continúan siendo las celdas canónicas F1 de
+disponible. La capa 3D usa alturas OSM explícitas y completa solo la visualización
+con `building:levels × 3 m` o 9 m, diferenciados como estimaciones. Las geometrías de las celdas continúan siendo las celdas canónicas F1 de
 25/50 m. Se recomienda Node.js 22.12 o superior.
 
 ## Despliegue integrado recomendado
@@ -12,40 +12,32 @@ de OSM. Las geometrías de las celdas continúan siendo las celdas canónicas F1
 Desde la raíz del repositorio:
 
 ```bash
-scripts/run_mvp3_stack.sh -d
+docker compose -f compose.app.yaml up -d --build
 ```
 
-También se conserva el arranque directo solicitado:
-
-```bash
-docker compose -f compose.mvp.yaml up
-```
-
-`compose.mvp.yaml` compila el frontend con `npm ci` y `npm run build`, copia
-`dist/` a una imagen Nginx y redirige `/api` al servicio FastAPI interno. Abrir:
+La aplicación publica únicamente Nginx en `127.0.0.1:8080`; FastAPI y el
+resource monitor permanecen en redes Compose. Abrir:
 
 ```text
 http://127.0.0.1:8080/
 ```
 
-El wrapper escucha por defecto en la LAN. Desde otro dispositivo de la misma red
-se abre `http://IP_LOCAL:8080/`. Para restringirlo a la propia PGX:
+Desde Windows se usa un túnel SSH:
 
 ```bash
-MVP_BIND_HOST=127.0.0.1 scripts/run_mvp3_stack.sh -d
+ssh -N -L 8080:127.0.0.1:8080 dataai@192.168.12.219
 ```
 
 Parar sin borrar datos:
 
 ```bash
-docker compose -f compose.mvp.yaml down
+docker compose -f compose.app.yaml stop
 ```
 
-El contenedor Nginx integrado utiliza el nombre estable `atlas-mvp-frontend`.
-
-La API no publica un puerto y el navegador utiliza un único origen. Consultar
-[`docs/MVP.md`](../docs/MVP.md) para variables, LAN,
-healthchecks y diagnóstico.
+`compose.mvp.yaml` se conserva como despliegue histórico del MVP original, pero
+no es la aplicación principal. Consultar
+[`docs/APP_DEPLOYMENT.md`](../docs/APP_DEPLOYMENT.md) para variables,
+healthchecks, perfil D098 y diagnóstico.
 
 ## Desarrollo con Vite
 
@@ -71,8 +63,8 @@ Abrir `http://127.0.0.1:5173/`.
 - Selección Sin LLM o Con LLM experimental (`en_cartographic`).
 - Top-10 fijo para una sola combinación.
 - Candidatos con ID, coordenadas WGS84 y similitud coseno.
-- Mapa MapLibre 2D/3D con tarjetas/marcadores/celdas sincronizados; extrusión
-  parcial solo para alturas OSM explícitas y numéricas.
+- Mapa MapLibre 2D/3D con tarjetas/marcadores/celdas sincronizados; alturas
+  explícitas y estimaciones visuales diferenciadas, nunca usadas por retrieval.
 - PMTiles locales servidos por el Nginx frontend existente; sin token ni API cartográfica externa.
 - Fallback Leaflet 2D sin teselas externas cuando no hay WebGL2.
 - Estados de carga, cancelación y errores del backend.

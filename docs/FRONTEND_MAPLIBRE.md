@@ -9,9 +9,11 @@ frontend. Nginx, que ya existe en `compose.mvp.yaml`, sirve los recursos desde
 
 El checkout dispone ahora del snapshot F2, del PBF regional F4 y de los manifests
 canónicos F1 de 25/50 m. El PMTiles local se genera desde la fuente F4 y se sirve
-por el Nginx existente. Las extrusiones usan únicamente atributos OSM `height`
-numéricos explícitos; la cobertura es parcial y el resto de los edificios queda
-en 2D. F1, F2 y F4 conservan identidades y procedencias separadas.
+por el Nginx existente. El archive conserva `height`, `min_height` y
+`building:levels` sin alterar. El estilo final usa `height` explícita cuando
+existe y completa solo la visualización con `building:levels × 3 m` o 9 m por
+defecto, diferenciando esos casos como estimaciones. F1, F2 y F4 conservan
+identidades y procedencias separadas.
 
 ## Arquitectura de ejecución
 
@@ -195,9 +197,11 @@ el sidecar con sus hashes de scripts/dependencias. Contiene
 `transportation_name`, `landuse`, `landcover`, `water` y `place`, con geometrías
 recortadas al buffer de 250 m.
 
-Para edificios, el perfil conserva `height` y `min_height` solo como números
-explícitos interpretables en metros. No estima alturas desde `building:levels`.
-El control 3D se activa solo si la capa `building` declara `height`, el sidecar
+Para edificios, el perfil conserva `height` y `min_height` como números
+explícitos interpretables en metros y mantiene `building:levels` como tag. El
+PMTiles no convierte niveles a metros. La conversión `levels × 3 m` y el fallback
+de 9 m existen únicamente en la expresión MapLibre del navegador. El control 3D
+se activa solo si la capa `building` declara `height`, el sidecar
 declara alturas explícitas y el tamaño servido del archive coincide con su
 provenance. La interfaz muestra por separado la cobertura de edificios base y
 partes, y mantiene las celdas/marcadores por encima de las capas de edificios.
@@ -213,10 +217,11 @@ Contrato verificado del archive:
   aceptados, `min_height` únicamente si es menor que `height`.
 
 La interfaz comprueba encabezado, tipo de tesela, bounds, capas, provenance y
-campo de altura antes de activar edificios 3D. Las 711 features de tesela con
+campos de edificio antes de activar edificios 3D. Las 711 features de tesela con
 altura incluyen copias de la misma feature a distintos zooms; representan 111
 objetos OSM únicos con `height` explícita, no 711 edificios distintos. La vista
-3D es cartográfica, no un levantamiento topográfico. No se añade DEM.
+3D es cartográfica, no un levantamiento topográfico. El color distingue altura
+explícita, niveles y fallback; no se añade DEM.
 
 El comando de regeneración PMTiles offline es:
 

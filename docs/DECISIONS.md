@@ -114,6 +114,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D096 | Evidencia visual opcional y no vinculante en DialogueVPR | ACEPTADA | DialogueVPR / VLM / provenance |
 | D097 | Perfil Python local para preparar PMTiles de D004 desde PBF F4 | PROPUESTA | Cartografía / frontend |
 | D098 | Separar admisión reutilizable de aplicación de la autorización científica FreeText | ACEPTADA | MVP / FreeText |
+| D099 | Completar edificios mediante alturas estimadas solo en MapLibre | ACEPTADA | Aplicación / cartografía visual |
 
 ## D053 — API HTTP interna del MVP
 
@@ -4215,3 +4216,19 @@ aprobación.
 
 La aprobación fue emitida expresamente por el operador el 2026-11-16. El perfil
 real permanece fuera de Git en `runtime/` y está ligado a policies y executor.
+
+## D099 — Alturas estimadas exclusivamente para visualización MapLibre
+
+**Estado:** ACEPTADA
+**Componente:** Aplicación / frontend cartográfico
+**Fecha:** 2026-11-16
+
+La aplicación usa `height` OSM explícita cuando existe. Si falta, puede derivar
+una altura visual como `building:levels × 3 m`; sin ambos datos usa 9 m. Los tres
+casos se distinguen por color y la interfaz declara que niveles/fallback son
+estimaciones, no mediciones.
+
+La regla vive únicamente en expresiones `fill-extrusion` del navegador. No
+modifica PMTiles, geometrías OSM, catálogo F1, asociaciones F3, embeddings,
+CrossText2Loc ni evaluación. `min_height` se respeta cuando existe y se usa una
+sola capa de extrusión para no duplicar capas base/partes.

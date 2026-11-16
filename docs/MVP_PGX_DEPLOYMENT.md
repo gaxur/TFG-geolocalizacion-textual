@@ -246,7 +246,8 @@ curl -fsS -X POST http://127.0.0.1:8080/api/v1/retrievals \
 Abre `http://127.0.0.1:8080/` en un navegador de PGX. Comprueba que se muestran
 10 tarjetas, 10 marcadores, la celda seleccionada sincronizada y el Top-1
 destacado. Prueba 3D solo si `capabilities`/mapa declara edificios 3D disponibles:
-la extrusión es parcial y usa alturas OSM explícitas, no `building:levels`.
+la extrusión usa `height` explícita y distingue estimaciones visuales por niveles
+×3 m o fallback 9 m. Estas estimaciones no modifican datos ni retrieval.
 La similitud coseno no es una probabilidad y las celdas no confirman la posición
 del observador.
 
