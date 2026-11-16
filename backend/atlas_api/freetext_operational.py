@@ -185,6 +185,8 @@ class OperationalFreeTextSessionService:
         with lock.open("a+") as handle:
             fcntl.flock(handle, fcntl.LOCK_EX)
             validated = self.authorization.validate(execution_id, self.executor)
+            if validated["document"]["description_sha256"] != hashlib.sha256(description.encode()).hexdigest():
+                raise FreeTextUnavailable("descripción no autorizada para esta ejecución")
             existing = self._idempotency("create", idempotency_key, body, reserve=False)
             if existing is not None:
                 receipt, _ = self.authorization.create_receipt(

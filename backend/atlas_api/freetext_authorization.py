@@ -104,9 +104,11 @@ class OperationalAuthorization:
             },
             "reusable_for_other_session": False,
         }
-        expected_keys = set(required) | {"authorization_id", "approved_at", "valid_from", "expires_at"}
+        expected_keys = set(required) | {"authorization_id", "approved_at", "valid_from", "expires_at", "description_sha256"}
         if set(document) != expected_keys or any(document.get(key) != value for key, value in required.items()):
             raise FreeTextUnavailable("autorizacion FreeText operacional incompatible")
+        if not isinstance(document.get("description_sha256"), str) or not SHA256.fullmatch(document["description_sha256"]):
+            raise FreeTextUnavailable("description_sha256 de autorización inválido")
         authorization_id = document.get("authorization_id")
         if not isinstance(authorization_id, str) or not authorization_id:
             raise FreeTextUnavailable("authorization_id FreeText ausente")

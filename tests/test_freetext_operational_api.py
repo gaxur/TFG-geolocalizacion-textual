@@ -56,8 +56,8 @@ class FakeRetriever:
 
 POLICY={"operational_policy_id":"dialogue-vpr-freetext-v1-operational","operational_policy_version":"1.0.0","operational_policy_sha256":"a"*64,"core_policy_id":"dialogue-vpr-freetext-v1","core_policy_version":"1.0.0","core_policy_sha256":"b"*64}
 
-def authorize(root,executor,execution_id="exec-1"):
-    now=datetime.now(timezone.utc);identity=executor.identity;root.mkdir(parents=True,exist_ok=True);document={"schema_version":"1.0","contract_version":"atlas-dialogue-freetext-operational-authorization-v1","authorization_id":"auth-1","execution_id":execution_id,"status":"OPERATOR_AUTHORIZED","approved":True,"approved_at":(now-timedelta(minutes=2)).isoformat().replace('+00:00','Z'),"valid_from":(now-timedelta(minutes=1)).isoformat().replace('+00:00','Z'),"expires_at":(now+timedelta(hours=1)).isoformat().replace('+00:00','Z'),**POLICY,"executor_identity":identity,"executor_identity_sha256":hashlib.sha256(canonical(identity)).hexdigest(),"scope":{"session_count":1,"stages":["E0","E1","E2","E3"]},"budgets":{"maximum_qwen_loads":4,"maximum_qwen_calls":4,"maximum_ct2l_loads":4,"maximum_ct2l_calls":4,"maximum_questions":3,"automatic_retries":0},"constraints":{"ground_truth_permitted":False,"vlm_permitted":False,"h38_h61_permitted":False,"references_permitted":False,"network_permitted":False},"reusable_for_other_session":False};(root/f'{execution_id}.json').write_text(json.dumps(document));return root
+def authorize(root,executor,execution_id="exec-1",description="Estoy junto a una plaza y veo una torre a mi derecha."):
+    now=datetime.now(timezone.utc);identity=executor.identity;root.mkdir(parents=True,exist_ok=True);document={"schema_version":"1.0","contract_version":"atlas-dialogue-freetext-operational-authorization-v1","authorization_id":"auth-1","execution_id":execution_id,"status":"OPERATOR_AUTHORIZED","approved":True,"approved_at":(now-timedelta(minutes=2)).isoformat().replace('+00:00','Z'),"valid_from":(now-timedelta(minutes=1)).isoformat().replace('+00:00','Z'),"expires_at":(now+timedelta(hours=1)).isoformat().replace('+00:00','Z'),"description_sha256":hashlib.sha256(description.encode()).hexdigest(),**POLICY,"executor_identity":identity,"executor_identity_sha256":hashlib.sha256(canonical(identity)).hexdigest(),"scope":{"session_count":1,"stages":["E0","E1","E2","E3"]},"budgets":{"maximum_qwen_loads":4,"maximum_qwen_calls":4,"maximum_ct2l_loads":4,"maximum_ct2l_calls":4,"maximum_questions":3,"automatic_retries":0},"constraints":{"ground_truth_permitted":False,"vlm_permitted":False,"h38_h61_permitted":False,"references_permitted":False,"network_permitted":False},"reusable_for_other_session":False};(root/f'{execution_id}.json').write_text(json.dumps(document));return root
 
 
 def app_fixture(tmp_path):
@@ -85,7 +85,7 @@ def test_arbitrary_description_idempotency_e0_e3_and_recreate(tmp_path):
         repeated = client.post("/api/v1/dialogue-freetext/sessions", json=start_payload(), headers={"Idempotency-Key": "create-1"})
         assert repeated.json()["session_id"] == session_id
         conflict = client.post("/api/v1/dialogue-freetext/sessions", json=start_payload("Otra descripción arbitraria."), headers={"Idempotency-Key": "create-1"})
-        assert conflict.status_code == 409
+        assert conflict.status_code == 503
         for index in range(1, 4):
             payload = answer_payload(f"Respuesta {index}", session["current_question"], f"answer-{index}")
             response = client.post(f"/api/v1/dialogue-freetext/sessions/{session_id}/answers", json=payload, headers={"Idempotency-Key": f"answer-{index}"})
@@ -126,7 +126,7 @@ def test_startup_reconciliation_marks_running_unknown_without_execution(tmp_path
     assert executor.qwen_calls == executor.ct2l_calls == []
 
 def test_prepare_returns_pending_before_executor_and_run_advances_once(tmp_path):
-    executor=Executor();auth=authorize(tmp_path/'auth',executor);service=OperationalFreeTextSessionService(session_root=tmp_path/'sessions',executor=executor,enabled=True,authorization_root=auth,policy_identity=POLICY,execution_id='exec-1');document,execute=service.prepare_start('Descripción libre de una plaza.','prepare-1','prepare-1');assert execute is True and document['status']=='pending';assert executor.qwen_calls==executor.ct2l_calls==[];finished=service.run_start(document['session_id']);assert finished['status']=='waiting_user';assert executor.qwen_calls==executor.ct2l_calls==['E0'];same,execute=service.prepare_start('Descripción libre de una plaza.','prepare-1','prepare-1');assert execute is False and same['session_id']==document['session_id'];assert executor.qwen_calls==['E0']
+    description='Descripción libre de una plaza.';executor=Executor();auth=authorize(tmp_path/'auth',executor,description=description);service=OperationalFreeTextSessionService(session_root=tmp_path/'sessions',executor=executor,enabled=True,authorization_root=auth,policy_identity=POLICY,execution_id='exec-1');document,execute=service.prepare_start(description,'prepare-1','prepare-1');assert execute is True and document['status']=='pending';assert executor.qwen_calls==executor.ct2l_calls==[];finished=service.run_start(document['session_id']);assert finished['status']=='waiting_user';assert executor.qwen_calls==executor.ct2l_calls==['E0'];same,execute=service.prepare_start(description,'prepare-1','prepare-1');assert execute is False and same['session_id']==document['session_id'];assert executor.qwen_calls==['E0']
 
 def test_operational_mode_readiness_uses_sequential_workers_without_resident_retriever(tmp_path):
     executor=Executor();auth=authorize(tmp_path/'auth',executor);service=OperationalFreeTextSessionService(session_root=tmp_path/'sessions',executor=executor,enabled=True,authorization_root=auth,policy_identity=POLICY,execution_id='exec-1');settings=Settings(Path('runtime'),Path('config/madrid.yaml'),'a'*64,'clip',(),freetext_operational_enabled=True,freetext_operational_session_root=tmp_path/'sessions',freetext_operational_authorization_root=auth,freetext_operational_execution_id='exec-1');calls=[]
@@ -136,7 +136,7 @@ def test_operational_mode_readiness_uses_sequential_workers_without_resident_ret
     assert calls==['ephemeral-retriever','ephemeral-qwen']
 
 def test_expired_session_returns_410_without_execution(tmp_path):
-    app,service,executor=app_fixture(tmp_path);document,_=service.prepare_start('Descripción que expira.','expire-1','expire-1');stored=service.load(document['session_id']);stored['expires_at']=(datetime.now(timezone.utc)-timedelta(seconds=1)).isoformat().replace('+00:00','Z');service._persist(stored)
+    description='Descripción que expira.';executor=Executor();auth=authorize(tmp_path/'auth',executor,description=description);service=OperationalFreeTextSessionService(session_root=tmp_path/'sessions',executor=executor,enabled=True,authorization_root=auth,policy_identity=POLICY,execution_id='exec-1');settings=Settings(Path('runtime'),Path('config/madrid.yaml'),'a'*64,'clip',());app=create_app(settings=settings,retriever_factory=lambda _:FakeRetriever(),transformer_factory=lambda _:None,freetext_operational_service=service);document,_=service.prepare_start(description,'expire-1','expire-1');stored=service.load(document['session_id']);stored['expires_at']=(datetime.now(timezone.utc)-timedelta(seconds=1)).isoformat().replace('+00:00','Z');service._persist(stored)
     with TestClient(app) as client:
         response=client.get(f"/api/v1/dialogue-freetext/sessions/{document['session_id']}");assert response.status_code==410;assert response.json()['detail']['code']=='FREETEXT_EXPIRED'
     assert executor.qwen_calls==executor.ct2l_calls==[]
@@ -162,7 +162,7 @@ def test_retrieval_and_freetext_share_one_model_gate(tmp_path):
     assert retrieval.status_code==503 and retrieval.json()['error']['code']=='RUNTIME_BUSY';assert dialogue.status_code==409 and dialogue.json()['detail']['code']=='FREETEXT_BUSY'
 
 def test_operational_description_accepts_2400_and_rejects_2401_before_execution(tmp_path):
-    accepted_path=tmp_path/'accepted';app,_,executor=app_fixture(accepted_path)
+    accepted_path=tmp_path/'accepted';description='x'*2400;executor=Executor();auth=authorize(accepted_path/'auth',executor,description=description);service=OperationalFreeTextSessionService(session_root=accepted_path/'sessions',executor=executor,enabled=True,authorization_root=auth,policy_identity=POLICY,execution_id='exec-1');settings=Settings(Path('runtime'),Path('config/madrid.yaml'),'a'*64,'clip',());app=create_app(settings=settings,retriever_factory=lambda _:FakeRetriever(),transformer_factory=lambda _:None,freetext_operational_service=service)
     with TestClient(app) as client:accepted=client.post('/api/v1/dialogue-freetext/sessions',json=start_payload('x'*2400,'length-2400'),headers={'Idempotency-Key':'length-2400'})
     assert accepted.status_code==200;assert executor.qwen_calls==['E0']
     rejected_path=tmp_path/'rejected';app,_,executor=app_fixture(rejected_path);payload=start_payload('x'*2401);payload['client_operation_id']='length-2401'

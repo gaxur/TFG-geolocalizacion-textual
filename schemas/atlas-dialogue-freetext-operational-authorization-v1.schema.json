@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": [
     "schema_version", "contract_version", "authorization_id", "execution_id",
-    "status", "approved", "approved_at", "valid_from", "expires_at",
+    "status", "approved", "approved_at", "valid_from", "expires_at", "description_sha256",
     "operational_policy_id", "operational_policy_version", "operational_policy_sha256",
     "core_policy_id", "core_policy_version", "core_policy_sha256",
     "executor_identity", "executor_identity_sha256", "scope", "budgets",
@@ -22,6 +22,7 @@
     "approved_at": {"type": "string", "format": "date-time"},
     "valid_from": {"type": "string", "format": "date-time"},
     "expires_at": {"type": "string", "format": "date-time"},
+    "description_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "operational_policy_id": {"const": "dialogue-vpr-freetext-v1-operational"},
     "operational_policy_version": {"type": "string", "minLength": 1},
     "operational_policy_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},

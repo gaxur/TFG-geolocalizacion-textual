@@ -65,6 +65,7 @@ def authorization(root: Path, executor: Executor, execution_id="exec-1", **chang
         "approved_at": z(now - timedelta(minutes=2)),
         "valid_from": z(now - timedelta(minutes=1)),
         "expires_at": z(now + timedelta(hours=1)),
+        "description_sha256": hashlib.sha256("Descripción válida".encode()).hexdigest(),
         **POLICY,
         "executor_identity": identity,
         "executor_identity_sha256": hashlib.sha256(canonical(identity)).hexdigest(),
@@ -206,6 +207,12 @@ def test_expiry_or_authorization_replacement_between_turns_blocks_before_reserva
 def test_idempotency_header_and_body_must_match_before_consumption(tmp_path):
     service,executor,_,sessions=fixture(tmp_path)
     with pytest.raises(FreeTextConflict,match='coincidir'):service.prepare_start('Descripción válida','body-id','header-id')
+    assert executor.calls==[];assert not (sessions/'.authorization-receipts').exists();assert not (sessions/'.idempotency').exists()
+
+
+def test_description_mismatch_fails_before_consumption(tmp_path):
+    service,executor,_,sessions=fixture(tmp_path)
+    with pytest.raises(FreeTextUnavailable,match='descripción no autorizada'):service.prepare_start('Descripción distinta','key','key')
     assert executor.calls==[];assert not (sessions/'.authorization-receipts').exists();assert not (sessions/'.idempotency').exists()
 
 
