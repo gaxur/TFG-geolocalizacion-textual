@@ -119,14 +119,13 @@ async def start(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
     gate = request.app.state.dialogue_gate
-    if gate.locked():
-        raise HTTPException(status_code=409, detail={"code": "FREETEXT_BUSY", "message": "Otra transición está en curso."})
     try:
         if isinstance(payload, OperationalFreeTextStartRequest):
             service = operational(request)
             if service is None:
                 raise FreeTextUnavailable("servicio FreeText operacional no configurado")
-            await gate.acquire()
+            if not gate.try_acquire():
+                raise HTTPException(status_code=409, detail={"code": "FREETEXT_BUSY", "message": "Otra transición está en curso."})
             try:
                 document, execute = await anyio.to_thread.run_sync(
                     service.prepare_start, payload.description_es, payload.client_operation_id, idempotency_key or ""
@@ -150,6 +149,8 @@ async def start(
         service = historical(request)
         if service is None:
             raise FreeTextUnavailable("servicio FreeText histórico no configurado")
+        if not gate.try_acquire():
+            raise HTTPException(status_code=409, detail={"code": "FREETEXT_BUSY", "message": "Otra transición está en curso."})
         if isinstance(payload, FreeTextPolicyStartRequest):
             async with gate:
                 document = await transition(
@@ -194,8 +195,6 @@ async def answer(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
     gate = request.app.state.dialogue_gate
-    if gate.locked():
-        raise HTTPException(status_code=409, detail={"code": "FREETEXT_BUSY", "message": "Otra transición está en curso."})
     try:
         if session_id.startswith("freetext-operational-"):
             service = operational(request)
@@ -203,7 +202,8 @@ async def answer(
                 raise FreeTextUnavailable("servicio FreeText operacional no configurado")
             if not isinstance(payload, OperationalFreeTextAnswerRequest):
                 raise FreeTextConflict("contrato de respuesta operacional requerido")
-            await gate.acquire()
+            if not gate.try_acquire():
+                raise HTTPException(status_code=409, detail={"code": "FREETEXT_BUSY", "message": "Otra transición está en curso."})
             try:
                 document, execute = await anyio.to_thread.run_sync(
                     service.prepare_answer,
@@ -234,6 +234,8 @@ async def answer(
         service = historical(request)
         if service is None:
             raise FreeTextUnavailable("servicio FreeText histórico no configurado")
+        if not gate.try_acquire():
+            raise HTTPException(status_code=409, detail={"code": "FREETEXT_BUSY", "message": "Otra transición está en curso."})
         document = service.load(session_id)
         async with gate:
             updated = await transition(

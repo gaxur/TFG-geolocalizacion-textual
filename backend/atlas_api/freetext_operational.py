@@ -187,6 +187,18 @@ class OperationalFreeTextSessionService:
             validated = self.authorization.validate(execution_id, self.executor)
             existing = self._idempotency("create", idempotency_key, body, reserve=False)
             if existing is not None:
+                receipt, _ = self.authorization.create_receipt(
+                    validated,
+                    session_id=existing["session_id"],
+                    body_sha256=hashlib.sha256(canonical(body)).hexdigest(),
+                    idempotency_key_sha256=hashlib.sha256(idempotency_key.encode()).hexdigest(),
+                    created_at=existing["created_at"],
+                )
+                if receipt.get("state") == "reserved":
+                    receipt = self.authorization.bind_receipt(receipt, utcnow())
+                if existing["authorization_binding"]["receipt_sha256"] != receipt["receipt_sha256"]:
+                    existing["authorization_binding"]["receipt_sha256"] = receipt["receipt_sha256"]
+                    self._persist(existing)
                 self._authorized(existing)
                 return existing, False
             session_id = f"freetext-operational-{uuid.uuid4()}"
@@ -211,7 +223,6 @@ class OperationalFreeTextSessionService:
                     return recovered, False
                 if receipt.get("state") == "bound":
                     raise FreeTextConflict("autorización consumida con sesión ausente; resultado incierto")
-            self._idempotency("create", idempotency_key, body)
             document = {
                 "schema_version": "1.0",
                 "contract_version": "atlas-dialogue-freetext-operational-session-v1",

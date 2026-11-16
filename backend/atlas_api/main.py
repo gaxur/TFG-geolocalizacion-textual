@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 from pathlib import Path
@@ -26,6 +25,7 @@ from .dialogue_freetext_executor import FreeTextRuntimeExecutor
 from .dialogue_executor import SequentialDialogueExecutor
 from .freetext_operational import OperationalFreeTextSessionService
 from .dialogue_sessions import sha256_file
+from .model_gate import ModelGate
 
 
 def create_app(*, settings: Settings | None = None, retriever_factory: Callable | None = None, transformer_factory: Callable | None = None, visual_factory: Callable | None = None, dialogue_executor=None, freetext_service=None, freetext_operational_service=None, operational_retriever_factory: Callable | None = None, operational_transformer_factory: Callable | None = None) -> FastAPI:
@@ -37,7 +37,7 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
     if operational_retriever_factory is not None: lifespan_kwargs["operational_retriever_factory"] = operational_retriever_factory
     if operational_transformer_factory is not None: lifespan_kwargs["operational_transformer_factory"] = operational_transformer_factory
     app = FastAPI(title="Geolocalización textual", version="3.0-experimental", lifespan=build_lifespan(settings, factory, qwen_factory, visual_factory or default_visual_factory, **lifespan_kwargs))
-    model_gate = asyncio.Lock()
+    model_gate = ModelGate()
     app.state.model_gate = model_gate
     app.state.inference_gate = model_gate
     app.state.dialogue_gate = model_gate

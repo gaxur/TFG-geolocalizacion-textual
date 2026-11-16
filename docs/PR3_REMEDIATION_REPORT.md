@@ -64,7 +64,7 @@ La sesión E0 histórica no se modificó y no se continúa.
 
 ## Validación
 
-- Backend/API/autorización/concurrencia/retrieval/dialogue: 58 PASS.
+- Backend/API/autorización/concurrencia/retrieval/dialogue: 60 PASS.
 - Frontend: 41 PASS, 1 skip por PMTiles externo ausente.
 - Vite build: PASS con warning de chunk existente.
 - Chromium operacional: PASS.

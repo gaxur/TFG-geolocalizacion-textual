@@ -34,13 +34,13 @@ async def retrieve(payload: RetrievalRequest, request: Request, retriever: Cross
             await progress.stage(progress.active_stage, "failed", "La etapa activa terminó con un error.")
 
     try:
-        if request.app.state.reject_when_busy and gate.locked():
-            await progress.pipeline("failed", "El recuperador está procesando otra consulta.", error_code="RUNTIME_BUSY")
-            raise ApiServiceUnavailable("RUNTIME_BUSY", "El recuperador está procesando otra consulta.")
         if gallery_id not in retriever.gallery_ids:
             raise GalleryNotLoadedError(gallery_id)
         if document["top_k"] > retriever.gallery_count(gallery_id):
             raise RetrievalInputError("Top-K supera el tamaño de la galería")
+        if request.app.state.reject_when_busy and not gate.try_acquire():
+            await progress.pipeline("failed", "El recuperador está procesando otra consulta.", error_code="RUNTIME_BUSY")
+            raise ApiServiceUnavailable("RUNTIME_BUSY", "El recuperador está procesando otra consulta.")
 
         async with gate:
             await progress.pipeline("running", "Consulta aceptada; comienza el procesamiento.")

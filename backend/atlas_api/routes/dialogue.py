@@ -24,11 +24,12 @@ async def image(query_id:str,request:Request):
 @router.post("/sessions")
 async def start(payload:DialogueStartRequest,request:Request):
     gate=getattr(request.app.state,'dialogue_gate',None)
-    if gate is not None and gate.locked():raise HTTPException(status_code=409,detail={"code":"DIALOGUE_BUSY","message":"Otra transición DialogueVPR está en curso."})
+    if gate is not None and not gate.try_acquire():raise HTTPException(status_code=409,detail={"code":"DIALOGUE_BUSY","message":"Otra transición DialogueVPR está en curso."})
     try:
         if gate is None:document=await anyio.to_thread.run_sync(lambda:service(request).start(mode=payload.mode,query_id=payload.query_id,description=payload.description_es))
         else:
-            async with gate:document=await anyio.to_thread.run_sync(lambda:service(request).start(mode=payload.mode,query_id=payload.query_id,description=payload.description_es))
+            try:document=await anyio.to_thread.run_sync(lambda:service(request).start(mode=payload.mode,query_id=payload.query_id,description=payload.description_es))
+            finally:gate.release()
     except (DialogueConflict,DialogueUnavailable) as error:fail(error)
     return service(request).public(document)
 
@@ -40,10 +41,11 @@ async def get_session(session_id:str,request:Request):
 @router.post("/sessions/{session_id}/answers")
 async def answer(session_id:str,payload:DialogueAnswerRequest,request:Request):
     gate=getattr(request.app.state,'dialogue_gate',None)
-    if gate is not None and gate.locked():raise HTTPException(status_code=409,detail={"code":"DIALOGUE_BUSY","message":"Otra transición DialogueVPR está en curso."})
+    if gate is not None and not gate.try_acquire():raise HTTPException(status_code=409,detail={"code":"DIALOGUE_BUSY","message":"Otra transición DialogueVPR está en curso."})
     try:
         if gate is None:document=await anyio.to_thread.run_sync(lambda:service(request).answer(session_id=session_id,answer=payload.answer_literal,answer_kind=payload.answer_kind))
         else:
-            async with gate:document=await anyio.to_thread.run_sync(lambda:service(request).answer(session_id=session_id,answer=payload.answer_literal,answer_kind=payload.answer_kind))
+            try:document=await anyio.to_thread.run_sync(lambda:service(request).answer(session_id=session_id,answer=payload.answer_literal,answer_kind=payload.answer_kind))
+            finally:gate.release()
     except (DialogueConflict,DialogueUnavailable) as error:fail(error)
     return service(request).public(document)
