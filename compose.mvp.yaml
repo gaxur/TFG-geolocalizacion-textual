@@ -42,6 +42,8 @@ services:
       ATLAS_FREETEXT_SESSION_ROOT: /freetext-sessions
       ATLAS_FREETEXT_OPERATIONAL_ENABLED: ${ATLAS_FREETEXT_OPERATIONAL_ENABLED:-false}
       ATLAS_FREETEXT_OPERATIONAL_SESSION_ROOT: /freetext-operational-sessions
+      ATLAS_FREETEXT_OPERATIONAL_AUTHORIZATION_ROOT: /freetext-operational-authorizations
+      ATLAS_FREETEXT_OPERATIONAL_EXECUTION_ID: ${ATLAS_FREETEXT_OPERATIONAL_EXECUTION_ID:-}
       ATLAS_DIALOGUE_F3_BUNDLE: ${ATLAS_DIALOGUE_F3_BUNDLE_CONTAINER:-/workspace/project/data/processed/osm/osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141/f3-madrid-pilot-associations-sha256-5f4af89b9349de792d3a60752a15f227d49b96cdb688a671504e4cf30bf68453}
       ATLAS_OLLAMA_PS_URL: ${ATLAS_OLLAMA_PS_URL:-http://host.docker.internal:11434/api/ps}
     tmpfs:
@@ -58,6 +60,7 @@ services:
       - ${MVP_FREETEXT_AUTHORIZATION_DIR:-./results/generated/dialogue-vpr-freetext-v1-h27-comparison-design}:/freetext-authorizations:ro
       - ${MVP_FREETEXT_SESSION_DIR:-./results/generated/mvp-freetext-sessions}:/freetext-sessions:rw
       - ${MVP_FREETEXT_OPERATIONAL_SESSION_DIR:-./runtime/freetext-operational-sessions}:/freetext-operational-sessions:rw
+      - ${MVP_FREETEXT_OPERATIONAL_AUTHORIZATION_DIR:-./config/freetext-operational-authorizations}:/freetext-operational-authorizations:ro
       - ${MVP_DIALOGUE_IMAGE_DIR:-./data/cache/mapillary/images}:/dialogue-images:ro
       - ${MVP_PROCESSED_DATA_DIR:-./data/processed}:/workspace/project/data/processed:ro
       - ${MVP_EMBEDDINGS_DIR:-./data/embeddings}:/workspace/project/data/embeddings:ro

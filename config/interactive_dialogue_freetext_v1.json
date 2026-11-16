@@ -2,6 +2,7 @@
   "schema_version": "1.0",
   "contract_version": "dialogue-freetext-policy-config-v1",
   "policy_id": "dialogue-vpr-freetext-v1",
+  "version": "1.0.0",
   "gallery_id": "madrid-50m",
   "reserve_size": 20,
   "cluster_radius_m": 75.0,

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Proceso efímero Qwen o CT2L para el servicio DialogueVPR web."""
 from __future__ import annotations
-import argparse,hashlib,json,sys,time
+import argparse,ctypes,hashlib,json,sys,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 from backend.atlas_api.dialogue_sessions import atomic_write
 def main():
+ if ctypes.CDLL(None).prctl(1,9,0,0,0)!=0:raise RuntimeError('no se pudo fijar PDEATHSIG')
  p=argparse.ArgumentParser();p.add_argument('stage',choices=('qwen','ct2l'));p.add_argument('--request',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--model',type=Path);p.add_argument('--runtime-config',type=Path);p.add_argument('--region-config',type=Path);p.add_argument('--clip',type=Path);p.add_argument('--cvg-utils-sha256');a=p.parse_args();request=json.loads(a.request.read_text())
  if a.stage=='qwen':
   from src.tfg_phase0.f5_text_transform import GenerationConfig,QwenTransformersAdapter

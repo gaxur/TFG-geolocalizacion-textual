@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH,
   OPERATIONAL_FREETEXT_POLICY,
   adaptFreeTextStage,
   buildOperationalFreeTextAnswer,
@@ -23,7 +24,15 @@ test('valida sesión operacional y adapta E0 al mapa',()=>{
 });
 
 test('selecciona operacional y liga operaciones idempotentes',()=>{
- const catalogue=validateFreeTextPolicyCatalogue({contract_version:'atlas-dialogue-freetext-policy-catalogue-v1',policies:[{policy_id:OPERATIONAL_FREETEXT_POLICY,available:true,enabled:true}]});assert.equal(selectPrimaryFreeTextPolicy(catalogue),OPERATIONAL_FREETEXT_POLICY);const start=buildOperationalFreeTextStart({description:'  Veo una plaza  ',clientOperationId:'start-1'});assert.equal(start.description_es,'Veo una plaza');const answer=buildOperationalFreeTextAnswer({literal:' Sí, delante. ',turnIndex:1,questionId:'question-1',clientOperationId:'answer-1'});assert.equal(answer.answer_literal,'Sí, delante.');assert.throws(()=>buildOperationalFreeTextAnswer({literal:'Sí',turnIndex:1}));
+ const catalogue=validateFreeTextPolicyCatalogue({contract_version:'atlas-dialogue-freetext-policy-catalogue-v1',policies:[{policy_id:OPERATIONAL_FREETEXT_POLICY,available:true,enabled:true}]});assert.equal(selectPrimaryFreeTextPolicy(catalogue),OPERATIONAL_FREETEXT_POLICY);const start=buildOperationalFreeTextStart({description:'  Veo una plaza  ',clientOperationId:'start-1'});assert.equal(start.description_es,'Veo una plaza');assert.equal(Object.hasOwn(start,'execution_id'),false);const answer=buildOperationalFreeTextAnswer({literal:' Sí, delante. ',turnIndex:1,questionId:'question-1',clientOperationId:'answer-1'});assert.equal(answer.answer_literal,'Sí, delante.');assert.throws(()=>buildOperationalFreeTextAnswer({literal:'Sí',turnIndex:1}));
+});
+
+test('acepta descripciones operacionales hasta 2400 y mantiene respuestas en 1200',()=>{
+ assert.equal(OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH,2400);
+ assert.equal(buildOperationalFreeTextStart({description:'x'.repeat(2400),clientOperationId:'start-boundary'}).description_es.length,2400);
+ assert.throws(()=>buildOperationalFreeTextStart({description:'x'.repeat(2401),clientOperationId:'start-overflow'}),/2400 caracteres/);
+ assert.equal(buildOperationalFreeTextAnswer({literal:'x'.repeat(1200),turnIndex:1,questionId:'q1',clientOperationId:'answer-boundary'}).answer_literal.length,1200);
+ assert.throws(()=>buildOperationalFreeTextAnswer({literal:'x'.repeat(1201),turnIndex:1,questionId:'q1',clientOperationId:'answer-overflow'}),/Respuesta operativa FreeText inválida/);
 });
 
 test('normaliza eventos y compara rankings sin afirmar mejora geográfica',()=>{
@@ -32,4 +41,7 @@ test('normaliza eventos y compara rankings sin afirmar mejora geográfica',()=>{
 
 test('recovery queda aislada por policy y prefijo operacional',()=>{
  const session={session_id:'freetext-operational-00000000-0000-0000-0000-000000000000',policy_id:OPERATIONAL_FREETEXT_POLICY,updated_at_utc:'2026-11-15T00:00:00Z'},pointer=recoveryPointer(session);assert.equal(pointer.version,3);assert.deepEqual(validateRecoveryPointer(pointer),pointer);assert.equal(validateRecoveryPointer({...pointer,session_id:'dialogue-freetext-00000000-0000-0000-0000-000000000000'}),null);assert.notEqual(recoveryStorageKey(OPERATIONAL_FREETEXT_POLICY),recoveryStorageKey('dialogue-vpr-freetext-v1'));
+});
+test('un puntero operacional sigue siendo recuperable tras consumir autorización',()=>{
+ const pointer=recoveryPointer({session_id:'freetext-operational-00000000-0000-0000-0000-000000000000',policy_id:OPERATIONAL_FREETEXT_POLICY,updated_at_utc:'2026-11-15T00:00:00Z'}),catalogue=validateFreeTextPolicyCatalogue({contract_version:'atlas-dialogue-freetext-policy-catalogue-v1',policies:[{policy_id:OPERATIONAL_FREETEXT_POLICY,available:false,enabled:true,authorization_status:'consumed'},{policy_id:'dialogue-vpr-freetext-v1',available:true}]});assert.equal(selectPrimaryFreeTextPolicy(catalogue),'dialogue-vpr-freetext-v1');assert.equal(validateRecoveryPointer(pointer).policy_id,OPERATIONAL_FREETEXT_POLICY);
 });

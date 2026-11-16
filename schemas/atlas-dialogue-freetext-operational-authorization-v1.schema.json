@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "atlas-dialogue-freetext-operational-authorization-v1.schema.json",
+  "title": "Operational FreeText authorization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_version", "authorization_id", "execution_id",
+    "status", "approved", "approved_at", "valid_from", "expires_at",
+    "operational_policy_id", "operational_policy_version", "operational_policy_sha256",
+    "core_policy_id", "core_policy_version", "core_policy_sha256",
+    "executor_identity", "executor_identity_sha256", "scope", "budgets",
+    "constraints", "reusable_for_other_session"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_version": {"const": "atlas-dialogue-freetext-operational-authorization-v1"},
+    "authorization_id": {"type": "string", "minLength": 1},
+    "execution_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "status": {"const": "OPERATOR_AUTHORIZED"},
+    "approved": {"const": true},
+    "approved_at": {"type": "string", "format": "date-time"},
+    "valid_from": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "operational_policy_id": {"const": "dialogue-vpr-freetext-v1-operational"},
+    "operational_policy_version": {"type": "string", "minLength": 1},
+    "operational_policy_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "core_policy_id": {"const": "dialogue-vpr-freetext-v1"},
+    "core_policy_version": {"type": "string", "minLength": 1},
+    "core_policy_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "executor_identity": {"type": "object", "minProperties": 1},
+    "executor_identity_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "scope": {
+      "const": {"session_count": 1, "stages": ["E0", "E1", "E2", "E3"]}
+    },
+    "budgets": {
+      "const": {"maximum_qwen_loads": 4, "maximum_qwen_calls": 4, "maximum_ct2l_loads": 4, "maximum_ct2l_calls": 4, "maximum_questions": 3, "automatic_retries": 0}
+    },
+    "constraints": {
+      "const": {"ground_truth_permitted": false, "vlm_permitted": false, "h38_h61_permitted": false, "references_permitted": false, "network_permitted": false}
+    },
+    "reusable_for_other_session": {"const": false}
+  }
+}

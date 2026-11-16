@@ -2,7 +2,7 @@ import './minimal.css';
 import { icon } from './visuals.js';
 import { AtlasApiError, answerDialogue,answerFreeText, apiBaseUrl, freeTextEventStreamUrl,getCapabilities, getDialogueQueries,getDialogueVariants,getFreeTextEvents,getFreeTextPilot,getFreeTextPilots,getFreeTextSession, retrieve, startDialogue,startFreeText } from './api.js';
 import { buildDialogueAnswer, buildDialogueStart, validateDialogueSession } from './dialogue.js';
-import {HISTORICAL_FREETEXT_POLICY,MEDIUM_FREETEXT_POLICY,OPERATIONAL_FREETEXT_POLICY,adaptFreeTextStage,buildFreeTextAnswer,buildFreeTextPolicyStart,buildFreeTextStart,buildOperationalFreeTextAnswer,buildOperationalFreeTextStart,compareFreeTextStages,normalizeFreeTextEvents,normalizeFreeTextStatus,reconcilePersistedFreeText,recoveryPointer,recoveryStorageKey,selectPrimaryFreeTextPolicy,validateFreeTextPilot,validateFreeTextPolicyCatalogue,validateFreeTextSession,validateRecoveryPointer} from './dialogue-freetext.js';
+import {HISTORICAL_FREETEXT_POLICY,MEDIUM_FREETEXT_POLICY,OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH,OPERATIONAL_FREETEXT_POLICY,adaptFreeTextStage,buildFreeTextAnswer,buildFreeTextPolicyStart,buildFreeTextStart,buildOperationalFreeTextAnswer,buildOperationalFreeTextStart,compareFreeTextStages,normalizeFreeTextEvents,normalizeFreeTextStatus,reconcilePersistedFreeText,recoveryPointer,recoveryStorageKey,selectPrimaryFreeTextPolicy,validateFreeTextPilot,validateFreeTextPolicyCatalogue,validateFreeTextSession,validateRecoveryPointer} from './dialogue-freetext.js';
 import { experimentalSessionId,getDescriptionVariant,validateDescriptionVariantManifest } from './description-variants.js';
 import {
   adaptRetrievalResponse,
@@ -78,7 +78,7 @@ let history = [];
 try {
   const stored = JSON.parse(localStorage.getItem('atlas-history') || '[]');
   history = Array.isArray(stored) ? stored.filter(item =>
-    item?.mode === 'real' && typeof item.text === 'string' && item.text.length <= 1200 &&
+    item?.mode === 'real' && typeof item.text === 'string' && item.text.length <= OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH &&
     typeof item.date === 'string' && Array.isArray(item.galleryIds) && item.galleryIds.length > 0 &&
     item.galleryIds.every(id => typeof id === 'string') && item.topK === 10 && ['no_llm', 'with_llm'].includes(item.processingMode)
   ).slice(0, 12) : [];
@@ -230,6 +230,10 @@ function render() {
   });
   $('#main').innerHTML = state.page === 'explore' ? explorePage() : historyPage();
   if (state.page !== 'explore') return;
+  const descriptionInput=$('#description');
+  if(descriptionInput)descriptionInput.maxLength=OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH;
+  const descriptionCounter=$('#char-count');
+  if(descriptionCounter)descriptionCounter.textContent=`${state.text.length.toLocaleString('es-ES')} / ${OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH.toLocaleString('es-ES')}`;
   const adaptiveModeOption=document.querySelector('#dialogue-mode option[value="exploratory"]');
   if(adaptiveModeOption&&!(state.dialogue.catalogue?.adaptive_sessions||[]).length){adaptiveModeOption.disabled=true;adaptiveModeOption.textContent='Experimental adaptativa · cerrada';}
   const mode=$('#dialogue-mode');
@@ -243,7 +247,7 @@ function render() {
   }
   $('#description')?.addEventListener('input', event => {
     state.text = event.target.value;
-    $('#char-count').textContent = `${state.text.length} / 1.200`;
+    $('#char-count').textContent = `${state.text.length.toLocaleString('es-ES')} / ${OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH.toLocaleString('es-ES')}`;
     $('#form-error').textContent = '';
   });
   $('#search-form')?.addEventListener('submit', event => { event.preventDefault(); runSearch(); });
@@ -301,7 +305,7 @@ async function loadDialogueCatalogue() {
 }
 
 async function loadFreeTextPilot(){
- try{const catalogue=validateFreeTextPolicyCatalogue(await getFreeTextPilots({baseUrl:apiBaseUrl,timeoutMs:12000}));state.freetext.catalogue=catalogue;state.freetext.selectedPolicy=selectPrimaryFreeTextPolicy(catalogue);try{state.freetext.pilot=validateFreeTextPilot(await getFreeTextPilot({baseUrl:apiBaseUrl,timeoutMs:12000}));}catch{state.freetext.pilot=null;}await recoverFreeTextSession(state.freetext.selectedPolicy);}
+ try{const catalogue=validateFreeTextPolicyCatalogue(await getFreeTextPilots({baseUrl:apiBaseUrl,timeoutMs:12000}));state.freetext.catalogue=catalogue;let operationalPointer=null;try{operationalPointer=validateRecoveryPointer(JSON.parse(localStorage.getItem(recoveryStorageKey(OPERATIONAL_FREETEXT_POLICY))||'null'));}catch{/* Puntero corrupto. */}state.freetext.selectedPolicy=operationalPointer?OPERATIONAL_FREETEXT_POLICY:selectPrimaryFreeTextPolicy(catalogue);try{state.freetext.pilot=validateFreeTextPilot(await getFreeTextPilot({baseUrl:apiBaseUrl,timeoutMs:12000}));}catch{state.freetext.pilot=null;}await recoverFreeTextSession(state.freetext.selectedPolicy);}
  catch(error){state.freetext.error={message:error?.message||'FreeText no disponible.'};}
  render();
 }
@@ -370,6 +374,7 @@ async function runSearch() {
   if (state.request.status === 'loading' || state.capabilities.status !== 'ready') return;
   const text = state.text.trim();
   if (text.length < 3) { $('#form-error').textContent = 'Escribe una descripción antes de buscar.'; $('#description').focus(); return; }
+  if (text.length > OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH) { $('#form-error').textContent = `La descripción no puede superar ${OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH.toLocaleString('es-ES')} caracteres.`; $('#description').focus(); return; }
   const epoch = requestGuard.next();
   const controller = new AbortController();
   const queryId = createQueryId();

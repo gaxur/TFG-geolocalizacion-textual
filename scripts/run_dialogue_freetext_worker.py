@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Worker Qwen efímero para el prompt literal FreeText-v1."""
 from __future__ import annotations
-import argparse,hashlib,json,sys
+import argparse,ctypes,hashlib,json,sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 from backend.atlas_api.dialogue_sessions import atomic_write
 from src.tfg_phase0.f5_text_transform import GenerationConfig,QwenTransformersAdapter
 def main():
+ if ctypes.CDLL(None).prctl(1,9,0,0,0)!=0:raise RuntimeError('no se pudo fijar PDEATHSIG')
  p=argparse.ArgumentParser();p.add_argument('--request',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--model',type=Path,required=True);a=p.parse_args();request=json.loads(a.request.read_text());required={'contract_version':'atlas-dialogue-freetext-qwen-worker-request-v1','prompt_version':'dialogue-vpr-freetext-qwen-v1'}
  if any(request.get(k)!=v for k,v in required.items()) or hashlib.sha256(request['transcript'].encode()).hexdigest()!=request['transcript_sha256'] or hashlib.sha256(request['prompt'].encode()).hexdigest()!=request['prompt_sha256']:raise ValueError('request FreeText divergente')
  transformer=QwenTransformersAdapter(a.model,model_id='Qwen/Qwen3-8B',revision='b968826d9c46dd6066d109eabc6255188de91218')

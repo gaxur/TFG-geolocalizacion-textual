@@ -12,6 +12,7 @@
     "test:browser:real": "node scripts/browser-real-check.mjs",
     "test:browser:freetext-policy": "node scripts/browser-freetext-policy-check.mjs",
     "test:browser:freetext-operational": "node scripts/browser-freetext-operational-check.mjs",
+    "test:integration:freetext-nginx": "node scripts/browser-freetext-nginx-integration.mjs",
     "test:browser:freetext-real": "node scripts/browser-freetext-real-smoke.mjs"
   },
   "devDependencies": {

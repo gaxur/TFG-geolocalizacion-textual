@@ -21,13 +21,12 @@ async def ready(request: Request):
     freetext_operational = getattr(request.app.state, "freetext_operational_service", None)
     if retriever is None and not (freetext_operational and freetext_operational.enabled):
         raise ApiServiceUnavailable("RUNTIME_NOT_READY", "El recuperador todavía no está disponible.")
-    if retriever is None:
-        return {"status": "ready", "runtime": "freetext-sequential-workers", "gallery_ids": ["madrid-50m"], "processing_modes": {"no_llm": False, "with_llm": False}}
     try:
         gallery_ids = list(retriever.gallery_ids)
     except Exception as error:
         raise ApiInternalError("readiness failure") from error
-    return {"status": "ready", "runtime": "crosstext2loc", "gallery_ids": gallery_ids, "processing_modes": {"no_llm": True, "with_llm": getattr(request.app.state, "transformer", None) is not None}}
+    ephemeral = bool(getattr(retriever, "ephemeral", False))
+    return {"status": "ready", "runtime": "ephemeral-sequential-workers" if ephemeral else "crosstext2loc", "gallery_ids": gallery_ids, "processing_modes": {"no_llm": True, "with_llm": getattr(request.app.state, "transformer", None) is not None}}
 
 
 @router.get("/capabilities", responses={500: {"model": ErrorResponse}})
@@ -51,8 +50,8 @@ async def capabilities(request: Request):
         "api_version": "v3-experimental",
         "retrievers": [{"id": "crosstext2loc", "available": retriever is not None, "scores_are_probabilities": False}],
         "processing_modes": [
-            {"id": "no_llm", "available": retriever is not None, "variant": "es_original"},
-            {"id": "with_llm", "available": retriever is not None and qwen is not None, "variant": "en_cartographic", "experimental": True},
+            {"id": "no_llm", "available": retriever is not None, "variant": "es_original", "resident": False if getattr(retriever, "ephemeral", False) else None},
+            {"id": "with_llm", "available": retriever is not None and qwen is not None, "variant": "en_cartographic", "experimental": True, "resident": False if getattr(qwen, "resource_usage", {}).get("ephemeral") else None},
         ],
         "postprocessing_capabilities": [
             {"id": "topn_visual_promotion", "available": visual is not None, "enabled": visual is not None, "experimental": True, "source": "precomputed_qwen3_vl" if visual is not None else None, "online_inference": False, "supported_reserve_k": [10, 20, 50, 100, 200, 500, "full"], "output_top_k": 10, "fallback": "baseline"},
@@ -66,7 +65,7 @@ async def capabilities(request: Request):
                 {"id": "crosstext2loc", "available": retriever is not None, "operation": "text_encoding_and_exhaustive_gallery_ranking"},
                 {"id": "vlm", "available": visual is not None, "source": "precomputed_qwen3_vl" if visual is not None else None, "online_inference": False},
                 {"id": "dialoguevpr", "available": bool(dialogue and dialogue.available), "reason": None if dialogue and dialogue.available else "runtime_or_dataset_not_configured"},
-                {"id": "freetext", "available": freetext is not None or freetext_operational is not None, "operation": "literal_dialogue_e0_e3" if freetext is not None or freetext_operational is not None else None},
+                {"id": "freetext", "available": bool(freetext is not None or freetext_operational is not None and freetext_operational.policy()["available"]), "operation": "literal_dialogue_e0_e3" if freetext is not None or freetext_operational is not None and freetext_operational.policy()["available"] else None},
             ],
         },
         "galleries": galleries,

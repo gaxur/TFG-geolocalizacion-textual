@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "atlas-pr3-remediation-manifest-v1",
+  "status": "PR3_REMEDIATED_PENDING_REAL_E1_E3_VALIDATION",
+  "artifacts": {
+    "authorization_service_sha256": "782fd5fe929197f75682d8174d7dfc151f5671837a843cf000760c8029797bf6",
+    "operational_service_sha256": "305dffb066cc212cc5a40dd278412aa50c97a36b03b59dc4361ec6a1b585b0cd",
+    "ephemeral_retrieval_sha256": "24dfd8603737f12e96a62e0bc63580b3548e89667cf36665e7923680bac225da",
+    "freetext_executor_sha256": "638900e4b0f16f480a504679b87ccf8c1a60bb6c76cfa8cc296abae4bebdd16b",
+    "base_executor_sha256": "ef9a313f097f6fc7f1fd168a740785408e314e2e8123d0bcb73142217aeab938",
+    "lifespan_sha256": "a07bf071ef9b36977ac730722a36f41935d10873170ed760931664fea3948146",
+    "main_sha256": "92b4553feebb907730e4745be075407a439b1195d22cdad7a2946c7aa70697e6",
+    "settings_sha256": "30bd0d2655b06475cd3aaaf2eef46d825d11e815db3d12d47d02dd4ef3dc5efd",
+    "freetext_routes_sha256": "b8ffb0d78c5555f4ae9812ef41d2f9a2a76080257b6a5343572dbcd83c55871e",
+    "health_routes_sha256": "4f7f71cd2d6dbb380788d0f5399e797ad938a1e629ccfe079c66bc6603b9e002",
+    "qwen_worker_sha256": "ee5b7e503aa4467a40e6bb819a8ddefe8ed7983c07523c6f88a723f76ad46097",
+    "dialogue_worker_sha256": "c859cc26265acaf9fd221da3182a339a182a7cdf7dc26c00ea98868b3dbd4c63",
+    "retrieval_worker_sha256": "28ce986d3b8fc193b6b6e41ccc2a310ca9792c2126860538801ca4c9636262cd",
+    "policy_sha256": "7adc3c44ae2e6da83b3cb1c551b13b1132844f22110ab240756ff79dd8354b24",
+    "authorization_template_sha256": "7a4c6e1829010a1f44db6380e58e7763401dbdcd22e5d32c1dec383637817433",
+    "authorization_schema_sha256": "d5d976fd9404ebbb57f2621e5c00ec055816c93bc2448c8bf7ebe82cbd5eb21d",
+    "nginx_sha256": "d5ed774bbc9a455cff43abe0eefad54508c3ff847d18577257201d193fef7e12",
+    "frontend_contract_sha256": "fa83b3e21f5ea5ef800aa82a03b4dc4543e0ed57e419aa888118e1cc1669d31b",
+    "frontend_main_sha256": "59bbc7d952ab95aff8124300c9d5780da1c661916102b55cadb93a415e6fcb6b",
+    "compose_mvp_sha256": "388d658f4602f7a02da31ddbd65f7a9951d9087bd6815e1916d10534fcf35308",
+    "compose_nginx_test_sha256": "d93f4bc35cf788abb8b71d9e056105ec8aefda448196db64e15ac577729d9a44",
+    "report_sha256": "579359f51ac58648079569530b14684c3856f9edcb04ea2611ef29a11af68343",
+    "e1_e3_plan_sha256": "8c40c7cac28865e544802aeb3491c9e7308aebc610e8e751595d8ce7f83afbec",
+    "tests_report_sha256": "141499ae5bade28edb1bd11f29a0ff19121562480235305556ba4413f0cfdb12"
+  },
+  "validation": {
+    "backend_tests_passed": 58,
+    "frontend_tests_passed": 41,
+    "frontend_tests_skipped": 1,
+    "vite_build": "PASS_WITH_EXISTING_CHUNK_WARNING",
+    "chromium_operational": "PASS",
+    "nginx_chromium_integration": "PASS",
+    "nginx_config": "PASS",
+    "compose": "PASS",
+    "py_compile": "PASS",
+    "diff_check": "PASS"
+  },
+  "controls": {
+    "models_executed": false,
+    "approved_authorizations_committed": false,
+    "results_committed": false,
+    "vlm_integrated": false,
+    "h38_h61_opened": false,
+    "pr_merged": false
+  }
+}

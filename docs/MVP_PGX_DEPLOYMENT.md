@@ -301,6 +301,8 @@ autorizada en PGX:
 ```bash
 ATLAS_FREETEXT_OPERATIONAL_ENABLED=true
 MVP_FREETEXT_OPERATIONAL_SESSION_DIR=./runtime/freetext-operational-sessions
+MVP_FREETEXT_OPERATIONAL_AUTHORIZATION_DIR=./config/freetext-operational-authorizations
+ATLAS_FREETEXT_OPERATIONAL_EXECUTION_ID=<execution-id-autorizado>
 ATLAS_QWEN_REQUIRED=false
 docker compose -f compose.mvp.yaml up --build
 ```
@@ -310,6 +312,13 @@ servicio FreeText lanza workers secuenciales y aplica los gates existentes antes
 de cada carga. Los artefactos host necesarios siguen montados read-only; solo el
 directorio de sesiones operativas es writable.
 
+La variable `ATLAS_FREETEXT_OPERATIONAL_ENABLED` no sustituye una autorización.
+El directorio de autorizaciones se monta read-only y debe contener exactamente
+`<execution-id>.json`, generado a partir de
+`config/freetext_operational_authorization.template.json`, aprobado, vigente y
+ligado a hashes actuales. El receipt consumible se guarda bajo el session root
+y nunca se elimina para reutilizar una autorización.
+
 Antes de activar:
 
 1. comprobar snapshot Qwen y revisión;
@@ -318,6 +327,9 @@ Antes de activar:
 4. usar un solo worker Uvicorn;
 5. conservar `stable-swap-v2` y cero retries;
 6. no montar GT o H38-H61 en el contenedor.
+7. conservar `uvicorn --workers 1`; no replicar la API sin lock host-wide.
+8. comprobar `/retrievals` en ambos modos y el catálogo FreeText antes de abrir
+   el frontend.
 
 La candidata medium provisional no se activa mediante esta variable y requiere
 una autorización distinta.

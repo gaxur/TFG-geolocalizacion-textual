@@ -25,16 +25,22 @@ from .settings import Settings
 from .dialogue_freetext_executor import FreeTextRuntimeExecutor
 from .dialogue_executor import SequentialDialogueExecutor
 from .freetext_operational import OperationalFreeTextSessionService
+from .dialogue_sessions import sha256_file
 
 
-def create_app(*, settings: Settings | None = None, retriever_factory: Callable | None = None, transformer_factory: Callable | None = None, visual_factory: Callable | None = None, dialogue_executor=None, freetext_service=None, freetext_operational_service=None) -> FastAPI:
+def create_app(*, settings: Settings | None = None, retriever_factory: Callable | None = None, transformer_factory: Callable | None = None, visual_factory: Callable | None = None, dialogue_executor=None, freetext_service=None, freetext_operational_service=None, operational_retriever_factory: Callable | None = None, operational_transformer_factory: Callable | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     factory = retriever_factory or default_retriever_factory
     qwen_factory = transformer_factory or default_transformer_factory
     from .lifespan import default_visual_factory
-    app = FastAPI(title="Geolocalización textual", version="3.0-experimental", lifespan=build_lifespan(settings, factory, qwen_factory, visual_factory or default_visual_factory))
-    app.state.inference_gate = asyncio.Lock()
-    app.state.dialogue_gate = asyncio.Lock()
+    lifespan_kwargs = {}
+    if operational_retriever_factory is not None: lifespan_kwargs["operational_retriever_factory"] = operational_retriever_factory
+    if operational_transformer_factory is not None: lifespan_kwargs["operational_transformer_factory"] = operational_transformer_factory
+    app = FastAPI(title="Geolocalización textual", version="3.0-experimental", lifespan=build_lifespan(settings, factory, qwen_factory, visual_factory or default_visual_factory, **lifespan_kwargs))
+    model_gate = asyncio.Lock()
+    app.state.model_gate = model_gate
+    app.state.inference_gate = model_gate
+    app.state.dialogue_gate = model_gate
     app.state.progress_hub = ProgressHub()
     app.state.reject_when_busy = settings.reject_when_busy
     app.state.search_area = {"region_id": "madrid_pilot", "crs": "EPSG:4326", "bbox": settings.region_bbox()}
@@ -52,7 +58,10 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
         if missing:
             raise ValueError(f"FreeText operacional requiere: {', '.join(missing)}")
         executor = FreeTextRuntimeExecutor(qwen_model=Path(os.environ["ATLAS_QWEN_MODEL_PATH"]), runtime_config=settings.runtime_config, region_config=settings.region_config, f3_bundle=Path(os.environ["ATLAS_DIALOGUE_F3_BUNDLE"]), clip_weights=Path(settings.clip_weights_path), cvg_utils_sha256=settings.cvg_utils_sha256, ollama_ps_url=os.environ["ATLAS_OLLAMA_PS_URL"])
-        freetext_operational_service = OperationalFreeTextSessionService(session_root=settings.freetext_operational_session_root, executor=executor, enabled=True)
+        root = Path(__file__).resolve().parents[2]
+        operational_policy = root / "config/dialogue_freetext_operational_v1.json"
+        core_policy = root / "config/interactive_dialogue_freetext_v1.json"
+        freetext_operational_service = OperationalFreeTextSessionService(session_root=settings.freetext_operational_session_root, executor=executor, enabled=True, authorization_root=settings.freetext_operational_authorization_root, execution_id=settings.freetext_operational_execution_id, policy_identity={"operational_policy_id":"dialogue-vpr-freetext-v1-operational","operational_policy_version":"1.0.0","operational_policy_sha256":sha256_file(operational_policy),"core_policy_id":"dialogue-vpr-freetext-v1","core_policy_version":"1.0.0","core_policy_sha256":sha256_file(core_policy)})
     app.state.freetext_operational_service = freetext_operational_service
     app.state.dialogue_variants = json.loads(settings.dialogue_variants_path.read_text()) if settings.dialogue_variants_path and settings.dialogue_variants_path.is_file() else {"schema_version":"1.0","contract_version":"description-length-experiments-v1","status":"not_configured","variant_count":0,"condition_count":0,"variants":[],"conditions":[]}
     if settings.allowed_origins:

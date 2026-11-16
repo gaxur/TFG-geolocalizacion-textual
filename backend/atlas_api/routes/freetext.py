@@ -126,16 +126,25 @@ async def start(
             service = operational(request)
             if service is None:
                 raise FreeTextUnavailable("servicio FreeText operacional no configurado")
-            document, execute = await anyio.to_thread.run_sync(
-                service.prepare_start, payload.description_es, payload.client_operation_id, idempotency_key or ""
-            )
+            await gate.acquire()
+            try:
+                document, execute = await anyio.to_thread.run_sync(
+                    service.prepare_start, payload.description_es, payload.client_operation_id, idempotency_key or ""
+                )
+            except Exception:
+                gate.release()
+                raise
 
             async def run_start():
-                async with gate:
+                try:
                     await anyio.to_thread.run_sync(service.run_start, document["session_id"])
+                finally:
+                    gate.release()
 
             if execute:
                 background_tasks.add_task(run_start)
+            else:
+                gate.release()
             return service.public(document)
 
         service = historical(request)
@@ -194,23 +203,32 @@ async def answer(
                 raise FreeTextUnavailable("servicio FreeText operacional no configurado")
             if not isinstance(payload, OperationalFreeTextAnswerRequest):
                 raise FreeTextConflict("contrato de respuesta operacional requerido")
-            document, execute = await anyio.to_thread.run_sync(
-                service.prepare_answer,
-                session_id,
-                payload.answer_literal,
-                payload.turn_index,
-                payload.question_id,
-                payload.question_sha256,
-                payload.client_operation_id,
-                idempotency_key or "",
-            )
+            await gate.acquire()
+            try:
+                document, execute = await anyio.to_thread.run_sync(
+                    service.prepare_answer,
+                    session_id,
+                    payload.answer_literal,
+                    payload.turn_index,
+                    payload.question_id,
+                    payload.question_sha256,
+                    payload.client_operation_id,
+                    idempotency_key or "",
+                )
+            except Exception:
+                gate.release()
+                raise
 
             async def run_answer():
-                async with gate:
+                try:
                     await anyio.to_thread.run_sync(service.run_answer, session_id)
+                finally:
+                    gate.release()
 
             if execute:
                 background_tasks.add_task(run_answer)
+            else:
+                gate.release()
             return service.public(document)
 
         service = historical(request)

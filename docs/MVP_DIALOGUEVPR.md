@@ -183,6 +183,33 @@ expone Top-10 por etapa para MapLibre.
 - `Idempotency-Key`: obligatorio en creación y respuestas.
 - Una reserva incierta no se reinfiere automáticamente.
 
+### Autorización fail-closed
+
+`ATLAS_FREETEXT_OPERATIONAL_ENABLED=true` solo carga la capacidad; no autoriza
+una inferencia. Para publicar la política como disponible debe existir el archivo
+read-only `<execution_id>.json` indicado por
+`ATLAS_FREETEXT_OPERATIONAL_EXECUTION_ID` y debe validar:
+
+- IDs, versiones y hashes de policy wrapper/core;
+- identidad canónica del executor, modelo, workers, configuración, CLIP y F3;
+- alcance único E0-E3;
+- cuatro loads/calls Qwen, cuatro CT2L, tres preguntas y cero retries;
+- aprobación, ventana temporal y prohibiciones GT/VLM/H38-H61/red/referencias.
+
+El servidor persiste un receipt de consumo antes de crear la sesión. Una
+autorización se consume para una sola sesión y no se libera tras fallo, timeout,
+reinicio o expiración. Cada etapa vuelve a comprobar autorización, receipt,
+identidad y presupuesto. Las respuestas públicas no exponen autorización,
+receipt, execution ID ni paths.
+
+## API unificada y memoria
+
+En modo operacional `/retrievals` usa proveedores efímeros: `with_llm` ejecuta
+Qwen, termina el proceso y después ejecuta CT2L; `no_llm` ejecuta solo CT2L. Las
+sesiones FreeText usan el mismo gate de modelo que retrieval, por lo que ambas
+rutas permanecen disponibles sin residencia concurrente. El despliegue conserva
+un solo worker Uvicorn; múltiples replicas requieren un lock host-wide adicional.
+
 ## Progreso y recuperación
 
 La sesión persiste eventos antes de publicarlos. Cada evento contiene
@@ -197,3 +224,8 @@ Rutas:
 SSE admite `Last-Event-ID`; ante desconexión, el frontend reconcilia con GET sin
 repetir POST. Tras reinicio, una sesión `running` sin evidencia terminal pasa a
 `unknown` y no se reintenta.
+
+Nginx publica `/api/v1/dialogue-freetext/` con HTTP/1.1, `Connection ""`,
+buffering/cache deshabilitados y timeout de lectura de 900 s. El límite de la
+descripción operacional es 2.400 caracteres en FastAPI, JavaScript y UI; las
+respuestas permanecen limitadas a 1.200.
