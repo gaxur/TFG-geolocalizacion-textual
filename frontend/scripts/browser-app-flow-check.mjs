@@ -22,20 +22,28 @@ try{
   await send('Page.enable');await send('Runtime.enable');await send('Page.navigate',{url:base});
   await waitFor(`Boolean(document.querySelector('#search-form button:not([disabled])')&&document.querySelector('.maplibregl-canvas'))`);
   const instance=await evaluate(`document.querySelector('#results-map').dataset.mapInstanceId`);
+  await evaluate(`(()=>{const x=document.querySelector('#description');x.value='xx';x.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#search-form').requestSubmit()})()`);await delay(150);assert.equal(await evaluate(`Boolean(document.querySelector('#operation-modal')?.open)`),false);
   await evaluate(`(()=>{const x=document.querySelector('#description');x.value='Una plaza y una torre';x.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#search-form').requestSubmit()})()`);
-  await waitFor(`document.querySelector('.freetext-progress small')?.textContent.includes('qwen E0: completed')&&document.querySelectorAll('.result-card').length===0`);
+  await waitFor(`document.querySelector('#operation-modal')?.open`);
+  await evaluate(`document.querySelector('#operation-modal').dispatchEvent(new Event('cancel',{cancelable:true}))`);
+  assert.equal(await evaluate(`document.querySelector('#operation-modal').open`),true);
+  await waitFor(`document.querySelector('.freetext-progress small')?.textContent.includes('crosstext2loc E0: running')&&document.querySelector('#operation-modal')?.open&&document.querySelectorAll('.result-card').length===0`);
+  assert.equal(await evaluate(`document.querySelector('.operation-stages li:first-child').classList.contains('done')`),true);
   await send('Page.reload');
-  await waitFor(`document.querySelectorAll('.result-card').length===10&&Boolean(document.querySelector('#freetext-answer'))`);
+  await waitFor(`document.querySelectorAll('.result-card').length===10&&Boolean(document.querySelector('#freetext-answer'))&&!document.querySelector('#operation-modal')?.open`);
+  await waitFor(`document.activeElement===document.querySelector('#freetext-answer')`);
   for(let stage=0;stage<4;stage++){
     await waitFor(`Boolean(document.querySelector('[data-freetext-stage="E${stage}"]')&&document.querySelectorAll('.result-card').length===10)`);
     assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapInstanceId`),instance);
     if(stage<3){
       await waitFor(`Boolean(document.querySelector('#freetext-answer'))`);
       await evaluate(`(()=>{const x=document.querySelector('#freetext-answer');x.value='Respuesta ${stage+1}';x.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#freetext-answer-form').requestSubmit()})()`);
-      if(stage===1){await waitFor(`document.querySelector('.freetext-progress small')?.textContent.includes('crosstext2loc E2: running')`);await send('Page.reload');}
+      await waitFor(`document.querySelector('#operation-modal')?.open`);
+      if(stage===1){await waitFor(`document.querySelector('.freetext-progress small')?.textContent.includes('crosstext2loc E2: running')&&document.querySelector('#operation-modal')?.open`);await send('Page.reload');}
     }
   }
   await waitFor(`!document.querySelector('#freetext-answer')`);
+  assert.equal(await evaluate(`Boolean(document.querySelector('#operation-modal')?.open)`),false);
   await send('Page.reload');
   await waitFor(`document.querySelectorAll('[data-freetext-stage]').length===4`);
   assert.equal(await evaluate(`document.querySelectorAll('[data-freetext-stage]').length`),4);

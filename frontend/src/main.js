@@ -72,6 +72,7 @@ let activeProgressStream = null;
 let activeFreeTextEventSource = null;
 let freeTextReconnectTimer = null;
 let freeTextStreamGeneration = 0;
+let operationModalReturnFocus = null;
 let pipelineClockTimer = null;
 let mapHandle = null;
 let mapMountPromise = null;
@@ -221,12 +222,13 @@ function resetFreeTextSession() {
 function shell() {
   $('#app').innerHTML = `<div class="app-body">
     <a class="skip-link" href="#main">Saltar al contenido principal</a>
-    <header class="header"><a class="wordmark" href="#explore" aria-label="Inicio">${icon('compass', 27)}<span>Geolocalización textual</span></a><nav class="top-nav" aria-label="Vistas"><button data-page="explore" class="active">Explorar</button><button data-page="history">Historial</button></nav><div class="header-right"><span class="service-badge"><i></i>CrossText2Loc</span><button class="icon-button" data-action="help" aria-label="Ayuda">${icon('info')}</button></div></header>
+    <header class="header"><a class="wordmark" href="#explore" aria-label="Inicio">${icon('compass', 27)}<span>Geolocalización textual</span></a><nav class="top-nav" aria-label="Vistas"><button data-page="explore" class="active">Explorar</button><button data-page="history">Historial</button></nav><div class="header-right"><span class="service-badge state-checking"><i></i><span>Comprobando servicio</span></span><button class="icon-button" data-action="help" aria-label="Ayuda">${icon('info')}</button></div></header>
     <main id="main" tabindex="-1"></main>
     <footer class="footer"><span>Geolocalización textual <span class="footer-dot">/</span> Madrid</span><span>TFG <span class="footer-dot">/</span> Scores no calibrados</span></footer>
-  </div><dialog id="modal" aria-labelledby="modal-title"></dialog>`;
+  </div><dialog id="modal" aria-labelledby="modal-title"></dialog><dialog id="operation-modal" class="operation-modal" aria-labelledby="operation-title" aria-describedby="operation-message"></dialog>`;
   $('#app').addEventListener('click', handleClick);
   $('#modal').addEventListener('click', event => { if (event.target === $('#modal')) $('#modal').close(); });
+  $('#operation-modal').addEventListener('cancel',event=>event.preventDefault());
   document.addEventListener('click', event => {
     if (state.openSelect && !event.target.closest('.custom-select')) {
       state.openSelect = '';
@@ -272,6 +274,9 @@ function enhanceApplicationPanel() {
   const chat=panel.querySelector('.freetext-chat');if(chat){chat.addEventListener('scroll',()=>{state.freetext.chatPinned=chat.scrollHeight-chat.scrollTop-chat.clientHeight<48;},{passive:true});if(state.freetext.chatPinned)queueMicrotask(()=>chat.scrollTo({top:chat.scrollHeight,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));}
 }
 
+function operationPresentation(){const ft=state.freetext,session=ft.session,status=normalizeFreeTextStatus(session?.status||(ft.status==='loading'?'running':'unknown')),last=ft.events.at(-1),stage=last?.stage||ft.progress?.stage_id||'session',component=stage?.includes('_qwen')?'qwen':stage?.includes('_crosstext2loc')?'crosstext2loc':null,eventState=last?.state||ft.progress?.state||'pending',iteration=/^E[0-3]/.exec(stage)?.[0]||session?.final_stage||'E0',iterationEvents=ft.events.filter(row=>row.stage===`${iteration}_qwen`||row.stage===`${iteration}_crosstext2loc`),qwenDone=iterationEvents.some(row=>row.stage===`${iteration}_qwen`&&row.state==='completed'),ct2lDone=iterationEvents.some(row=>row.stage===`${iteration}_crosstext2loc`&&row.state==='completed'),persisting=ct2lDone&&!isFreeTextSessionBoundaryEvent(last);const title=component==='qwen'&&eventState==='running'?'Analizando tu descripción…':component==='crosstext2loc'&&eventState==='running'?'Buscando ubicaciones candidatas…':persisting?'Guardando el nuevo ranking…':'Preparando la siguiente etapa…',connection={connected:'Conexión de progreso activa',reconciling:'Verificando el estado persistido…',disconnected:'Reconectando al estado persistido…',unavailable:'Progreso SSE no disponible; verificando por estado',unknown:'Estado de conexión no confirmado',idle:'Preparando conexión de progreso'}[ft.streamState]||'Verificando conexión de progreso…';return{active:ft.status==='loading'||['pending','running'].includes(status),title,message:last?.message||ft.progress?.message||'La operación ha sido recibida y se procesa de forma secuencial.',iteration,component,eventState,qwenDone,ct2lDone,persisting,connection};}
+function syncOperationModal(){if(!applicationMode)return;const dialog=$('#operation-modal');if(!dialog)return;const view=operationPresentation();if(view.active){dialog.innerHTML=`<div class="operation-card" role="document"><div class="operation-orbit" aria-hidden="true"><span></span></div><div class="operation-copy"><span class="section-label">DIALOGUEVPR · ${escapeHtml(view.iteration)}</span><h2 id="operation-title">${escapeHtml(view.title)}</h2><p id="operation-message" role="status" aria-live="polite">${escapeHtml(view.message)}</p><div class="operation-track" aria-hidden="true"><i></i></div><ol class="operation-stages" aria-label="Etapas reales de la iteración"><li class="${view.component==='qwen'&&view.eventState==='running'?'active':view.qwenDone?'done':''}"><span>1</span>Qwen3-8B</li><li class="${view.component==='crosstext2loc'&&view.eventState==='running'?'active':view.ct2lDone?'done':''}"><span>2</span>CrossText2Loc</li><li class="${view.persisting?'active':''}"><span>3</span>Persistencia</li></ol><small>${escapeHtml(view.connection)} · la sesión continúa y puede recuperarse tras recargar</small></div></div>`;if(!dialog.open){if(!operationModalReturnFocus)operationModalReturnFocus=document.activeElement;dialog.showModal();}}else if(dialog.open){dialog.close();const preferred=typeof operationModalReturnFocus==='string'?document.querySelector(operationModalReturnFocus):operationModalReturnFocus,target=preferred?.isConnected&&!preferred.disabled?preferred:document.querySelector('#freetext-answer:not([disabled]),[data-action="new-freetext-search"]:not([disabled])')||$('#main');target?.focus({preventScroll:true});operationModalReturnFocus=null;}}
+
 function navigate(page) {
   state.page = page;
   if (location.hash !== `#${page}`) window.history.replaceState(null, '', `#${page}`);
@@ -293,7 +298,7 @@ function render() {
   $('#main').innerHTML = state.page === 'explore' ? explorePage() : historyPage();
   if (state.page !== 'explore') return;
   const descriptionInput=$('#description');
-  if(descriptionInput)descriptionInput.maxLength=OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH;
+  if(descriptionInput){descriptionInput.maxLength=OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH;descriptionInput.minLength=3;descriptionInput.required=true;}
   const descriptionCounter=$('#char-count');
   if(descriptionCounter)descriptionCounter.textContent=`${state.text.length.toLocaleString('es-ES')} / ${OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH.toLocaleString('es-ES')}`;
   const adaptiveModeOption=document.querySelector('#dialogue-mode option[value="exploratory"]');
@@ -312,7 +317,7 @@ function render() {
     $('#char-count').textContent = `${state.text.length.toLocaleString('es-ES')} / ${OPERATIONAL_FREETEXT_DESCRIPTION_MAX_LENGTH.toLocaleString('es-ES')}`;
     $('#form-error').textContent = '';
   });
-  $('#search-form')?.addEventListener('submit', event => { event.preventDefault(); applicationMode?startFreeTextSession():runSearch(); });
+  $('#search-form')?.addEventListener('submit', event => { event.preventDefault();if(applicationMode)operationModalReturnFocus='#search-form button[type="submit"]';applicationMode?startFreeTextSession():runSearch(); });
   $('#dialogue-form')?.addEventListener('submit', event => { event.preventDefault(); startDialogueSession(); });
   $('#dialogue-answer-form')?.addEventListener('submit', event => { event.preventDefault(); submitDialogueAnswer(); });
   $('#dialogue-query')?.addEventListener('change', event => { state.dialogue.queryId=event.target.value;if(state.dialogue.mode==='exploratory'){const row=state.dialogue.catalogue?.adaptive_sessions?.find(item=>item.experimental_query_id===event.target.value);if(row?.policy_id)state.dialogue.policyId=row.policy_id;}state.dialogue.session=null;state.dialogue.error=null;render(); });
@@ -323,16 +328,18 @@ function render() {
   $('#dialogue-answer')?.addEventListener('input', event => { state.dialogue.answer=event.target.value; });
   $('#dialogue-answer-kind')?.addEventListener('change', event => { state.dialogue.answerKind=event.target.value; });
   $('#freetext-start')?.addEventListener('click',event=>{event.preventDefault();startFreeTextSession();});
-  $('#freetext-answer-form')?.addEventListener('submit',event=>{event.preventDefault();submitFreeTextAnswer();});
-  $('#freetext-answer')?.addEventListener('input',event=>{state.freetext.answer=event.target.value;const submit=$('#freetext-answer-form button[type="submit"]');if(submit)submit.disabled=state.freetext.status==='loading'||!state.freetext.answer.trim();});
+  $('#freetext-answer-form')?.addEventListener('submit',event=>{event.preventDefault();operationModalReturnFocus='#freetext-answer';submitFreeTextAnswer();});
+  $('#freetext-answer')?.addEventListener('input',event=>{state.freetext.answer=event.target.value;event.target.style.height='auto';event.target.style.height=`${Math.min(event.target.scrollHeight,180)}px`;const submit=$('#freetext-answer-form button[type="submit"]');if(submit)submit.disabled=state.freetext.status==='loading'||!state.freetext.answer.trim();});
+  $('#freetext-answer')?.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();if(state.freetext.answer.trim()&&state.freetext.status!=='loading')$('#freetext-answer-form')?.requestSubmit();}});
   $('#freetext-policy')?.addEventListener('change',event=>{state.freetext.selectedPolicy=event.target.value;state.freetext.session=null;state.freetext.events=[];recoverFreeTextSession(event.target.value);render();});
   $('#freetext-variant')?.addEventListener('change',event=>{state.freetext.selectedVariant=event.target.value;render();});
   if(applicationMode){
+    const badge=$('.service-badge');if(badge){const available=state.capabilities.status==='ready'&&state.freetext.catalogue?.policies?.some(item=>item.policy_id===APPLICATION_FREETEXT_POLICY&&item.available);badge.className=`service-badge ${state.capabilities.status==='loading'?'state-checking':available?'state-ready':'state-error'}`;badge.querySelector('span').textContent=state.capabilities.status==='loading'?'Comprobando servicio':available?'Servicio disponible':'Servicio no disponible';}
     $('#gallery')?.closest('.select-field')?.remove();
     $('#processing')?.closest('.select-field')?.remove();
     $('#freetext-start')?.remove();
     const note=$('#search-form .unknown-note');if(note)note.textContent='Qwen en_cartographic y CrossText2Loc se ejecutan secuencialmente. Después podrás responder hasta tres preguntas.';
-    const busy=state.freetext.status==='loading',hasSession=Boolean(state.freetext.session);const button=$('#search-form button[type="submit"]');if(button){button.disabled=busy||hasSession||state.capabilities.status!=='ready';button.innerHTML=busy?'<span class="spinner"></span> Procesando etapa…':hasSession?'Sesión activa':`${icon('search',18)} Iniciar geolocalización ${icon('arrow',18)}`;}const input=$('#description');if(input)input.disabled=busy||hasSession;document.querySelectorAll('.example-chip').forEach(chip=>{chip.disabled=busy||hasSession;});enhanceApplicationPanel();
+    const busy=state.freetext.status==='loading',hasSession=Boolean(state.freetext.session);const button=$('#search-form button[type="submit"]');if(button){button.disabled=busy||hasSession||state.capabilities.status!=='ready';button.innerHTML=busy?'<span class="spinner"></span> Procesando etapa…':hasSession?'Sesión activa':`${icon('search',18)} Iniciar geolocalización ${icon('arrow',18)}`;}const input=$('#description');if(input)input.disabled=busy||hasSession;document.querySelectorAll('.example-chip').forEach(chip=>{chip.disabled=busy||hasSession;});enhanceApplicationPanel();syncOperationModal();
   }
   document.querySelectorAll('[data-freetext-stage]').forEach(button=>button.addEventListener('click',()=>selectFreeTextStage(button.dataset.freetextStage)));
   document.querySelectorAll('.select-trigger').forEach(trigger => trigger.addEventListener('keydown', handleSelectKeydown));
