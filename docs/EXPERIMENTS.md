@@ -32,8 +32,9 @@ referencias, H38-H61, retries ni campañas adicionales.
 El resource gate observó 99-100 GB disponibles, PSI 0, cero procesos GPU y cero
 deltas bloqueantes. Bloqueó por `URLError` al consultar Ollama desde la red
 interna. Después se añadió un sidecar allowlist para `/api/ps` y se verificó
-`{"models":[]}` desde API, pero no se repitió inferencia: requiere autorización
-nueva.
+`{"models":[]}` desde API, pero el agente no repitió inferencia: otro smoke
+automatizado requiere autorización nueva. D098 sí mantiene autorizado el uso
+interactivo iniciado por el operador.
 
 ## F4.1b-B: galería visual OSM de Madrid
 

@@ -40,5 +40,6 @@ el perfil real aprobado se genera fuera de Git y está ligado al runtime.
 
 ## Pendiente
 
-- Solicitar autorización nueva si se desea repetir la prueba GPU tras corregir
-  el acceso allowlist al estado local de Ollama.
+- Solicitar autorización nueva solo si el agente debe repetir el smoke GPU. Las
+  búsquedas iniciadas por el operador desde el frontend siguen autorizadas por
+  D098 durante la vigencia del perfil.

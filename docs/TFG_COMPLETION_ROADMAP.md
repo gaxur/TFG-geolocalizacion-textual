@@ -542,7 +542,8 @@ Las entradas son append-only.
 - **Perfil posterior:** app `c4fef72d…`, core application `80a13a5d…`, executor
   `d5a003a3…`, expiración `2027-02-14T16:56:53Z`.
 - **Estado:** `APP_INTEGRATED_D098_APPROVED_GPU_PREFLIGHT_FAILED_NO_RETRY`.
-- **Próximo paso:** autorización nueva antes de otra sesión GPU.
+- **Próximo paso:** autorización nueva antes de otro smoke GPU automatizado; el
+  uso interactivo del operador permanece autorizado por D098.
 - **Validación final CPU/contratos:** 79 backend PASS; frontend 45 PASS +1 skip;
   browser app fake PASS; Compose/py_compile/diff PASS; revisión final 0 blockers.
 

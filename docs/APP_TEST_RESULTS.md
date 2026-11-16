@@ -19,4 +19,5 @@ Qwen, CrossText2Loc ni VLM en esta integración.
 - Causa: resource gate no pudo consultar Ollama desde la red interna (`URLError`).
 - Modelos residentes después del fallo: ninguno.
 - Corrección posterior: sidecar allowlist `resource-monitor` para `/api/ps`.
-- Repetición: no ejecutada; requiere autorización nueva.
+- Repetición automatizada por el agente: no ejecutada; requiere autorización
+  nueva. El uso interactivo iniciado por el operador sigue cubierto por D098.
