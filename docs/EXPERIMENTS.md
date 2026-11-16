@@ -12,6 +12,29 @@ entorno, dataset, checkpoint y hash, configuración, comando, resultados,
 métricas, tiempo, memoria, problemas y cambios realizados. Solo se sustituirán
 valores pendientes por observaciones reales.
 
+## Aplicación FreeText GPU smoke 2026-11-16
+
+### Objetivo y alcance
+
+Validar una sesión reutilizable autorizada bajo D098, sin VLM, ground truth,
+referencias, H38-H61, retries ni campañas adicionales.
+
+### Resultado
+
+- Perfil: `freetext-application-pgx-20261116-v1`.
+- Sesión: `freetext-application-7cf633c5-bf33-4acf-9aa7-a0841e0c8c19`.
+- Descripción SHA-256:
+  `4d77bbff9dd7593266a053ad9e5a4dbc36659d50ec9d1667dd8a902972cdae37`.
+- Estado: `failed`, `runtime_error_no_retry`, sin snapshots E0.
+- Reserva: una unidad E0 Qwen/CT2L/pregunta, sin refund.
+- Modelos cargados: ninguno.
+
+El resource gate observó 99-100 GB disponibles, PSI 0, cero procesos GPU y cero
+deltas bloqueantes. Bloqueó por `URLError` al consultar Ollama desde la red
+interna. Después se añadió un sidecar allowlist para `/api/ps` y se verificó
+`{"models":[]}` desde API, pero no se repitió inferencia: requiere autorización
+nueva.
+
 ## F4.1b-B: galería visual OSM de Madrid
 
 ### Objetivo y resultado

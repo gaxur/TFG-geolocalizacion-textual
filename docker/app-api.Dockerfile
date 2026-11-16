@@ -4,7 +4,9 @@ RUN mkdir -p /workspace/project/data/processed /workspace/project/data/embedding
 COPY backend ./backend
 COPY src ./src
 RUN mkdir -p scripts config schemas
-COPY scripts/run_mvp1_api.sh scripts/run_dialogue_freetext_worker.py scripts/run_mvp_dialogue_worker.py scripts/run_mvp_ephemeral_retrieval_worker.py ./scripts/
-COPY config/madrid_f46_retriever.json config/madrid.yaml config/madrid_f4_visual_gallery_25m.json config/madrid_f4_visual_gallery_50m.json config/interactive_dialogue_multiturn.json config/interactive_dialogue_freetext_v1.json config/dialogue_freetext_application_v1.json ./config/
+RUN mkdir -p docker
+COPY scripts/run_mvp1_api.sh scripts/run_dialogue_freetext_worker.py scripts/run_mvp_dialogue_worker.py scripts/run_mvp_ephemeral_retrieval_worker.py scripts/generate_freetext_application_profile.py ./scripts/
+COPY config/madrid_f46_retriever.json config/madrid.yaml config/madrid_f4_visual_gallery_25m.json config/madrid_f4_visual_gallery_50m.json config/interactive_dialogue_multiturn.json config/interactive_dialogue_freetext_v1.json config/interactive_dialogue_freetext_application_v1.json config/dialogue_freetext_application_v1.json config/freetext_application_approval_d098.json ./config/
 COPY schemas/atlas-dialogue-freetext-application-profile-v1.schema.json ./schemas/
+COPY docker/ollama-status-nginx.conf ./docker/
 COPY AGENTS.md README.md ./

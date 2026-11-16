@@ -113,7 +113,7 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D095 | Diálogo adaptativo de hasta tres preguntas en contrato v2 | ACEPTADA | DialogueVPR / orquestación |
 | D096 | Evidencia visual opcional y no vinculante en DialogueVPR | ACEPTADA | DialogueVPR / VLM / provenance |
 | D097 | Perfil Python local para preparar PMTiles de D004 desde PBF F4 | PROPUESTA | Cartografía / frontend |
-| D098 | Separar admisión reutilizable de aplicación de la autorización científica FreeText | PROPUESTA | MVP / FreeText |
+| D098 | Separar admisión reutilizable de aplicación de la autorización científica FreeText | ACEPTADA | MVP / FreeText |
 
 ## D053 — API HTTP interna del MVP
 
@@ -4185,7 +4185,7 @@ validación en PGX/ARM64, Docker Compose/Nginx y hardware objetivo sigue pendien
 
 ## D098 — Modo aplicación FreeText reutilizable y separado
 
-**Estado:** PROPUESTA / DEFAULT OFF POR PERFIL
+**Estado:** ACEPTADA
 **Componente:** Aplicación integrada / FreeText-v1
 **Fecha:** 2026-11-16
 
@@ -4193,21 +4193,25 @@ validación en PGX/ARM64, Docker Compose/Nginx y hardware objetivo sigue pendien
 
 Mantener intacta la autorización científica one-shot y añadir una policy distinta,
 `dialogue-vpr-freetext-v1-application`, para uso local reutilizable. Un perfil
-aprobado fija identidad, expiry, máximo total de sesiones y máximo de sesiones
-abiertas. Cada sesión reserva 4 Qwen, 4 CT2L, 3 preguntas y cero retries; cuotas
-inciertas no se devuelven.
+aprobado fija identidad, expiry y máximo de sesiones abiertas. El uso acumulativo
+no tiene límite de sesiones o descripciones. Cada sesión reserva como máximo 4
+Qwen, 4 CT2L y 3 preguntas, con cero retries; cuotas inciertas no se devuelven.
 
 El despliegue queda ligado a `127.0.0.1`, con una sola operación de modelo,
 FastAPI/Nginx app-only, SQLite durable, modelos/datos read-only y sin GT, VLM,
 referencias ni H38-H61. Cambiar perfil, cuotas, expiry o identidad exige otra
 aprobación.
 
-### Pendiente de aprobación
+### Aprobación registrada
 
-- `profile_id`.
-- Fecha/hora UTC de expiración.
-- `maximum_sessions_total`.
-- `maximum_open_sessions`.
-- Retención y revocación del volumen `atlas-app-state`.
+- `profile_id`: `freetext-application-pgx-20261116-v1`.
+- Vigencia: 90 días desde la generación hash-bound.
+- Sesiones/descripciones acumuladas: ilimitadas (`null`).
+- Sesiones abiertas: 1.
+- Retención: hasta revisión del TFG.
+- Acceso: loopback y túnel SSH, sin exposición pública.
+- GPU: secuencial y solo tras acción del usuario; Compose no infiere al arrancar.
+- Prueba autorizada: una sesión real, sin VLM ni campañas adicionales.
 
-La plantilla permanece `PENDING_APPROVAL`; arrancar Compose no habilita inferencia.
+La aprobación fue emitida expresamente por el operador el 2026-11-16. El perfil
+real permanece fuera de Git en `runtime/` y está ligado a policies y executor.

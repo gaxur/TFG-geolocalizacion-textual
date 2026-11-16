@@ -1,7 +1,7 @@
 """Reusable, fail-closed admission for local FreeText application sessions."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import re
@@ -131,17 +131,16 @@ class ApplicationFreeTextSessionService(OperationalFreeTextSessionService):
             raise FreeTextUnavailable("profile_id FreeText application inválido")
         if not isinstance(document.get("profile_version"), str) or not document["profile_version"]:
             raise FreeTextUnavailable("profile_version FreeText application inválido")
-        for key in ("max_sessions_total", "max_open_sessions"):
-            if type(document.get(key)) is not int or document[key] < 1:
-                raise FreeTextUnavailable(f"{key} FreeText application inválido")
-        total = document["max_sessions_total"]
-        if document["max_open_sessions"] > total or document.get("global_quotas") != {"maximum_qwen_units": total * 4, "maximum_ct2l_units": total * 4, "maximum_questions": total * 3}:
+        if document.get("max_sessions_total") is not None or document.get("max_open_sessions") != 1:
+            raise FreeTextUnavailable("límites de sesiones FreeText application incompatibles")
+        expected_global = {"maximum_qwen_units": None, "maximum_ct2l_units": None, "maximum_questions": None}
+        if document.get("global_quotas") != expected_global:
             raise FreeTextUnavailable("cuotas globales FreeText application incompatibles")
         approved = _instant(document["approved_at"], "approved_at")
         valid_from = _instant(document["valid_from"], "valid_from")
         expires = _instant(document["expires_at"], "expires_at")
         now = datetime.now(timezone.utc)
-        if approved > now or valid_from > now or expires <= now or expires <= valid_from:
+        if approved > now or valid_from > now or expires <= now or expires <= valid_from or expires - valid_from > timedelta(days=90):
             raise FreeTextUnavailable("perfil FreeText application fuera de su ventana temporal")
         return {"document": document, "sha256": sha256_file(self.profile_path), "identity": identity, "identity_sha256": identity_sha256}
 
@@ -156,6 +155,8 @@ class ApplicationFreeTextSessionService(OperationalFreeTextSessionService):
                 "max_sessions_total": profile["document"]["max_sessions_total"],
                 "max_open_sessions": profile["document"]["max_open_sessions"],
                 "access_mode": "loopback",
+                "per_session_quotas": dict(QUOTAS),
+                "constraints": dict(CONSTRAINTS),
             }
         except FreeTextUnavailable:
             available = False
@@ -164,7 +165,8 @@ class ApplicationFreeTextSessionService(OperationalFreeTextSessionService):
             with self._connect() as connection:
                 admitted = connection.execute("SELECT COUNT(*) FROM sessions WHERE profile_id=?", (profile["document"]["profile_id"],)).fetchone()[0]
                 opened = connection.execute("SELECT COUNT(*) FROM sessions WHERE profile_id=? AND status IN (?,?,?)", (profile["document"]["profile_id"], *OPEN_STATUSES)).fetchone()[0]
-            metadata.update(sessions_admitted=admitted, sessions_remaining=max(0, profile["document"]["max_sessions_total"]-admitted), open_sessions=opened)
+            total = profile["document"]["max_sessions_total"]
+            metadata.update(sessions_admitted=admitted, sessions_remaining=None if total is None else max(0, total-admitted), open_sessions=opened)
         return {
             "schema_version": "1.0", "contract_version": "atlas-dialogue-freetext-policy-public-v1",
             "policy_id": POLICY_ID, "version": "1.0.0", "status": "application" if available else "disabled",
@@ -234,10 +236,7 @@ class ApplicationFreeTextSessionService(OperationalFreeTextSessionService):
                 connection.commit()
                 return self.load(existing), False
             limits = profile["document"]
-            total = connection.execute("SELECT COUNT(*) FROM sessions WHERE profile_id=?", (limits["profile_id"],)).fetchone()[0]
             opened = connection.execute("SELECT COUNT(*) FROM sessions WHERE profile_id=? AND status IN (?,?,?)", (limits["profile_id"], *OPEN_STATUSES)).fetchone()[0]
-            if total >= limits["max_sessions_total"]:
-                raise FreeTextUnavailable("límite total de sesiones FreeText application agotado")
             if opened >= limits["max_open_sessions"]:
                 raise FreeTextUnavailable("límite de sesiones abiertas FreeText application agotado")
             session_id = f"freetext-application-{uuid.uuid4()}"

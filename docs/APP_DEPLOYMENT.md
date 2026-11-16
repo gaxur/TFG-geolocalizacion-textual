@@ -33,7 +33,9 @@ DialogueVPR/FreeText científicos están desactivados explícitamente.
   assets cartográficos y contexto PMTiles ya presentes en el host.
 
 El runtime usa una red Compose marcada `internal` y variables offline de
-Hugging Face/Transformers. No descarga modelos, datos ni mapas al arrancar.
+Hugging Face/Transformers. No descarga modelos, datos ni mapas al arrancar. El
+sidecar `resource-monitor` permite únicamente `/api/ps` hacia Ollama para el
+resource gate; no publica puerto y la API permanece en la red interna.
 
 ## Rutas de la PGX
 
@@ -152,14 +154,11 @@ Qwen y CrossText2Loc.
 
 ## Aprobación y activación
 
-La plantilla no es una autorización. Antes de poner `APP_MODE_ENABLED=true`, el
-responsable debe crear un perfil separado y completar, como mínimo:
-
-- `[PENDIENTE: responsable que aprueba y fundamento]`;
-- `[PENDIENTE: profile_id, ventana temporal y límites de sesiones]`;
-- `[PENDIENTE: hashes exactos de las políticas y del ejecutor]`;
-- `[PENDIENTE: revisión de rutas, artefactos, GPU/RAM y política offline]`;
-- `[PENDIENTE: aceptación expresa de limitaciones y procedimiento de revocación]`.
+La plantilla no es una autorización. D098 aprobó para esta PGX sesiones
+acumuladas ilimitadas, una abierta, máximos 4 Qwen/4 CT2L/3 preguntas, cero
+retries y vigencia de 90 días. El perfil real se genera fuera de Git con la
+expiración absoluta y referencia de aprobación registradas; volver a ejecutar el
+generador no puede extender por sí solo esa vigencia.
 
 Después se configura `APP_PROFILE_FILE` con la ruta de ese JSON aprobado. El
 backend debe validar estado, vigencia, hashes,
@@ -181,5 +180,6 @@ montarlas en este stack.
   independientes.
 - El healthcheck demuestra disponibilidad técnica, no autorización para ejecutar
   ni validez científica de resultados.
-- El perfil por defecto impide el modo aplicación. No se realizó una ejecución de
-  contenedores, modelos o inferencias al preparar esta guía.
+- El perfil por defecto impide el modo aplicación. La prueba GPU autorizada está
+  registrada en `APP_TEST_RESULTS.md`: falló en el preflight antes de cargar
+  modelos y no se repitió.

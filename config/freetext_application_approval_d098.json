@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "atlas-dialogue-freetext-application-approval-v1",
+  "decision_id": "D098",
+  "profile_id": "freetext-application-pgx-20261116-v1",
+  "status": "OPERATOR_APPROVED",
+  "approved": true,
+  "approved_at": "2026-11-16T16:56:53Z",
+  "valid_from": "2026-11-16T16:56:53Z",
+  "expires_at": "2027-02-14T16:56:53Z",
+  "max_sessions_total": null,
+  "max_open_sessions": 1,
+  "retention": "until_tfg_review",
+  "per_session_maximums": {
+    "qwen": 4,
+    "crosstext2loc": 4,
+    "questions": 3,
+    "automatic_retries": 0
+  },
+  "constraints": {
+    "access_mode": "loopback_ssh",
+    "gpu_sequential": true,
+    "ground_truth_permitted": false,
+    "references_permitted": false,
+    "vlm_permitted": false,
+    "h38_h61_permitted": false
+  }
+}

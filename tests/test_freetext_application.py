@@ -22,9 +22,10 @@ POLICY = {
     "application_policy_id": "dialogue-vpr-freetext-v1-application",
     "application_policy_version": "1.0.0",
     "application_policy_sha256": "a" * 64,
-    "core_policy_id": "dialogue-vpr-freetext-v1",
+    "core_policy_id": "dialogue-vpr-freetext-v1-application-core",
     "core_policy_version": "1.0.0",
     "core_policy_sha256": "b" * 64,
+    "approval_reference": "D098:" + "e" * 64,
 }
 
 
@@ -60,16 +61,17 @@ class Executor:
         return state
 
 
-def write_profile(path: Path, executor: Executor, *, total=4, opened=2, **changes):
+def write_profile(path: Path, executor: Executor, *, total=None, opened=1, **changes):
     now = datetime.now(timezone.utc)
     identity = executor.identity
     document = {
         "schema_version": "1.0", "contract_version": "atlas-dialogue-freetext-application-profile-v1",
         "profile_id": "local-approved-v1", "profile_version": "1.0.0", "status": "APPROVED", "approved": True,
+        "approval_reference": "test-explicit-approval",
         "approved_at": z(now - timedelta(minutes=2)), "valid_from": z(now - timedelta(minutes=1)), "expires_at": z(now + timedelta(hours=1)),
         **POLICY, "executor_identity": identity, "executor_identity_sha256": hashlib.sha256(canonical(identity)).hexdigest(),
         "max_sessions_total": total, "max_open_sessions": opened,
-        "global_quotas": {"maximum_qwen_units": total*4, "maximum_ct2l_units": total*4, "maximum_questions": total*3},
+        "global_quotas": {"maximum_qwen_units": None, "maximum_ct2l_units": None, "maximum_questions": None} if total is None else {"maximum_qwen_units": total*4, "maximum_ct2l_units": total*4, "maximum_questions": total*3},
         "per_session_quotas": {"maximum_qwen_loads": 4, "maximum_qwen_calls": 4, "maximum_ct2l_loads": 4, "maximum_ct2l_calls": 4, "maximum_questions": 3, "automatic_retries": 0},
         "constraints": {"access_mode": "loopback", "network_permitted": False, "ground_truth_permitted": False, "references_permitted": False, "vlm_permitted": False, "h38_h61_permitted": False},
     }
@@ -79,7 +81,7 @@ def write_profile(path: Path, executor: Executor, *, total=4, opened=2, **change
     return document
 
 
-def service(tmp_path: Path, *, total=4, opened=2, enabled=True):
+def service(tmp_path: Path, *, total=None, opened=1, enabled=True):
     executor = Executor()
     profile = tmp_path / "profile.json"
     write_profile(profile, executor, total=total, opened=opened)
@@ -91,6 +93,9 @@ def service(tmp_path: Path, *, total=4, opened=2, enabled=True):
     {"status": "PENDING_APPROVAL", "approved": False},
     {"application_policy_sha256": "0" * 64},
     {"expires_at": "2000-01-01T00:00:00Z"},
+    {"max_sessions_total": 4, "global_quotas": {"maximum_qwen_units": 16, "maximum_ct2l_units": 16, "maximum_questions": 12}},
+    {"max_open_sessions": 2},
+    {"expires_at": z(datetime.now(timezone.utc) + timedelta(days=91))},
 ])
 def test_disabled_pending_mismatch_and_expiry_fail_before_ledger_admission(tmp_path, change):
     instance, executor, profile = service(tmp_path)
@@ -120,8 +125,8 @@ def test_direct_service_enforces_description_bounds(tmp_path):
     assert executor.calls == []
 
 
-def test_total_quota_open_limit_and_concurrent_admission_are_transactional(tmp_path):
-    instance, _, _ = service(tmp_path, total=2, opened=1)
+def test_open_limit_and_concurrent_admission_are_transactional(tmp_path):
+    instance, _, _ = service(tmp_path)
 
     def create(key):
         try:
@@ -138,10 +143,21 @@ def test_total_quota_open_limit_and_concurrent_admission_are_transactional(tmp_p
     instance._persist(first)
     second, execute = instance.prepare_start("Descripción final", "three", "three")
     assert execute is True and second["session_id"] != first["session_id"]
-    second["status"] = "completed"
-    instance._persist(second)
-    with pytest.raises(FreeTextUnavailable, match="total"):
-        instance.prepare_start("Descripción excedente", "four", "four")
+
+
+def test_unlimited_total_keeps_single_open_session_and_allows_sequential_reuse(tmp_path):
+    instance,_,_=service(tmp_path)
+    for index in range(6):
+        document,execute=instance.prepare_start(f'Descripción reutilizable {index}',f'key-{index}',f'key-{index}');assert execute is True
+        with pytest.raises(FreeTextUnavailable,match='abiertas'):
+            instance.prepare_start('Otra descripción simultánea',f'blocked-{index}',f'blocked-{index}')
+        document['status']='completed';instance._persist(document)
+    policy=instance.policy()['profile'];assert policy['max_sessions_total'] is None and policy['sessions_remaining'] is None and policy['sessions_admitted']==6
+
+
+def test_unlimited_total_requires_unlimited_global_quotas(tmp_path):
+    instance,_,profile=service(tmp_path);document=json.loads(profile.read_text());document['global_quotas']['maximum_qwen_units']=4;profile.write_text(json.dumps(document))
+    assert instance.policy()['available'] is False
 
 
 def test_restart_idempotency_exact_replay_and_body_conflict(tmp_path):
@@ -156,7 +172,7 @@ def test_restart_idempotency_exact_replay_and_body_conflict(tmp_path):
 
 
 def test_restart_marks_ledger_session_without_artifact_unknown_and_releases_open_slot(tmp_path):
-    instance, executor, profile = service(tmp_path, total=2, opened=1)
+    instance, executor, profile = service(tmp_path)
     with instance._connect() as connection:
         connection.execute("INSERT INTO sessions VALUES (?,?,?,?,?)", ("freetext-application-00000000-0000-0000-0000-000000000001", "local-approved-v1", "x", "pending", z(datetime.now(timezone.utc))))
     restarted=ApplicationFreeTextSessionService(session_root=tmp_path/'sessions',state_root=tmp_path/'state',profile_path=profile,executor=executor,enabled=True,policy_identity=POLICY)
@@ -165,7 +181,7 @@ def test_restart_marks_ledger_session_without_artifact_unknown_and_releases_open
 
 
 def test_persistence_failure_marks_ledger_unknown_without_refund(tmp_path,monkeypatch):
-    instance,_,_=service(tmp_path,total=2,opened=1);original=instance._persist;calls=0
+    instance,_,_=service(tmp_path);original=instance._persist;calls=0
     def fail_once(document):
         nonlocal calls;calls+=1
         if calls==1:raise OSError('disk failure')

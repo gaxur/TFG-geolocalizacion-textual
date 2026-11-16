@@ -2,11 +2,11 @@
 
 ## Estado
 
-`APP_INTEGRATED_PENDING_D098_PROFILE_APPROVAL_AND_REAL_GPU_TEST`
+`APP_INTEGRATED_D098_APPROVED_GPU_PREFLIGHT_FAILED_NO_RETRY`
 
 La aplicación integra en una interfaz descripción libre, FreeText-v1, SSE, chat,
-rankings E0-E3 y MapLibre. El perfil distribuido permanece `PENDING_APPROVAL`;
-la infraestructura arranca, pero ninguna sesión ni inferencia puede iniciarse.
+rankings E0-E3 y MapLibre. La plantilla distribuida permanece `PENDING_APPROVAL`;
+el perfil real aprobado se genera fuera de Git y está ligado al runtime.
 
 ## Arquitectura
 
@@ -14,6 +14,8 @@ la infraestructura arranca, pero ninguna sesión ni inferencia puede iniciarse.
 - Solo Nginx publica `127.0.0.1:18085`; API en red interna.
 - Imagen API propia derivada de `crosstext2loc-gb10:f511`, sin datos/modelos.
 - Qwen/CT2L efímeros secuenciales y un único `ModelGate`.
+- Policy core application separada sobre la implementación FreeText compartida;
+  declara stop temprano sin modificar la policy científica.
 - SQLite WAL/FULL para cuotas, idempotencia y admisión reutilizable.
 - Volumen persistente `atlas-app-state`.
 - FastAPI y Nginx exponen solo rutas application/health/capabilities.
@@ -38,6 +40,5 @@ la infraestructura arranca, pero ninguna sesión ni inferencia puede iniciarse.
 
 ## Pendiente
 
-- Aprobar D098 con profile ID, expiry, sesiones totales/abiertas y retención.
-- Generar perfil hash-bound.
-- Ejecutar una prueba GPU nueva explícitamente autorizada.
+- Solicitar autorización nueva si se desea repetir la prueba GPU tras corregir
+  el acceso allowlist al estado local de Ollama.

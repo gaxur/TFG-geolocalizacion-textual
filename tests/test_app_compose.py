@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +13,9 @@ def test_application_compose_is_loopback_internal_and_fail_closed():
     assert compose.count("ports:") == 1
     assert "internal: true" in compose
     assert "app-backend" in compose and "app-edge" in compose
+    assert "resource-monitor:8081/api/ps" in compose
+    assert './docker/ollama-status-nginx.conf:/application-config/ollama-status-nginx.conf:ro' in compose
+    monitor=(ROOT/'docker/ollama-status-nginx.conf').read_text();assert 'location = /api/ps' in monitor and 'location / { return 404; }' in monitor
     assert "ATLAS_FREETEXT_APPLICATION_ENABLED: ${APP_MODE_ENABLED:-true}" in compose
     assert "/api/v1/health/live" in compose
     assert "ATLAS_FREETEXT_OPERATIONAL_ENABLED: \"false\"" in compose
@@ -46,3 +50,12 @@ def test_application_api_build_context_excludes_scientific_data_and_models():
 
 def test_application_nginx_is_loopback_allowlist_not_broad_api_proxy():
     nginx=(ROOT/'frontend/nginx.app.conf').read_text();assert 'X-Atlas-App-Loopback 1' in nginx;assert 'freetext-application-[0-9a-f-]{36}' in nginx;assert 'location /api/v1/dialogue-freetext/ { return 404; }' in nginx;assert 'location /api/ { return 404; }' in nginx;assert 'location ^~ /api/' not in nginx;assert 'location ^~ /api/v1/dialogue-freetext/' not in nginx
+
+
+def test_application_core_is_separate_from_scientific_core():
+    source=(ROOT/'backend/atlas_api/main.py').read_text();assert source.count('policy_config=application_core_policy')==1
+    scientific=json.loads((ROOT/'config/interactive_dialogue_freetext_v1.json').read_text());application=json.loads((ROOT/'config/interactive_dialogue_freetext_application_v1.json').read_text());assert scientific['full_e0_e3_required'] is True;assert application['full_e0_e3_required'] is False and application['early_stop_when_no_valid_question'] is True
+
+
+def test_d098_approval_has_exact_unlimited_scope():
+    approval=json.loads((ROOT/'config/freetext_application_approval_d098.json').read_text());assert approval['status']=='OPERATOR_APPROVED' and approval['max_sessions_total'] is None and approval['max_open_sessions']==1;assert approval['per_session_maximums']=={'qwen':4,'crosstext2loc':4,'questions':3,'automatic_retries':0};assert approval['constraints']['vlm_permitted'] is False and approval['constraints']['h38_h61_permitted'] is False

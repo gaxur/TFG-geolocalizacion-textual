@@ -516,6 +516,36 @@ Las entradas son append-only.
 - **Próximo paso:** aprobar D098/perfil concreto; no activar inferencia ni VLM
   automáticamente.
 
+### 2026-11-16 — FREETEXT-APPLICATION-D098-APPROVAL-01
+
+- **Aprobación:** D098 aceptada expresamente por el operador.
+- **Perfil:** `freetext-application-pgx-20261116-v1`, 90 días, sesiones
+  acumuladas ilimitadas, una abierta, máximos 4 Qwen/4 CT2L/3 preguntas,
+  cero retries y retención hasta revisión del TFG.
+- **Restricciones:** loopback/SSH, GPU secuencial, sin GT, VLM, referencias ni
+  H38-H61; ninguna inferencia al arrancar Compose.
+- **Separación:** core application con stop temprano explícito; core científico
+  original sin cambios.
+- **Autorización de prueba:** una sesión GPU real E0-E3 como máximo.
+- **Estado:** `APP_INTEGRATED_D098_APPROVED_PENDING_REAL_GPU_TEST`.
+
+### 2026-11-16 — FREETEXT-APPLICATION-GPU-SMOKE-01
+
+- **Sesión:** `freetext-application-7cf633c5-bf33-4acf-9aa7-a0841e0c8c19`.
+- **Resultado:** fallo E0 `runtime_error_no_retry`; sin ranking, pregunta o carga
+  de Qwen/CT2L.
+- **Causa:** `URLError` al consultar Ollama desde la red interna; GPU, memoria,
+  PSI y vmstat estaban limpios.
+- **Cuota:** reserva E0 conservada; cero retries y cero refunds.
+- **Corrección CPU/config:** sidecar allowlist `resource-monitor` para `/api/ps`,
+  healthy antes de API; no se repitió inferencia.
+- **Perfil posterior:** app `c4fef72d…`, core application `80a13a5d…`, executor
+  `d5a003a3…`, expiración `2027-02-14T16:56:53Z`.
+- **Estado:** `APP_INTEGRATED_D098_APPROVED_GPU_PREFLIGHT_FAILED_NO_RETRY`.
+- **Próximo paso:** autorización nueva antes de otra sesión GPU.
+- **Validación final CPU/contratos:** 79 backend PASS; frontend 45 PASS +1 skip;
+  browser app fake PASS; Compose/py_compile/diff PASS; revisión final 0 blockers.
+
 ### 2026-11-06 — P2-04-CONTINUATION-BLOCKED-01
 
 - **Tarea:** registrar aprobación humana de E0 y generar E1–E3 mediante contrato

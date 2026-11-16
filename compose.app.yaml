@@ -11,6 +11,9 @@ services:
     init: true
     read_only: true
     restart: unless-stopped
+    depends_on:
+      resource-monitor:
+        condition: service_healthy
     environment:
       ATLAS_API_HOST: 0.0.0.0
       ATLAS_API_PORT: "8000"
@@ -27,7 +30,8 @@ services:
       ATLAS_FREETEXT_APPLICATION_STATE_ROOT: /application-state
       ATLAS_FREETEXT_APPLICATION_SESSION_ROOT: /application-state/sessions
       ATLAS_DIALOGUE_F3_BUNDLE: /workspace/project/data/processed/osm/osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141/f3-madrid-pilot-associations-sha256-5f4af89b9349de792d3a60752a15f227d49b96cdb688a671504e4cf30bf68453
-      ATLAS_OLLAMA_PS_URL: http://host.docker.internal:11434/api/ps
+      ATLAS_OLLAMA_PS_URL: http://resource-monitor:8081/api/ps
+      ATLAS_OLLAMA_STATUS_CONFIG: /application-config/ollama-status-nginx.conf
       ATLAS_VISUAL_PROMOTION_ENABLED: "false"
       ATLAS_VISUAL_PROMOTION_REQUIRED: "false"
       CUDA_VISIBLE_DEVICES: ${APP_CUDA_VISIBLE_DEVICES:-0}
@@ -52,6 +56,7 @@ services:
       - ${APP_EXTERNAL_DIR:-./external}:/workspace/project/external:ro
       - ${APP_CHECKPOINT_DIR:-./checkpoints/CrossText2Loc}:/workspace/project/checkpoints/CrossText2Loc:ro
       - ${APP_PROFILE_FILE:-./config/freetext_application_profile.template.json}:/application-config/profile.json:ro
+      - ./docker/ollama-status-nginx.conf:/application-config/ollama-status-nginx.conf:ro
       - app-state:/application-state
     working_dir: /workspace/project
     extra_hosts:
@@ -73,6 +78,26 @@ services:
       start_period: 180s
     networks:
       - app-backend
+
+  resource-monitor:
+    image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    read_only: true
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./docker/ollama-status-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    tmpfs:
+      - /var/cache/nginx:rw,noexec,nosuid,size=8m
+      - /var/run:rw,noexec,nosuid,size=1m
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8081/api/ps"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+    networks:
+      - app-backend
+      - app-edge
 
   frontend:
     image: ${APP_FRONTEND_IMAGE:-atlas-app-frontend:local}

@@ -73,10 +73,12 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
         missing = [name for name in required if not os.environ.get(name)]
         if missing:
             raise ValueError(f"FreeText application requiere: {', '.join(missing)}")
-        executor = FreeTextRuntimeExecutor(qwen_model=Path(os.environ["ATLAS_QWEN_MODEL_PATH"]), runtime_config=settings.runtime_config, region_config=settings.region_config, f3_bundle=Path(os.environ["ATLAS_DIALOGUE_F3_BUNDLE"]), clip_weights=Path(settings.clip_weights_path), cvg_utils_sha256=settings.cvg_utils_sha256, ollama_ps_url=os.environ["ATLAS_OLLAMA_PS_URL"])
+        application_core_policy = Path(__file__).resolve().parents[2] / "config/interactive_dialogue_freetext_application_v1.json"
+        approval = Path(__file__).resolve().parents[2] / "config/freetext_application_approval_d098.json"
+        executor = FreeTextRuntimeExecutor(qwen_model=Path(os.environ["ATLAS_QWEN_MODEL_PATH"]), runtime_config=settings.runtime_config, region_config=settings.region_config, f3_bundle=Path(os.environ["ATLAS_DIALOGUE_F3_BUNDLE"]), clip_weights=Path(settings.clip_weights_path), cvg_utils_sha256=settings.cvg_utils_sha256, ollama_ps_url=os.environ["ATLAS_OLLAMA_PS_URL"], policy_config=application_core_policy, ollama_status_config=Path(os.environ["ATLAS_OLLAMA_STATUS_CONFIG"]))
         root = Path(__file__).resolve().parents[2]
         application_policy = root / "config/dialogue_freetext_application_v1.json"
-        core_policy = root / "config/interactive_dialogue_freetext_v1.json"
+        core_policy = application_core_policy
         freetext_application_service = ApplicationFreeTextSessionService(
             session_root=settings.freetext_application_session_root,
             state_root=settings.freetext_application_state_root,
@@ -87,9 +89,10 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
                 "application_policy_id": "dialogue-vpr-freetext-v1-application",
                 "application_policy_version": "1.0.0",
                 "application_policy_sha256": sha256_file(application_policy),
-                "core_policy_id": "dialogue-vpr-freetext-v1",
+                "core_policy_id": "dialogue-vpr-freetext-v1-application-core",
                 "core_policy_version": "1.0.0",
                 "core_policy_sha256": sha256_file(core_policy),
+                "approval_reference": f"D098:{sha256_file(approval)}",
             },
         )
     app.state.freetext_application_service = freetext_application_service
