@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "atlas-freetext-failure-audit-evidence-v1",
+  "session_id": "freetext-application-5f0b0122-b141-4489-a0b5-385d342a16af",
+  "source": "local_atlas_app_state_not_versioned",
+  "observed_at_utc": "2026-11-16T19:34:39Z",
+  "artifacts": {
+    "session.json": "f052dfc765843072c89710c51053c09ef63993f36bda2373069816a0d7879a67",
+    "e1-qwen-runtime.json": "fa0cffc0e67a82b09d6279b3b5efd4c3d3ca47a814aff480cb9b36d9add1d25e"
+  },
+  "answer_sha256": "1c93ebddbbc54a880069a8e28fdc3ce9e9162974c205fea417effed21b14c8cc",
+  "events": {
+    "e1_running": "2026-11-16T19:05:36.568Z",
+    "qwen_running": "2026-11-16T19:05:36.582Z",
+    "qwen_failed": "2026-11-16T19:05:40.288Z",
+    "e1_failed": "2026-11-16T19:05:40.293Z"
+  },
+  "telemetry": {
+    "lifecycle": "resident-sequential-lazy-v1",
+    "cache_hit": true,
+    "model_load_ms": 0.0,
+    "inference_wall_ms": 3677.0025677978992,
+    "error": "ValueError"
+  },
+  "traceback_terminal": "ValueError: salida FreeText rechazada por validación",
+  "ct2l_e1_started": false,
+  "raw_output_persisted": false,
+  "validation_issues_persisted": false
+}

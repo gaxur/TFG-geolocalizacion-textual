@@ -2,7 +2,7 @@
 
 ## Estado
 
-`APP_INTEGRATED_D098_APPROVED_GPU_PREFLIGHT_FAILED_NO_RETRY`
+`APP_INTEGRATED_D098_V2_RESIDENT_E0_VALIDATED_E1_VALIDATION_FAILED`
 
 La aplicación integra en una interfaz descripción libre, FreeText-v1, SSE, chat,
 rankings E0-E3 y MapLibre. La plantilla distribuida permanece `PENDING_APPROVAL`;

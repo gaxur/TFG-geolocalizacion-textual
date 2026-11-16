@@ -595,6 +595,21 @@ Las entradas son append-only.
 - **Estado real:** sesión v2 terminó posteriormente `failed` en E1 Qwen por una
   respuesta externa; frontend final recupera E0 y muestra el fallo sin responder.
 
+### 2026-11-16 — INTEGRATED-APP-PROFESSIONAL-UX-01
+
+- **Diseño:** mapa dominante 70 %, panel derecho DialogueVPR, ranking compacto y
+  bottom sheet móvil; sistema visual documentado sin dependencias nuevas.
+- **Modal:** `<dialog>` bloqueante, focus trap, Escape/backdrop desactivados,
+  estados reales Qwen/CT2L/persistencia y cierre global seguro.
+- **Chat:** composer autoajustable, Enter/Shift+Enter, borrador durable, pregunta
+  N/3, scroll independiente y último ranking válido ante fallo.
+- **Validación:** 50 frontend PASS +1 skip; APP_FLOW, Nginx SSE y diseño responsive
+  Chromium PASS; capturas fake versionadas, sin inferencia GPU.
+- **E1 real:** Qwen cache hit y generación 3,677 s; fallo exacto post-generación
+  `ValueError: salida FreeText rechazada por validación`; CT2L E1 no ejecutado.
+- **Bloqueo:** output/validation issues rechazados no se persistían; propuesta de
+  sidecar diagnóstico pendiente de aprobación antes de cambiar runtime/D098.
+
 ### 2026-11-06 — P2-04-CONTINUATION-BLOCKED-01
 
 - **Tarea:** registrar aprobación humana de E0 y generar E1–E3 mediante contrato

@@ -60,6 +60,19 @@ La sesión se archivó posteriormente, antes del runtime v2, en
 El original conserva ranking/eventos y quedó `unknown` por supersession, no por
 fallo de inferencia. No se ejecutaron E1-E3.
 
+## Fallo E1 Qwen residente 2026-11-16
+
+- Sesión: `freetext-application-5f0b0122-b141-4489-a0b5-385d342a16af`.
+- Perfil: D098 v2, lifecycle `resident-sequential-lazy-v1`.
+- Respuesta persistida antes de inferencia; SHA-256 `1c93ebdd…`.
+- Qwen: cache hit, carga 0 ms, ejecución 3.677,003 ms.
+- Resultado: `ValueError: salida FreeText rechazada por validación`.
+- CT2L E1: no iniciado; ranking E0 conservado.
+- Evidencia saneada:
+  `docs/evidence/freetext-e1-qwen-failure-5f0b0122.json`.
+- Limitación: no se persistieron raw output rechazado ni issues; no puede
+  atribuirse honestamente el rechazo a una regla concreta sin nueva inferencia.
+
 ## F4.1b-B: galería visual OSM de Madrid
 
 ### Objetivo y resultado

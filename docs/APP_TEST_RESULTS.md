@@ -37,7 +37,9 @@ no se revalidaron.
 - Startup: readiness `resident-sequential-lazy-v1`, cero POST y cero modelos.
 - CPU: cargas fake Qwen/CT2L únicas, cache hits E1, cierre, contratos CT2L,
   supersession e idempotencia.
-- GPU: no ejecutada; no se afirma todavía reducción real ni convivencia en RAM.
+- GPU v2: E0 y un intento E1 fueron ejecutados posteriormente por el operador;
+  Qwen/CT2L coexistieron en E0. E1 Qwen fue cache hit y su salida fue rechazada
+  por validación antes de CT2L. No se afirma todavía E1-E3 completo.
 
 ## Corrección SSE de subcomponentes
 
@@ -52,3 +54,5 @@ no se revalidaron.
   E0 waiting_user, desconexión y reanudación `after=2`, sin POST duplicado.
 - Chromium real: sesión final `failed` recuperada con 10 candidatos E0, último
   evento E1 failed y cero POST.
+- `DESIGN_MODAL_RESPONSIVE_PASS`: mapa 70,9 %, sidebar 29,1 %, modal nativo con
+  foco, bottom sheet móvil, composer y cero overflow.

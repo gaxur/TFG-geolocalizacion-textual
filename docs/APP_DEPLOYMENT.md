@@ -206,5 +206,6 @@ cargado o que quepan simultáneamente en memoria.
 - El healthcheck demuestra disponibilidad técnica, no autorización para ejecutar
   ni validez científica de resultados.
 - El perfil por defecto impide el modo aplicación. La prueba v1 y su supersession
-  están registradas en `APP_TEST_RESULTS.md`; v2 residente está aprobado y activo,
-  pero aún no tiene prueba GPU real ni métricas de mejora.
+  están registradas en `APP_TEST_RESULTS.md`. V2 residente tiene E0 real y un
+  intento E1 rechazado por validación; no existe todavía recorrido E1-E3 completo
+  ni métricas de mejora.

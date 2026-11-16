@@ -47,8 +47,9 @@ D098 v2 incorpora un executor residente lazy: Qwen y CT2L se cargan al primer
 uso, no al arrancar Compose, y se reutilizan entre E0-E3 y sesiones. Un único
 `ModelGate`, un lock residente y un worker Uvicorn impiden concurrencia GPU. Cada
 carga física tiene su preflight propio y la telemetría vive en sidecars fuera de
-los rankings científicos. La viabilidad conjunta y la mejora real siguen
-pendientes de la primera sesión del operador; no se ejecutó inferencia v2.
+los rankings científicos. E0 v2 fue ejecutado posteriormente por el operador y confirmó convivencia
+Qwen/CT2L; E1 reutilizó Qwen, pero la salida fue rechazada por validación antes de
+CT2L. El recorrido E1-E3 completo sigue pendiente.
 
 Los máximos de carga del perfil permanecen como unidades conservadoras de
 presupuesto. Las cargas físicas se observan por separado en sidecars
