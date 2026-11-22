@@ -126,7 +126,7 @@ def interpret_answer(answer: str, intent: QuestionIntent, previous_claims: Seque
         return {"kind": "ambiguous", "informative": False, "polarity": None, "clarification": None, "correction": correction, "conflict": None}
     elif normalized.startswith(("sí ", "si ", "veo ", "hay ")):
         polarity, kind = "positive", "partially_informative"
-    elif normalized.startswith(("no ", "ningún ", "ninguna ")):
+    elif re.match(r"^no(?:\s*,\s*|\s+)", normalized) or normalized.startswith(("ningún ", "ninguna ")):
         polarity, kind = "negative", "partially_informative"
     else:
         return {"kind": "ambiguous", "informative": False, "polarity": None, "clarification": None, "correction": correction, "conflict": None}

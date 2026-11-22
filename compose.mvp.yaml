@@ -3,44 +3,43 @@ name: atlas-mvp
 services:
   api:
     container_name: ${MVP_API_CONTAINER_NAME:-atlas-mvp-api}
-    image: ${MVP_API_IMAGE:-crosstext2loc-gb10:f511}
-    gpus: all
+    image: ${MVP_API_IMAGE:-atlas-mvp-api:local}
+    build:
+      context: .
+      dockerfile: docker/app-api.Dockerfile
+    pull_policy: never
     init: true
     read_only: true
     restart: "no"
     environment:
-      CUDA_VISIBLE_DEVICES: "0"
       HOME: /root
       HF_HOME: /tmp/huggingface
-      GIT_CONFIG_COUNT: "1"
-      GIT_CONFIG_KEY_0: safe.directory
-      GIT_CONFIG_VALUE_0: /workspace/project/external/CVG-Text
-      CLIP_WEIGHTS_PATH: /root/.cache/clip/ViT-L-14-336px.pt
+      ATLAS_CVG_UTILS_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
+      CLIP_WEIGHTS_PATH: /models-not-loaded/ViT-L-14-336px.pt
       ATLAS_API_HOST: 0.0.0.0
       ATLAS_API_PORT: "8000"
-      ATLAS_QWEN_MODEL_PATH: /models/Qwen3-8B
-      ATLAS_QWEN_MODEL_ID: Qwen/Qwen3-8B
-      ATLAS_QWEN_MODEL_REVISION: b968826d9c46dd6066d109eabc6255188de91218
-      ATLAS_QWEN_REQUIRED: "true"
-      ATLAS_VISUAL_PROMOTION_ENABLED: ${ATLAS_VISUAL_PROMOTION_ENABLED:-false}
-      ATLAS_VISUAL_PRECOMPUTED_BUNDLE: ${ATLAS_VISUAL_PRECOMPUTED_BUNDLE_CONTAINER:-}
-      ATLAS_VISUAL_PROMOTION_FALLBACK: baseline
+      ATLAS_QWEN_REQUIRED: "false"
+      ATLAS_VISUAL_PROMOTION_ENABLED: "false"
       ATLAS_VISUAL_PROMOTION_REQUIRED: "false"
+      ATLAS_DIALOGUE_ENABLED: "false"
+      ATLAS_FREETEXT_OPERATIONAL_ENABLED: "false"
+      ATLAS_FREETEXT_APPLICATION_ENABLED: "false"
+      ATLAS_DQ_ITERATIVE_ENABLED: "true"
+      ATLAS_DQ_ITERATIVE_SESSION_ROOT: /dq-state/sessions
+      HF_DATASETS_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      WANDB_DISABLED: "true"
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=1g
+      - /tmp:rw,noexec,nosuid,size=256m
     volumes:
-      - .:/workspace/project:ro
-      - ${MVP_CLIP_CACHE_DIR:-${HOME}/.cache/clip}:/root/.cache/clip:ro
-      - ${MVP_QWEN_MODEL_DIR:-${HOME}/models/hf/Qwen3-8B-b968826d9c46}:/models/Qwen3-8B:ro
-      - ${MVP_VISUAL_BUNDLE_DIR:-./config}:/visual-bundles:ro
+      - dq-state:/dq-state
     working_dir: /workspace/project
     command:
       - /bin/bash
       - -lc
-      - >-
-        export ATLAS_CVG_UTILS_SHA256=$$(sha256sum
-        /workspace/project/external/CVG-Text/utils.py | cut -d' ' -f1) &&
-        exec /workspace/project/scripts/run_mvp1_api.sh
+      - exec /workspace/project/scripts/run_mvp1_api.sh
     expose:
       - "8000"
     healthcheck:
@@ -48,7 +47,7 @@ services:
       interval: 5s
       timeout: 4s
       retries: 36
-      start_period: 120s
+      start_period: 10s
     networks:
       - internal
 
@@ -58,9 +57,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        VITE_TILE_URL: ${VITE_TILE_URL:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}
-        VITE_TILE_ATTRIBUTION: ${VITE_TILE_ATTRIBUTION:-&copy; OpenStreetMap contributors}
     init: true
     read_only: true
     restart: "no"
@@ -68,11 +64,14 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "${MVP_BIND_HOST:-0.0.0.0}:${MVP_HTTP_PORT:-8080}:8080"
+      - "${MVP_BIND_HOST:-0.0.0.0}:${MVP_HTTP_PORT:-18080}:8080"
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m
       - /var/cache/nginx:rw,noexec,nosuid,size=32m
       - /var/run:rw,noexec,nosuid,size=1m
+    volumes:
+      - ${MVP_MAP_ASSETS_DIR:-${APP_MAP_ASSETS_DIR:-./data/processed/map-assets}}:/usr/share/nginx/map-assets:ro
+      - ${MVP_MAP_CONTEXT_DIR:-${APP_MAP_CONTEXT_DIR:-./results/generated/map-assets-context-2000m}}:/usr/share/nginx/map-context:ro
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 5s
@@ -96,8 +95,13 @@ services:
     depends_on:
       frontend:
         condition: service_healthy
+    command: ["node", "scripts/browser-mvp-blocked-check.mjs"]
     networks:
       - internal
 
 networks:
   internal: {}
+
+volumes:
+  dq-state:
+    name: ${MVP_DQ_STATE_VOLUME:-atlas-mvp-dq-state}

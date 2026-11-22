@@ -1,5 +1,17 @@
 # Hoja de ruta permanente para completar el TFG
 
+## 2026-11-22 — Cierre supervisado DialogueVPR → VLM
+
+- `IMPLEMENTED` en modo CPU con fixtures: reserva por turno, selección visual
+  Top-10/50/100, abstenciones, ranking combinado y fallback exacto, con FastAPI
+  y MapLibre. [Contrato y pruebas reproducibles](DIALOGUE_FINAL_VISUAL.md).
+- StageLease y DQ56 quedan externos. FastAPI conserva la verificación de
+  recibos; la prueba propia del host es opcional y no acredita inferencia real.
+- Verificación en worktree aislado y sin pesos: 104 pruebas Python aprobadas
+  (1 de StageLease omitida), 67 frontend aprobadas (1 omitida) y build Vite correcto.
+- **Siguiente acción:** acordar con el operador de GB10 la procedencia y versión
+  del supervisor, una ventana segura y permisos de inferencia. No se reemite Q1.
+
 ## Propósito y uso
 
 Este documento es la referencia operativa permanente para terminar el TFG de
@@ -462,6 +474,179 @@ Si una tarea falla:
 ## Historial de avances
 
 Las entradas son append-only.
+
+### 2026-11-16 — APP-DEPLOYMENT-PREPARATION-01
+
+- **Tarea:** preparar el despliegue aislado de la aplicación integrada sin
+  ejecutar contenedores, modelos ni inferencias.
+- **Resultado:** Compose autónomo con API GPU interna, frontend Nginx en loopback,
+  mounts de modelos/datos solo lectura, estado persistente y perfil fail-closed;
+  guía operativa y tests estáticos añadidos.
+- **Evidencia:** `compose.app.yaml`, `.env.app.example`,
+  `docs/APP_DEPLOYMENT.md`,
+  `config/freetext_application_profile.template.json` y
+  `tests/test_app_compose.py`.
+- **Decisiones:** el modo aplicación permanece desactivado y la plantilla no está
+  aprobada; no se montan cohortes, autorizaciones científicas, imágenes ni VLM.
+- **Bloqueos:** activación condicionada a perfil aprobado, hashes/identidad reales
+  y revisión explícita de recursos y limitaciones.
+- **Próximo paso:** revisar y aprobar un perfil de aplicación separado; no
+  habilitar ni ejecutar inferencia automáticamente. La próxima tarea científica
+  recomendada del roadmap no cambia.
+
+### 2026-11-16 — FREETEXT-APPLICATION-ADMISSION-01
+
+- **Tarea:** implementar un modo de admisión reutilizable para la aplicación,
+  separado de la autorización científica FreeText por ejecución.
+- **Resultado:** modo deshabilitado por defecto, perfil aprobado fail-closed,
+  ledger SQLite `FULL`/WAL, límites transaccionales, cuotas E0-E3 4/4/3,
+  idempotencia durable y acceso solo loopback implementados con tests fake.
+- **Evidencia:** `backend/atlas_api/freetext_application.py`,
+  `schemas/atlas-dialogue-freetext-application-profile-v1.schema.json`,
+  `config/freetext_application_profile.template.json` y
+  `tests/test_freetext_application.py`.
+- **Decisiones:** D098 se registra como `PROPUESTA`; no modifica ni aprueba el
+  flujo científico existente.
+- **Bloqueos:** falta crear y aprobar un perfil real con hashes exactos; no se
+  ejecutaron modelos ni se habilitó el modo.
+- **Próximo paso:** revisión humana de D098 y del perfil antes de cualquier
+  activación; no crear ni aprobar el perfil automáticamente.
+
+### 2026-11-16 — INTEGRATED-APPLICATION-COMPOSE-01
+
+- **Compose:** comando autónomo, loopback 18085, API interna, imágenes app propias,
+  datos/modelos read-only y estado SQLite persistente.
+- **Frontend:** MapLibre principal montado, E0-E3 incremental, PMTiles local, 3D
+  solo con `height` explícita, UI app-only y recovery por sesión/operation ID.
+- **Backend:** policy application separada, cuotas globales/per-session, no refunds,
+  una operación global, rutas científicas ausentes, GT/VLM/H38 prohibidos.
+- **Validación:** backend 72 PASS; frontend 45 PASS +1 skip; build/Compose/Nginx;
+  `APP_DISABLED_BROWSER_PASS`, `APP_FLOW_BROWSER_PASS` y SSE integration PASS.
+- **Runtime:** stack pendiente activo en `127.0.0.1:18085`; readiness 503 esperado,
+  cero POST de inferencia y cero modelos residentes.
+- **Estado:** `APP_INTEGRATED_PENDING_D098_PROFILE_APPROVAL_AND_REAL_GPU_TEST`.
+- **Próximo paso:** aprobar D098/perfil concreto; no activar inferencia ni VLM
+  automáticamente.
+
+### 2026-11-16 — FREETEXT-APPLICATION-D098-APPROVAL-01
+
+- **Aprobación:** D098 aceptada expresamente por el operador.
+- **Perfil:** `freetext-application-pgx-20261116-v1`, 90 días, sesiones
+  acumuladas ilimitadas, una abierta, máximos 4 Qwen/4 CT2L/3 preguntas,
+  cero retries y retención hasta revisión del TFG.
+- **Restricciones:** loopback/SSH, GPU secuencial, sin GT, VLM, referencias ni
+  H38-H61; ninguna inferencia al arrancar Compose.
+- **Separación:** core application con stop temprano explícito; core científico
+  original sin cambios.
+- **Autorización de prueba:** una sesión GPU real E0-E3 como máximo.
+- **Estado:** `APP_INTEGRATED_D098_APPROVED_PENDING_REAL_GPU_TEST`.
+
+### 2026-11-16 — FREETEXT-APPLICATION-GPU-SMOKE-01
+
+- **Sesión:** `freetext-application-7cf633c5-bf33-4acf-9aa7-a0841e0c8c19`.
+- **Resultado:** fallo E0 `runtime_error_no_retry`; sin ranking, pregunta o carga
+  de Qwen/CT2L.
+- **Causa:** `URLError` al consultar Ollama desde la red interna; GPU, memoria,
+  PSI y vmstat estaban limpios.
+- **Cuota:** reserva E0 conservada; cero retries y cero refunds.
+- **Corrección CPU/config:** sidecar allowlist `resource-monitor` para `/api/ps`,
+  healthy antes de API; no se repitió inferencia.
+- **Perfil posterior:** app `c4fef72d…`, core application `80a13a5d…`, executor
+  `d5a003a3…`, expiración `2027-02-14T16:56:53Z`.
+- **Estado:** `APP_INTEGRATED_D098_APPROVED_GPU_PREFLIGHT_FAILED_NO_RETRY`.
+- **Próximo paso:** autorización nueva antes de otro smoke GPU automatizado; el
+  uso interactivo del operador permanece autorizado por D098.
+- **Validación final CPU/contratos:** 79 backend PASS; frontend 45 PASS +1 skip;
+  browser app fake PASS; Compose/py_compile/diff PASS; revisión final 0 blockers.
+
+### 2026-11-16 — INTEGRATED-APP-UX-PERFORMANCE-01
+
+- **Infraestructura:** `atlas-mvp` y `atlas-historical-view` detenidos con
+  `compose stop`; contenedores, redes, imágenes, sesiones, volúmenes y evidencia
+  conservados. La app principal publica solo `127.0.0.1:8080`.
+- **Diagnóstico real:** E0 134,813 s; Qwen 119,296 s (3,046 s generación,
+  ~93 s carga); CT2L 15,491 s. Top-10 y pregunta existían en backend.
+- **Frontend:** recovery SSE de sesiones activas, errores visibles, nueva búsqueda
+  terminal, operation ID segura, mapa dominante, sidebar/drawer responsive y
+  conservación del último ranking válido.
+- **MapLibre:** D099 aplica `height`, niveles ×3 m y fallback 9 m solo en estilo;
+  Chromium observó 4.800 extrusiones y 8.031 features fuente en la cámara final;
+  el recuento depende del encuadre y no es un censo.
+- **Validación:** 48 frontend PASS +1 skip, 79 backend/regresión PASS,
+  `APP_FLOW_BROWSER_PASS`, sesión real Top-10/pregunta PASS y cero POST.
+- **Bloqueo:** modelos residentes requieren cambiar backend, regenerar perfil D098
+  y decidir el tratamiento de la sesión abierta `freetext-application-599d…`.
+- **Próximo paso:** decisión humana sobre preservar la sesión o regenerar perfil;
+  no ejecutar otra inferencia automáticamente.
+
+### 2026-11-16 — FREETEXT-APPLICATION-RESIDENT-V2-PREPARATION-01
+
+- **Sesión v1:** archivada byte-exacta con manifest `a06e6401…`; original marcado
+  `unknown/runtime_identity_superseded_no_retry`, ranking E0 y eventos conservados.
+- **D098 v2:** perfil `freetext-application-pgx-20261116-v2`, versión 2.0.0,
+  lifecycle residente secuencial lazy y vigencia hasta `2027-02-14T18:34:52Z`.
+- **Runtime:** una carga física lazy por modelo, dos preflights independientes,
+  un único `ModelGate` global, lock residente y cierre best-effort.
+- **Inferencia:** no ejecutada para v2; viabilidad conjunta Qwen+CT2L pendiente de
+  una futura prueba autorizada.
+- **Perfil final v2:** executor `6f7adaab…`, readiness
+  `resident-sequential-lazy-v1`, solo galería 50 m, cero POST/modelos al startup.
+- **Validación:** 83 backend PASS; 48 frontend PASS +1 skip; browser fake E0-E3
+  PASS; Compose/py_compile PASS.
+
+### 2026-11-16 — FREETEXT-APPLICATION-SSE-BOUNDARIES-01
+
+- **Defecto:** el frontend cerraba SSE ante `E0_qwen: completed`, antes de CT2L y
+  del límite global E0 `waiting_user`.
+- **Corrección:** clasificación explícita componente/sesión, reconexión por cursor,
+  guards de generación/session ID y doble reconciliación ante carrera terminal.
+- **Pruebas:** 50 frontend PASS +1 skip; app browser reload durante E0/E2 y E0-E3
+  PASS; Nginx desconexión/replay PASS; fallo E1 conserva Top-10 E0.
+- **Despliegue:** solo frontend recreado; API ID/start time y sesión/hash intactos,
+  contador POST 2→2, ninguna inferencia nueva.
+- **Estado real:** sesión v2 terminó posteriormente `failed` en E1 Qwen por una
+  respuesta externa; frontend final recupera E0 y muestra el fallo sin responder.
+
+### 2026-11-16 — INTEGRATED-APP-PROFESSIONAL-UX-01
+
+- **Diseño:** mapa dominante 70 %, panel derecho DialogueVPR, ranking compacto y
+  bottom sheet móvil; sistema visual documentado sin dependencias nuevas.
+- **Modal:** `<dialog>` bloqueante, focus trap, Escape/backdrop desactivados,
+  estados reales Qwen/CT2L/persistencia y cierre global seguro.
+- **Chat:** composer autoajustable, Enter/Shift+Enter, borrador durable, pregunta
+  N/3, scroll independiente y último ranking válido ante fallo.
+- **Validación:** 50 frontend PASS +1 skip; APP_FLOW, Nginx SSE y diseño responsive
+  Chromium PASS; capturas fake versionadas, sin inferencia GPU.
+- **E1 real:** Qwen cache hit y generación 3,677 s; fallo exacto post-generación
+  `ValueError: salida FreeText rechazada por validación`; CT2L E1 no ejecutado.
+- **Bloqueo:** output/validation issues rechazados no se persistían; propuesta de
+  sidecar diagnóstico pendiente de aprobación antes de cambiar runtime/D098.
+
+### 2026-11-16 — FREETEXT-FAILURE-MODES-AUDIT-01
+
+- **Auditoría:** rutas `failed/unknown`, reservas, persistencia, Qwen, CT2L,
+  ModelGate, SSE y recovery inventariadas.
+- **Causa intermitente demostrada:** validación post-Qwen en E1/E3; existen otras
+  sesiones v2 E3 completadas, por lo que no es un fallo global de residencia.
+- **Propuesta:** validador específico y sidecar de rechazo diseñados, pero no
+  conservados en código tras revisión de alcance/privacidad; cero GPU.
+- **Frontend:** mensajes de validación/CT2L/unknown contextuales; último ranking y
+  acción Nueva búsqueda conservados. Desplegado solo frontend, API no reiniciada.
+- **Decisión:** D100 permanece `PROPUESTA`; runtime autorizado restaurado byte a
+  byte, D098 no regenerado. Requiere aprobación de alcance y retención.
+
+### 2026-11-16 — DIALOGUEVPR-SCIENTIFIC-AUDIT-01
+
+- **Implementación real:** selector propio determinista sobre Top-20, clusters 75 m
+  y evidencia F3; DQ-pilot no implementado; Qwen no selecciona preguntas.
+- **Adaptatividad CPU:** ranking distinto cambia intención; scores reescalados sin
+  cambio de orden no; familias usadas se bloquean; shared feature produce stop.
+- **Naturalidad:** estudio determinista bajo `research/`, no importado ni desplegado;
+  7 tests nuevos de auditoría/wording y 43 regresiones relacionadas dentro de un
+  comando de 50 PASS, sin GPU y sin tocar sesión activa.
+- **Limitaciones:** utilidad heurística, unión de features por cluster, ausencia F3
+  unknown, sin entropía/visibilidad/parser semántico o convergencia.
+- **Decisión:** D101 `PROPUESTA`; no cambia policy, preguntas reales ni D098.
 
 ### 2026-11-06 — P2-04-CONTINUATION-BLOCKED-01
 

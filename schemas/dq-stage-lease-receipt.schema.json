@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Contrato de admisión del recibo StageLease (campos mínimos)",
+  "type": "object",
+  "required": ["lease", "postflight_sha256", "terminal_sha256", "execution_id", "cgroup_state"],
+  "properties": {
+    "lease": {
+      "type": "object",
+      "required": ["contract_version", "operation_sha256", "session_id", "operation_id", "component", "mode"],
+      "properties": {
+        "contract_version": {"const": "atlas-dq-exclusive-stage-lease-v1"},
+        "operation_sha256": {"$ref": "#/$defs/sha256"},
+        "session_id": {"type": "string", "minLength": 1},
+        "operation_id": {"type": "string", "minLength": 1},
+        "component": {"enum": ["qwen", "crosstext2loc", "dq_pilot", "qwen_translation"]},
+        "mode": {"const": "real"}
+      }
+    },
+    "postflight_sha256": {"$ref": "#/$defs/sha256"},
+    "terminal_sha256": {"$ref": "#/$defs/sha256"},
+    "execution_id": {"type": "string", "minLength": 1},
+    "cgroup_state": {"enum": ["empty", "removed"]}
+  },
+  "$defs": {"sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}
+}

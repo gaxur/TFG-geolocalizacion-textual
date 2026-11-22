@@ -1,4 +1,4 @@
-// E2E real: Chromium -> Nginx -> FastAPI -> CrossText2Loc -> Leaflet.
+// E2E real: Chromium -> Nginx -> FastAPI -> CrossText2Loc -> MapLibre/recursos locales.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -10,7 +10,7 @@ const chromePath = process.env.CHROME_PATH || ['/usr/bin/google-chrome', '/usr/b
 if (!chromePath) throw new Error('No se encontró Chrome/Chromium. Define CHROME_PATH.');
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-real-browser-'));
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const browser = spawn(chromePath, ['--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
+const browser = spawn(chromePath, ['--headless=new', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--enable-webgl', '--ignore-gpu-blocklist', '--use-gl=angle', '--use-angle=swiftshader', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
 let launchError, ws;
 browser.on('error', error => { launchError = error; });
 
@@ -22,8 +22,19 @@ try {
   ws = new WebSocket(pages.find(page => page.type === 'page').webSocketDebuggerUrl);
   await new Promise(resolve => ws.addEventListener('open', resolve, { once: true }));
   let id = 0;
-  const pending = new Map(), errors = [];
-  ws.addEventListener('message', event => { const data = JSON.parse(event.data); if (data.method === 'Runtime.exceptionThrown') errors.push(data.params.exceptionDetails.exception?.description || data.params.exceptionDetails.text); const item = pending.get(data.id); if (item) { pending.delete(data.id); data.error ? item.reject(new Error(JSON.stringify(data.error))) : item.resolve(data.result); } });
+  const pending = new Map(), errors = [], externalMapRequests = [];
+  ws.addEventListener('message', event => {
+    const data = JSON.parse(event.data);
+    if (data.method === 'Runtime.exceptionThrown') errors.push(data.params.exceptionDetails.exception?.description || data.params.exceptionDetails.text);
+    if (data.method === 'Network.requestWillBeSent') {
+      try {
+        const requestUrl = new URL(data.params.request.url);
+        if (['http:', 'https:'].includes(requestUrl.protocol) && requestUrl.origin !== baseUrl) externalMapRequests.push(requestUrl.href);
+      } catch { /* data/blob URLs are not external cartographic requests. */ }
+    }
+    const item = pending.get(data.id);
+    if (item) { pending.delete(data.id); data.error ? item.reject(new Error(JSON.stringify(data.error))) : item.resolve(data.result); }
+  });
   const send = (method, params = {}) => new Promise((resolve, reject) => { pending.set(++id, { resolve, reject }); ws.send(JSON.stringify({ id, method, params })); });
   const evaluate = async expression => { const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails)); return result.result.value; };
   const click = selector => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
@@ -36,20 +47,37 @@ try {
     await fill('Estoy en una plaza urbana amplia rodeada de edificios y calles estrechas');
     await click('.search-button');
     await waitFor(`document.querySelectorAll('.result-card').length === 10`);
-    assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker').length`), 10);
-    assert.equal(await evaluate(`document.querySelectorAll('.candidate-cell').length`), 10);
+    await waitFor(`document.querySelectorAll('.map-result-marker').length === 10`);
+    assert.equal(await evaluate(`document.querySelectorAll('.map-result-marker').length`), 10);
+    assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapCandidateCount`), '10');
+    assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapCellCount`), '10');
     assert.match(await evaluate(`document.querySelector('.cell-legend').textContent`), new RegExp(`${gallery.includes('25m') ? '25' : '50'} × ${gallery.includes('25m') ? '25' : '50'} m`));
-    assert.equal(await evaluate(`document.querySelectorAll('.candidate-marker.top-result').length`), 1);
+    assert.equal(await evaluate(`document.querySelectorAll('.map-result-marker.is-top-result').length`), 1);
     assert.equal(await evaluate(`[...document.querySelectorAll('.coordinate-compact')].every(x => /^-?\\d+\\.\\d+, -?\\d+\\.\\d+$/.test(x.textContent.trim()))`), true);
-    return evaluate(`[...document.querySelectorAll('.result-card')].map(card => ({id:card.querySelector('h3').textContent,score:card.querySelector('.score-row strong').childNodes[0].textContent.trim()}))`);
+    const renderer = await evaluate(`document.querySelector('#results-map').dataset.mapRenderer`);
+    const basemap = await evaluate(`document.querySelector('#results-map').dataset.mapBasemap`);
+    const buildings3d = !(await evaluate(`document.querySelector('[data-map-action="mode-3d"]').disabled`));
+    if (basemap === 'ready' && buildings3d) {
+      assert.equal(renderer, 'maplibre');
+      await click('[data-map-action="mode-3d"]');
+      assert.equal(await evaluate(`document.querySelector('#results-map').dataset.mapMode`), '3d');
+      await click('[data-map-action="mode-2d"]');
+    }
+    return {
+      results: await evaluate(`[...document.querySelectorAll('.result-card')].map(card => ({id:card.querySelector('h3').textContent,score:card.querySelector('.score-row strong').childNodes[0].textContent.trim()}))`),
+      renderer,
+      local_basemap: basemap,
+      local_building_extrusion: buildings3d,
+      local_cell_polygons: Number(await evaluate(`document.querySelector('#results-map').dataset.mapCellCount`)),
+    };
   };
 
-  await send('Runtime.enable'); await send('Page.enable');
+  await send('Runtime.enable'); await send('Page.enable'); await send('Network.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1080, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: baseUrl });
   await waitFor(`!!document.querySelector('#description') && !document.querySelector('[data-dropdown="gallery"]').disabled`);
   const rows50 = await run('madrid-50m', 'no_llm');
-  await click('.candidate-marker-shell:nth-of-type(2) .candidate-marker');
+  await evaluate(`document.querySelectorAll('.map-result-marker')[1].click()`);
   assert.equal(await evaluate(`document.querySelectorAll('.result-card.selected').length`), 1);
   const rows25 = await run('madrid-25m', 'no_llm');
   const llm50 = await run('madrid-50m', 'with_llm');
@@ -57,8 +85,9 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await delay(300);
   assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
+  assert.deepEqual(externalMapRequests, [], 'la interfaz no solicita cartografía a proveedores externos');
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ status: 'pass', base_url: baseUrl, no_llm_50m: rows50, no_llm_25m: rows25, with_llm_50m: llm50, with_llm_25m: llm25, leaflet_markers: true, mobile: true }));
+  console.log(JSON.stringify({ status: 'pass', base_url: baseUrl, no_llm_50m: rows50, no_llm_25m: rows25, with_llm_50m: llm50, with_llm_25m: llm25, external_map_requests: externalMapRequests.length, mobile: true }));
 } finally {
   ws?.close(); browser.kill();
 }

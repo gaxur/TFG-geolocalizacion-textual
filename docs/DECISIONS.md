@@ -110,6 +110,13 @@ apruebe expresamente o sea consecuencia inequívoca de una decisión ya aceptada
 | D092 | Evaluar reranking discriminativo con descuento de soporte compartido y compatibilidad espacial | PROPUESTA | VLM / reranking |
 | D093 | Seleccionar Qwen3-VL-8B con Top-50 y β=0,1 como política previa al test | ACEPTADA | VLM / calibración H26-H37 |
 | D094 | Mantener Atlas v3 tras ablaciones v2 y proponer nueva fuente/selección visual | PROPUESTA | VLM / mejora posterior |
+| D095 | Diálogo adaptativo de hasta tres preguntas en contrato v2 | ACEPTADA | DialogueVPR / orquestación |
+| D096 | Evidencia visual opcional y no vinculante en DialogueVPR | ACEPTADA | DialogueVPR / VLM / provenance |
+| D097 | Perfil Python local para preparar PMTiles de D004 desde PBF F4 | PROPUESTA | Cartografía / frontend |
+| D098 | Separar admisión reutilizable de aplicación de la autorización científica FreeText | ACEPTADA | MVP / FreeText |
+| D099 | Completar edificios mediante alturas estimadas solo en MapLibre | ACEPTADA | Aplicación / cartografía visual |
+| D100 | Validador FreeText específico y sidecars de outputs rechazados | PROPUESTA | Aplicación / robustez |
+| D101 | Separar intención grounded y formulación lingüística controlada | PROPUESTA | DialogueVPR / preguntas |
 
 ## D053 — API HTTP interna del MVP
 
@@ -4128,3 +4135,129 @@ decisión.
 | Confirmar condiciones del checkpoint y de las imágenes CrossText2Loc | Condiciona uso y publicación de artefactos | Autores y proveedor | No bloquea el diseño; sí antes de distribuir | D007, D013, D016 |
 | Confirmar permisos del proveedor satelital | Condiciona almacenamiento y embeddings derivados | Proveedor | No | D015 |
 | Confirmar licencias y permisos de GeoBridge/GeoLoc y de la galería visual | Condiciona ejecución, almacenamiento de embeddings y publicación | Autores y proveedor | No para el MVP; sí para la extensión | D038 |
+
+## D097 — Perfil Python local para teselas vectoriales PMTiles
+
+**Estado:** PROPUESTA
+**Componente:** Cartografía / frontend MapLibre
+**Fecha:** 2026-11-06
+**Origen:** Implementación local de P12 con las fuentes OSM F2/F4 restauradas.
+
+### Propuesta
+
+Usar un flujo offline y opcional, aislado del runtime del MVP, para convertir el
+PBF F4 regional verificado en un PMTiles local limitado a D004 y un margen de
+250 m calculado en EPSG:25830. El prototipo usa PyOsmium para lectura, Shapely
+para validar/recortar, `mapbox-vector-tile` para MVT y el writer Python de
+PMTiles. El archivo conserva OSM bajo ODbL 1.0 y attribution visible.
+
+La extrusión solo consume valores OSM numéricos explícitos de `height` o
+`building:height`; `min_height` se usa como base únicamente si es menor que una
+altura explícita válida. `building:levels` no se convierte a metros. La
+generación de mapa no interviene en inferencia, selección, ranking, ground truth
+ni embeddings.
+
+### Contexto y alternativas
+
+El repositorio tenía un render F4 raster con Mapnik, no un generador vectorial
+PMTiles. En este host Windows no había `osmium-tool`, Java, Planetiler, Tippecanoe
+ni Docker. Planetiler con un profile propio sería otra alternativa, condicionada
+a fijar JVM/profile y comprobar que no descargue datos auxiliares ni infiera
+alturas. Reutilizar el render Mapnik existente conservaría el raster y no
+habilitaría capas vectoriales/3D. Un proveedor remoto no cumple el requisito
+offline/coste cero.
+
+El margen de 250 m es una extensión cartográfica alrededor de la bbox piloto,
+equivalente a cinco lados de celda de 50 m; no cambia D004, candidatos ni el
+ámbito de evaluación. Sigue siendo una elección de presentación revisable.
+
+### Evidencia y límites
+
+El profile local produjo un PMTiles MVT/GZIP v3 con siete capas, zoom 11–17,
+77 teselas y provenance content-addressed. El PBF F4 se usó exclusivamente como
+fuente cartográfica; los manifests geométricos son F1, con
+`osm_snapshot_id: null`, validados separadamente contra las selecciones F4. El
+browser-check ejecutó MapLibre con el PMTiles y GeoJSON F1 locales y una API
+fake; no valida FastAPI ni Compose/Nginx real.
+
+### Pendiente
+
+Esta propuesta no se promueve a `ACEPTADA` sin aprobación expresa. Antes de
+distribuir el archive debe revisarse el paquete derivado conforme a ODbL. La
+validación en PGX/ARM64, Docker Compose/Nginx y hardware objetivo sigue pendiente.
+
+## D098 — Modo aplicación FreeText reutilizable y separado
+
+**Estado:** ACEPTADA
+**Componente:** Aplicación integrada / FreeText-v1
+**Fecha:** 2026-11-16
+
+### Propuesta
+
+Mantener intacta la autorización científica one-shot y añadir una policy distinta,
+`dialogue-vpr-freetext-v1-application`, para uso local reutilizable. Un perfil
+aprobado fija identidad, expiry y máximo de sesiones abiertas. El uso acumulativo
+no tiene límite de sesiones o descripciones. Cada sesión reserva como máximo 4
+Qwen, 4 CT2L y 3 preguntas, con cero retries; cuotas inciertas no se devuelven.
+
+El despliegue queda ligado a `127.0.0.1`, con una sola operación de modelo,
+FastAPI/Nginx app-only, SQLite durable, modelos/datos read-only y sin GT, VLM,
+referencias ni H38-H61. Cambiar perfil, cuotas, expiry o identidad exige otra
+aprobación.
+
+### Aprobación registrada
+
+- Perfil v1: `freetext-application-pgx-20261116-v1`, runtime efímero, supersedido
+  tras archivar íntegramente la sesión abierta.
+- Perfil v2 aprobado: `freetext-application-pgx-20261116-v2`, versión `2.0.0`,
+  runtime `resident-sequential-lazy-v1`.
+- Vigencia v2: `2026-11-16T18:34:52Z` a `2027-02-14T18:34:52Z`.
+- Sesiones/descripciones acumuladas: ilimitadas (`null`).
+- Sesiones abiertas: 1.
+- Retención: hasta revisión del TFG.
+- Acceso: loopback y túnel SSH, sin exposición pública.
+- GPU: secuencial y solo tras acción del usuario; Compose no infiere al arrancar.
+- Prueba autorizada: una sesión real, sin VLM ni campañas adicionales.
+
+La aprobación fue emitida expresamente por el operador el 2026-11-16. El perfil
+real permanece fuera de Git en `runtime/` y está ligado a policies y executor.
+
+## D099 — Alturas estimadas exclusivamente para visualización MapLibre
+
+**Estado:** ACEPTADA
+**Componente:** Aplicación / frontend cartográfico
+**Fecha:** 2026-11-16
+
+La aplicación usa `height` OSM explícita cuando existe. Si falta, puede derivar
+una altura visual como `building:levels × 3 m`; sin ambos datos usa 9 m. Los tres
+casos se distinguen por color y la interfaz declara que niveles/fallback son
+estimaciones, no mediciones.
+
+La regla vive únicamente en expresiones `fill-extrusion` del navegador. No
+modifica PMTiles, geometrías OSM, catálogo F1, asociaciones F3, embeddings,
+CrossText2Loc ni evaluación. `min_height` se respeta cuando existe y se usa una
+sola capa de extrusión para no duplicar capas base/partes.
+
+## D100 — Validador específico y evidencia de rechazos FreeText
+
+**Estado:** PROPUESTA
+**Componente:** Aplicación / Qwen textual
+**Fecha:** 2026-11-16
+
+Separar la validación DialogueVPR del contrato histórico F5 para distinguir
+incapacidad, negación factual, entidades, direcciones y números/unidades. Ante
+rechazo se conservaría un sidecar diagnóstico excluido de retrieval. La propuesta
+mantiene cero retries y requiere nueva identidad/perfil D098 antes de activarse.
+
+## D101 — Selección grounded y formulación controlada separadas
+
+**Estado:** PROPUESTA
+**Componente:** DialogueVPR / preguntas
+**Fecha:** 2026-11-16
+
+Mantener el selector determinista actual como nivel semántico y estudiar variantes
+lingüísticas controladas, reproducibles y auditables como nivel de presentación.
+El contrato transporta intención, evidencia, hipótesis, utilidad y pregunta
+canónica sin mutarlas; la equivalencia del texto visible queda pendiente de
+revisión humana. El estudio vive fuera del runtime; cualquier activación exige
+policy versionada y regeneración D098.

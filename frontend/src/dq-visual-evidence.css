@@ -1,0 +1,7 @@
+.dq-replay-evidence { display: grid; gap: .6rem; margin-block: .8rem; }
+.dq-replay-evidence h4, .dq-replay-evidence p { margin: 0; }
+.dq-replay-evidence code { overflow-wrap: anywhere; }
+.dq-evidence-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: .6rem; }
+.dq-evidence-grid figure { min-width: 0; margin: 0; }
+.dq-evidence-grid img { display: block; width: 100%; aspect-ratio: 4/3; object-fit: contain; background: #18252b; border-radius: .4rem; }
+.dq-evidence-grid figcaption { font-size: .8rem; padding-block: .25rem; }

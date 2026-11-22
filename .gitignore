@@ -54,6 +54,8 @@
 /results/cache/
 /results/cross_text2loc_docker/
 /results/cross_text2loc_wait_run/
+/runtime/
+/.runtime/
 *.log
 *.tmp
 *.temp
@@ -101,6 +103,7 @@ Desktop.ini
 .env.*
 !.env.example
 !.env.mvp.example
+!.env.app.example
 credentials.json
 *service-account*.json
 *service_account*.json

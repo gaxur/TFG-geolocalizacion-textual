@@ -1,0 +1,22 @@
+services:
+  api:
+    build: ./frontend/tests/app-fixture
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.app
+    depends_on: [api]
+    volumes:
+      - ${APP_MAP_ASSETS_DIR:-./data/processed/map-assets}:/usr/share/nginx/map-assets:ro
+      - ${APP_MAP_CONTEXT_DIR:-./results/generated/map-assets-context-2000m}:/usr/share/nginx/map-context:ro
+  browser-check:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.browser
+    environment:
+      CHROME_PATH: /usr/bin/chromium
+      APP_BASE_URL: http://frontend:8080
+    depends_on: [frontend]
+    volumes:
+      - ${APP_BROWSER_SCREENSHOT_DIR:-/tmp}:/tmp/screenshots
+    command: ["node","scripts/browser-dq-pilot24-check.mjs"]

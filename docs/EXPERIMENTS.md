@@ -1,5 +1,13 @@
 # Registro de experimentos
 
+## 2026-11-22 — Cierre supervisado con fixtures CPU
+
+Las pruebas en worktree aislado verifican la reserva exhaustiva, la actualización
+por respuesta, la selección visual del Top-50 final, promoción desde fuera del
+Top-10, abstención, fallback, rechazo de recibos inválidos y relectura. Se usaron
+dobles sintéticos: no se cargaron pesos ni se validó el supervisor del host.
+Véase [contrato y reproducción](DIALOGUE_FINAL_VISUAL.md).
+
 Conservar por separado el protocolo oficial de Nueva York, cuya galería de 100
 vecinos se obtiene usando las coordenadas reales de cada consulta, y cualquier
 evaluación sobre una galería que no utilice el ground truth para seleccionar
@@ -11,6 +19,67 @@ Cada ejecución futura debe registrar objetivo, fecha, commits, hardware,
 entorno, dataset, checkpoint y hash, configuración, comando, resultados,
 métricas, tiempo, memoria, problemas y cambios realizados. Solo se sustituirán
 valores pendientes por observaciones reales.
+
+## Aplicación FreeText GPU smoke 2026-11-16
+
+### Objetivo y alcance
+
+Validar una sesión reutilizable autorizada bajo D098, sin VLM, ground truth,
+referencias, H38-H61, retries ni campañas adicionales.
+
+### Resultado
+
+- Perfil: `freetext-application-pgx-20261116-v1`.
+- Sesión: `freetext-application-7cf633c5-bf33-4acf-9aa7-a0841e0c8c19`.
+- Descripción SHA-256:
+  `4d77bbff9dd7593266a053ad9e5a4dbc36659d50ec9d1667dd8a902972cdae37`.
+- Estado: `failed`, `runtime_error_no_retry`, sin snapshots E0.
+- Reserva: una unidad E0 Qwen/CT2L/pregunta, sin refund.
+- Modelos cargados: ninguno.
+
+El resource gate observó 99-100 GB disponibles, PSI 0, cero procesos GPU y cero
+deltas bloqueantes. Bloqueó por `URLError` al consultar Ollama desde la red
+interna. Después se añadió un sidecar allowlist para `/api/ps` y se verificó
+`{"models":[]}` desde API, pero el agente no repitió inferencia: otro smoke
+automatizado requiere autorización nueva. D098 sí mantiene autorizado el uso
+interactivo iniciado por el operador.
+
+## Auditoría de latencia E0 de aplicación 2026-11-16
+
+Se inspeccionó en lectura la sesión iniciada por el operador
+`freetext-application-599db399-b8d3-48bd-a172-0fd7628d342a`. El agente no la
+inició, no respondió su pregunta y no ejecutó modelos adicionales.
+
+- E0 completo: 134,813 s.
+- Qwen por eventos: 119,296 s.
+- Generación interna Qwen: 3,046 s.
+- Supervisor Qwen: carga visible de 399 pesos durante aproximadamente 93 s.
+- CrossText2Loc por eventos: 15,491 s.
+- Resultado: 253 candidatos exhaustivos, Top-10 público y primera pregunta.
+- Estado al cerrar esta auditoría: `waiting_user`.
+
+La comparación con el MVP residente identifica las cargas repetidas como cuello
+de botella dominante. No se modificó el backend porque hacerlo invalidaría la
+identidad D098 y la sesión abierta. Véase [APP_PERFORMANCE_AND_UX_AUDIT.md](APP_PERFORMANCE_AND_UX_AUDIT.md).
+
+La sesión se archivó posteriormente, antes del runtime v2, en
+`runtime/freetext-application/superseded-sessions/` con manifest
+`a06e6401baa785582ece933737420fae0e97eacc0fa1dd96b92c2c420f6312e8`.
+El original conserva ranking/eventos y quedó `unknown` por supersession, no por
+fallo de inferencia. No se ejecutaron E1-E3.
+
+## Fallo E1 Qwen residente 2026-11-16
+
+- Sesión: `freetext-application-5f0b0122-b141-4489-a0b5-385d342a16af`.
+- Perfil: D098 v2, lifecycle `resident-sequential-lazy-v1`.
+- Respuesta persistida antes de inferencia; SHA-256 `1c93ebdd…`.
+- Qwen: cache hit, carga 0 ms, ejecución 3.677,003 ms.
+- Resultado: `ValueError: salida FreeText rechazada por validación`.
+- CT2L E1: no iniciado; ranking E0 conservado.
+- Evidencia saneada:
+  `docs/evidence/freetext-e1-qwen-failure-5f0b0122.json`.
+- Limitación: no se persistieron raw output rechazado ni issues; no puede
+  atribuirse honestamente el rechazo a una regla concreta sin nueva inferencia.
 
 ## F4.1b-B: galería visual OSM de Madrid
 

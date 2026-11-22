@@ -12,15 +12,17 @@ export class AtlasApiError extends Error {
 
 const trimSlash = value => String(value || DEFAULT_BASE_URL).replace(/\/$/, '');
 
-async function parseJsonResponse(response) {
+export async function parseJsonResponse(response) {
   const requestId = response.headers?.get?.('x-request-id') || '';
   let body;
+  const contentType=String(response.headers?.get?.('content-type')||'').toLowerCase();
   try { body = await response.json(); }
   catch (cause) {
-    throw new AtlasApiError('El servicio devolvió una respuesta que no es JSON válido.', { code: 'INVALID_API_RESPONSE', status: response.status, requestId, cause });
+    const proxyLike=[502,503,504].includes(response.status)||contentType.includes('text/html');
+    throw new AtlasApiError(proxyLike?'El proxy perdió la respuesta del backend; se comprobará si la operación quedó persistida.':'El servicio devolvió una respuesta que no es JSON válido.', { code:proxyLike?'UPSTREAM_RESPONSE_LOST':'INVALID_API_RESPONSE', status: response.status, requestId, cause });
   }
   if (!response.ok) {
-    const error = body?.error;
+    const error = body?.error || body?.detail;
     throw new AtlasApiError(error?.message || 'El servicio no pudo completar la petición.', {
       code: error?.code || `HTTP_${response.status}`,
       status: response.status,
@@ -30,7 +32,7 @@ async function parseJsonResponse(response) {
   return body;
 }
 
-async function fetchJson(path, { baseUrl = DEFAULT_BASE_URL, method = 'GET', body, signal, timeoutMs = 20000, fetchImpl = fetch } = {}) {
+async function fetchJson(path, { baseUrl = DEFAULT_BASE_URL, method = 'GET', body, headers = {}, signal, timeoutMs = 20000, fetchImpl = fetch } = {}) {
   const timeout = new AbortController();
   const timer = setTimeout(() => timeout.abort('timeout'), timeoutMs);
   const combined = signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal;
@@ -38,7 +40,7 @@ async function fetchJson(path, { baseUrl = DEFAULT_BASE_URL, method = 'GET', bod
     const response = await fetchImpl(`${trimSlash(baseUrl)}${path}`, {
       method,
       signal: combined,
-      headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     return await parseJsonResponse(response);
@@ -62,6 +64,51 @@ export function getCapabilities(options = {}) {
 export function retrieve(request, options = {}) {
   return fetchJson('/retrievals', { ...options, method: 'POST', body: request });
 }
+
+export function getDialogueQueries(options = {}) {
+  return fetchJson('/dialogue/queries', options);
+}
+export function getDialogueVariants(options={}){return fetchJson('/dialogue/variants',options);}
+
+export function startDialogue(request, options = {}) {
+  return fetchJson('/dialogue/sessions', { ...options, method: 'POST', body: request });
+}
+
+export function getDialogueSession(sessionId, options = {}) {
+  return fetchJson(`/dialogue/sessions/${encodeURIComponent(sessionId)}`, options);
+}
+
+export function answerDialogue(sessionId, request, options = {}) {
+  return fetchJson(`/dialogue/sessions/${encodeURIComponent(sessionId)}/answers`, { ...options, method: 'POST', body: request });
+}
+export function getFreeTextPilot(options={}){return fetchJson('/dialogue-freetext/pilot',options);}
+export function getFreeTextPilots(options={}){return fetchJson('/dialogue-freetext/pilots',options);}
+export function startFreeText(request,options={}){const operationId=request?.client_operation_id;return fetchJson('/dialogue-freetext/sessions',{...options,method:'POST',body:request,headers:{...(options.headers||{}),...(operationId?{'Idempotency-Key':operationId}:{})}});}
+export function getFreeTextSession(sessionId,options={}){return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}`,options);}
+export function getApplicationSessionByOperation(operationId,options={}){return fetchJson(`/dialogue-freetext/application/operations/${encodeURIComponent(operationId)}`,options);}
+export function getDQIterativeSessionByOperation(operationId,options={}){return fetchJson(`/dialogue-freetext/iterative/operations/${encodeURIComponent(operationId)}`,options);}
+export function prepareDQIterative(request,options={}){const operationId=request?.client_operation_id;return fetchJson('/dialogue-freetext/iterative/preparations',{...options,method:'POST',body:request,headers:{...(options.headers||{}),...(operationId?{'Idempotency-Key':operationId}:{})}});}
+export function startHistoricalReplay(operationId, options={}) {
+  return fetchJson('/dialogue-freetext/iterative/historical-replays',{...options,method:'POST',body:{client_operation_id:operationId},headers:{...(options.headers||{}),'Idempotency-Key':operationId}});
+}
+export function saveHistoricalTranslation(sessionId, request, options={}) {
+  return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/historical-translation`,{...options,method:'POST',body:request});
+}
+export function answerFreeText(sessionId,request,options={}){const operationId=request?.client_operation_id;return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/answers`,{...options,method:'POST',body:request,headers:{...(options.headers||{}),...(operationId?{'Idempotency-Key':operationId}:{})}});}
+export function stopDQIterative(sessionId,request,options={}){const operationId=request?.client_operation_id;return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/stop`,{...options,method:'POST',body:request,headers:{...(options.headers||{}),...(operationId?{'Idempotency-Key':operationId}:{})}});}
+export function decidePilotTranslation(sessionId,request,options={}){return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/pilot-translation-decisions`,{...options,method:'POST',body:request});}
+export function submitDQVisualAction(sessionId, kind, request, options={}) {
+  const leaf={panel:'panel-reviews',question:'question-reviews',manual:'visual-translation'}[kind];
+  if(!leaf)throw new TypeError('Acción visual desconocida.');
+  return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/${leaf}`,{...options,method:'POST',body:request});
+}
+export function cancelDQIterative(sessionId,request,options={}){return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/cancel`,{...options,method:'POST',body:request});}
+export function getFreeTextEvents(sessionId,options={}){return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/events`,options);}
+export function freeTextEventStreamUrl(sessionId,{baseUrl=DEFAULT_BASE_URL,after}={}){const suffix=after?`&after=${encodeURIComponent(after)}`:'';return `${String(baseUrl).replace(/\/$/,'')}/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/events/stream?follow=true${suffix}`;}
+export function getDevelopmentQueries(options={}){return fetchJson('/dialogue-development/queries',options);}
+export function prepareDevelopmentSession(request,options={}){return fetchJson('/dialogue-development/sessions',{...options,method:'POST',body:request});}
+export function getDevelopmentSession(sessionId,{operatorView=true,...options}={}){return fetchJson(`/dialogue-development/sessions/${encodeURIComponent(sessionId)}?operator_view=${operatorView?'true':'false'}`,options);}
+export function answerDevelopmentSession(sessionId,request,options={}){return fetchJson(`/dialogue-development/sessions/${encodeURIComponent(sessionId)}/answers`,{...options,method:'POST',body:request});}
 
 export const apiBaseUrl = import.meta.env?.VITE_ATLAS_API_BASE_URL || DEFAULT_BASE_URL;
 
