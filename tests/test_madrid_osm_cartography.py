@@ -63,6 +63,13 @@ class MadridOSMCartographyTests(unittest.TestCase):
                 "geometry": LineString([(minx + 5, miny + 5), (minx + 80, miny + 80)]),
                 "properties": {"class": "minor", "highway": "residential"},
             },
+            {
+                "layer": "vegetation_3d", "source_type": "node", "osm_id": 12,
+                "geometry": Polygon([(minx + 50, miny + 50), (minx + 55, miny + 50),
+                                      (minx + 55, miny + 55), (minx + 50, miny + 55)]),
+                "properties": {"class": "tree", "visual_height": 6.0, "visual_base": 1.8,
+                               "dimensions_observed": False, "dimensions_illustrative": True},
+            },
         ]
         tiles, tile_stats = build_mvt_tiles(features, context, min_zoom=15, max_zoom=15)
         layers = vector_layer_metadata(features, min_zoom=15, max_zoom=15)
@@ -87,6 +94,7 @@ class MadridOSMCartographyTests(unittest.TestCase):
             validation = validate_pmtiles_archive(output, context["map_bounds_wgs84"])
             self.assertEqual(validation["tile_type"], "MVT")
             self.assertGreater(validation["explicit_height_features_in_tiles"], 0)
+            self.assertGreater(validation["decoded_feature_counts_by_layer"]["vegetation_3d"], 0)
             with self.assertRaises(FileExistsError):
                 write_pmtiles(
                     output, tiles, context, source_id="f4-test", source_sha256="a" * 64,

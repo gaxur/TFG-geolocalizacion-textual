@@ -94,7 +94,7 @@ def test_arbitrary_description_idempotency_e0_e3_and_recreate(tmp_path):
             assert duplicate.status_code == 200
             session = client.get(f"/api/v1/dialogue-freetext/sessions/{session_id}").json()
         final = session
-        assert final["status"] == "completed" and [row["stage"] for row in final["stage_snapshots"]] == ["E0", "E1", "E2", "E3"] and "stages" not in final
+        assert final["status"] == "completed" and final["maximum_questions"] == 3 and [row["stage"] for row in final["stage_snapshots"]] == ["E0", "E1", "E2", "E3"] and "stages" not in final
         assert executor.qwen_calls == executor.ct2l_calls == ["E0", "E1", "E2", "E3"]
         recreated = OperationalFreeTextSessionService(session_root=tmp_path / "sessions", executor=executor, enabled=True, authorization_root=tmp_path/'auth', policy_identity=POLICY, execution_id='exec-1')
         assert recreated.load(session_id)["status"] == "completed"

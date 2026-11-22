@@ -1,0 +1,6 @@
+-r requirements-dev.txt
+-r backend/requirements.txt
+-r backend/requirements-dev.txt
+pytest==9.1.1
+Pillow==12.2.0
+PyYAML==6.0.3

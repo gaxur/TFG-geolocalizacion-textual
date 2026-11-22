@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import hashlib,json,math,re,unicodedata
 from pathlib import Path
 from typing import Any,Mapping,Protocol,Sequence
+from src.tfg_phase0.question_policy import QuestionPolicyDecision,QuestionPolicyPort
 from src.tfg_phase0.interactive_dialogue import DialoguePolicyConfig,F3EvidenceIndex,SpatialHypothesis,cluster_ranked_candidates
 
 POLICY_ID='dialogue-vpr-freetext-v1';STATE_CONTRACT='atlas-dialogue-freetext-state-v1';PROMPT_VERSION='dialogue-vpr-freetext-qwen-v1'
@@ -98,6 +99,16 @@ class RetrievalPort(Protocol):
 class QuestionPort(Protocol):
  def select(self,*,ranking:Mapping[str,Any],description:str,turns:Sequence[Mapping[str,Any]])->tuple[FreeTextQuestion|None,Mapping[str,Any]]:...
 
+class LegacyQuestionPolicyAdapter:
+ def __init__(self,questions:QuestionPort):self.questions=questions
+ @property
+ def identity(self):return {'policy_id':'dialogue-vpr-freetext-legacy-selector-v1','adapter':'legacy_question_port'}
+ def decide(self,*,original_description,literal_history,ranking,stage,remaining_questions):
+  question,audit=self.questions.select(ranking=ranking,description=original_description,turns=literal_history)
+  if question is None:return QuestionPolicyDecision(action='STOP',policy_id=self.identity['policy_id'],reason='NO_VALID_QUESTION',lineage={'legacy_audit':audit,'stage':stage})
+  evidence=tuple({'evidence_ref':ref} for ref in question.evidence_refs)
+  return QuestionPolicyDecision(action='ASK',policy_id=self.identity['policy_id'],question=question.literal,question_origin='legacy_deterministic_f3',question_type=question.question_type,evidence=evidence,lineage={'legacy_audit':audit,'stage':stage,'intent_key':question.intent_key,'family':question.family,'grounding_kind':question.grounding_kind,'supported_hypothesis_ids':list(question.supported_hypothesis_ids),'unknown_hypothesis_ids':list(question.unknown_hypothesis_ids),'utility':list(question.utility)})
+
 def validate_full_ranking(ranking:Mapping[str,Any],expected_universe:set[str]|None=None)->set[str]:
  rows=ranking.get('results',[]);ids=[x.get('candidate_id') for x in rows];scores=[x.get('cosine_similarity') for x in rows]
  if len(rows)!=253 or len(set(ids))!=253 or [x.get('rank') for x in rows]!=list(range(1,254)) or not all(isinstance(x,(int,float)) and math.isfinite(x) for x in scores) or any(scores[i]<scores[i+1] for i in range(252)):raise ValueError('ranking FreeText inválido')
@@ -107,20 +118,42 @@ def validate_full_ranking(ranking:Mapping[str,Any],expected_universe:set[str]|No
 
 class FreeTextDialogueExecutor:
  policy_id=POLICY_ID;maximum_questions=3;maximum_qwen_calls=4;maximum_ct2l_calls=4
- def __init__(self,*,qwen:QwenPort,retriever:RetrievalPort,questions:QuestionPort):self.qwen=qwen;self.retriever=retriever;self.questions=questions
+ def __init__(self,*,qwen:QwenPort,retriever:RetrievalPort,questions:QuestionPort|None=None,question_policy:QuestionPolicyPort|None=None,final_ranking_postprocessor=None):
+  if (questions is None)==(question_policy is None):raise ValueError('se requiere exactamente una question policy')
+  self.qwen=qwen;self.retriever=retriever;self.question_policy=question_policy or LegacyQuestionPolicyAdapter(questions);self.final_ranking_postprocessor=final_ranking_postprocessor
  def _stage(self,state:dict[str,Any],stage:str)->None:
   transcript=render_literal_transcript(state['description']['literal'],state['turns']);prompt=build_freetext_prompt(transcript);qwen=self.qwen.transform(stage=stage,transcript=transcript,prompt=prompt);ranking=self.retriever.retrieve(stage=stage,query_id=state['query_id'],text=qwen['text']);universe=validate_full_ranking(ranking,set(state['candidate_universe']) if state.get('candidate_universe') else None);state['candidate_universe']=sorted(universe);state['stages'].append({'stage':stage,'source_turn_count':len(state['turns']),'transcript':transcript,'transcript_sha256':digest_text(transcript),'prompt_version':PROMPT_VERSION,'prompt_sha256':digest_text(prompt),'qwen':qwen,'ranking':ranking,'ranking_sha256':hashlib.sha256(canonical(ranking)).hexdigest()})
+ def _decide(self,state:dict[str,Any],stage:str)->QuestionPolicyDecision:
+  decision=self.question_policy.decide(original_description=state['description']['literal'],literal_history=state['turns'],ranking=state['stages'][-1]['ranking'],stage=stage,remaining_questions=self.maximum_questions-len(state['turns'])).validate();document=decision.document();document['stage']=stage;document['source_turn_count']=len(state['turns']);document['ranking_sha256']=state['stages'][-1]['ranking_sha256'];document['original_description_sha256']=state['description']['sha256'];state['question_policy_decisions'].append(document);return decision
+ def _finalize(self,state:dict[str,Any],stage:str,reason:str)->None:
+  row=state['stages'][-1]
+  if self.final_ranking_postprocessor is not None and 'visual_postprocessing' not in row:
+   baseline=row['ranking']['results'][:10]
+   try:
+    visual=self.final_ranking_postprocessor.apply(stage=stage,query_text=row['qwen']['text'],retrieval=row['ranking'])
+    if visual.get('status') not in {'applied','fallback_baseline'} or len(visual.get('baseline_results',[]))!=10 or len(visual.get('final_results',[]))!=10 or [x['candidate_id'] for x in visual['baseline_results']]!=[x['candidate_id'] for x in baseline]:raise ValueError('sobre visual final incompatible')
+    row['visual_postprocessing']=json.loads(json.dumps(visual))
+   except Exception as error:
+    row['visual_postprocessing']={'status':'fallback_baseline','source':'none','request_id':None,'reason':f'postprocessor_error:{type(error).__name__}','model':None,'policy_id':None,'baseline_results':baseline,'final_results':baseline,'evidence':[],'error':{'error_type':type(error).__name__,'message':str(error)[:500]}}
+  state['status']='completed';state['stop_reason']=reason;state['final_stage']=stage
+ def _apply_decision(self,state:dict[str,Any],decision:QuestionPolicyDecision,stage:str)->None:
+  if decision.action=='ASK':
+   lineage=dict(decision.lineage or {});index=len(state['turns'])+1;state['turns'].append({'index':index,'question':{'literal':decision.question,'sha256':digest_text(decision.question),'intent_key':lineage.get('intent_key'),'family':lineage.get('family'),'question_type':decision.question_type,'grounding_kind':lineage.get('grounding_kind'),'evidence_refs':[row.get('evidence_ref') for row in decision.evidence if row.get('evidence_ref')],'origin':decision.question_origin,'policy_id':decision.policy_id,'decision_id':state['question_policy_decisions'][-1]['decision_id'],'evidence':[dict(row) for row in decision.evidence]},'answer':None});state['status']='awaiting_answer';return
+  if decision.action in {'STOP','ABSTAIN'}:self._finalize(state,stage,f"question_policy_{decision.action.casefold()}:{decision.reason}");return
+  final_outcome=(decision.lineage or {}).get('final_outcome')
+  state['status']='completed' if final_outcome=='VALIDATION_REJECTED' else 'failed';state['stop_reason']='question_policy_validation_rejected' if final_outcome=='VALIDATION_REJECTED' else 'question_policy_technical_error';state['final_stage']=stage;state['failure']={'component':'question_policy','stage':stage,'final_outcome':final_outcome,**dict(decision.error or {})}
  def start(self,*,query_id:str,description:str)->dict[str,Any]:
-  state={'schema_version':'1.0','contract_version':STATE_CONTRACT,'policy_id':POLICY_ID,'query_id':query_id,'description':{'literal':description,'sha256':digest_text(description)},'turns':[],'stages':[],'question_selections':[],'candidate_universe':[],'status':'running','stop_reason':None,'final_stage':None};self._stage(state,'E0');question,audit=self.questions.select(ranking=state['stages'][-1]['ranking'],description=description,turns=state['turns']);state['question_selections'].append(audit)
-  if question is None:state['status']='completed';state['stop_reason']='no_valid_question';state['final_stage']='E0'
-  else:state['turns'].append({'index':1,'question':{'literal':question.literal,'sha256':digest_text(question.literal),'intent_key':question.intent_key,'family':question.family,'question_type':question.question_type,'grounding_kind':question.grounding_kind,'evidence_refs':question.evidence_refs},'answer':None});state['status']='awaiting_answer'
+  state={'schema_version':'1.0','contract_version':STATE_CONTRACT,'policy_id':POLICY_ID,'question_policy_identity':dict(self.question_policy.identity),'query_id':query_id,'description':{'literal':description,'sha256':digest_text(description)},'turns':[],'stages':[],'question_selections':[],'question_policy_decisions':[],'candidate_universe':[],'status':'running','stop_reason':None,'final_stage':None};self._stage(state,'E0');decision=self._decide(state,'E0');self._apply_decision(state,decision,'E0')
+  if isinstance(self.question_policy,LegacyQuestionPolicyAdapter):state['question_selections'].append(dict((decision.lineage or {}).get('legacy_audit',{})))
   return state
  def answer(self,*,state:Mapping[str,Any],answer_literal:str)->dict[str,Any]:
   value=json.loads(json.dumps(state));turn=value['turns'][-1]
   if value['status']!='awaiting_answer' or turn['answer'] is not None:raise ValueError('estado FreeText no espera respuesta')
   if not answer_literal or len(answer_literal)>1200:raise ValueError('respuesta literal inválida')
+  if _fold(answer_literal).rstrip('.') in {'quiero terminar el dialogo','prefiero terminar el dialogo','no quiero seguir'}:
+   turn['answer']={'literal':answer_literal,'sha256':digest_text(answer_literal),'human_attested':True,'external_context_used':False};self._finalize(value,value['stages'][-1]['stage'],'human_requested_stop');return value
   turn['answer']={'literal':answer_literal,'sha256':digest_text(answer_literal),'human_attested':True,'external_context_used':False};stage=f"E{turn['index']}";self._stage(value,stage)
-  if turn['index']>=self.maximum_questions:value['status']='completed';value['stop_reason']='max_questions_reached_after_e3';value['final_stage']=stage;return value
-  question,audit=self.questions.select(ranking=value['stages'][-1]['ranking'],description=value['description']['literal'],turns=value['turns']);value['question_selections'].append(audit)
-  if question is None:value['status']='completed';value['stop_reason']='no_valid_question';value['final_stage']=stage;return value
-  value['turns'].append({'index':turn['index']+1,'question':{'literal':question.literal,'sha256':digest_text(question.literal),'intent_key':question.intent_key,'family':question.family,'question_type':question.question_type,'grounding_kind':question.grounding_kind,'evidence_refs':question.evidence_refs},'answer':None});value['status']='awaiting_answer';return value
+  if turn['index']>=self.maximum_questions:self._finalize(value,stage,'max_questions_reached_after_e3');return value
+  decision=self._decide(value,stage);self._apply_decision(value,decision,stage)
+  if isinstance(self.question_policy,LegacyQuestionPolicyAdapter):value['question_selections'].append(dict((decision.lineage or {}).get('legacy_audit',{})))
+  return value

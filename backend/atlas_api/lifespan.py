@@ -55,6 +55,9 @@ def build_lifespan(settings: Settings, retriever_factory: Callable[[Settings], o
         app.state.retriever = None
         app.state.transformer = None
         app.state.visual_promoter = None
+        if settings.dq_iterative_enabled and not settings.freetext_application_enabled and not settings.freetext_operational_enabled:
+            yield
+            return
         if settings.freetext_application_enabled:
             try:
                 yield

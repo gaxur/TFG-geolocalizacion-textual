@@ -3,6 +3,7 @@ import {
   Map as MapLibreMap,
   Marker as MapLibreMarker,
   NavigationControl,
+  Popup,
   ScaleControl,
   setWorkerUrl,
 } from 'maplibre-gl';
@@ -56,7 +57,7 @@ function baseStyle(basemap) {
     url: `pmtiles://${PMTILES_URL}`,
     attribution: basemap.attribution,
   };
-  return { version: 8, sources, layers };
+  return { version: 8, sources, layers, light: { anchor: 'viewport', color: '#fff7e8', intensity: 0.38, position: [1.3, 165, 45] } };
 }
 
 function createBoundaryLayers(map, searchArea) {
@@ -126,15 +127,23 @@ function addBasemapLayers(map, basemap) {
   };
   add('landcover', {
     id: 'madrid-landcover', type: 'fill', source: 'madrid-local', 'source-layer': 'landcover',
-    paint: { 'fill-color': '#e2eadc', 'fill-opacity': 0.65 },
+    paint: { 'fill-color': ['match', ['get', 'class'], 'wood', '#aecbad', 'forest', '#aecbad', 'scrub', '#bfd1ad', 'grassland', '#d9e6bd', 'grass', '#d9e6bd', '#d4e1c4'], 'fill-opacity': 0.72 },
   });
   add('landuse', {
     id: 'madrid-landuse', type: 'fill', source: 'madrid-local', 'source-layer': 'landuse',
-    paint: { 'fill-color': ['match', ['get', 'class'], 'park', '#d6e7d3', 'grass', '#e1ebd8', '#edece5'], 'fill-opacity': 0.72 },
+    paint: { 'fill-color': ['match', ['get', 'class'], 'park', '#cce3c9', 'garden', '#d7e8cc', 'grass', '#dce9c7', 'meadow', '#dce9c7', 'cemetery', '#d5dfcf', '#edece5'], 'fill-opacity': 0.76 },
   });
   add('water', {
     id: 'madrid-water', type: 'fill', source: 'madrid-local', 'source-layer': 'water',
     paint: { 'fill-color': '#cbdfe2', 'fill-opacity': 0.94 },
+  });
+  add('vegetation_point', {
+    id: 'madrid-trees', type: 'circle', source: 'madrid-local', 'source-layer': 'vegetation_point', minzoom: 16,
+    paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 16, 2.2, 19, 5], 'circle-color': '#3f7d52', 'circle-stroke-color': '#e8f0e6', 'circle-stroke-width': 1, 'circle-opacity': 0.86 },
+  });
+  add('vegetation_line', {
+    id: 'madrid-vegetation-lines', type: 'line', source: 'madrid-local', 'source-layer': 'vegetation_line', minzoom: 15,
+    paint: { 'line-color': ['match', ['get', 'class'], 'hedge', '#4f7650', '#477b50'], 'line-width': ['interpolate', ['linear'], ['zoom'], 15, 1.2, 19, 4], 'line-opacity': 0.78 },
   });
   if (available.has('building')) {
     const explicitHeight = ['to-number', ['get', basemap.heightProperty], 0];
@@ -156,6 +165,16 @@ function addBasemapLayers(map, basemap) {
       },
     });
   }
+  add('vegetation_3d', {
+    id: 'madrid-trees-3d', type: 'fill-extrusion', source: 'madrid-local', 'source-layer': 'vegetation_3d', minzoom: 16,
+    paint: {
+      'fill-extrusion-color': ['case', ['get', 'dimensions_observed'], '#356f49', '#65905f'],
+      'fill-extrusion-height': ['to-number', ['get', 'visual_height'], 6],
+      'fill-extrusion-base': ['to-number', ['get', 'visual_base'], 1.8],
+      'fill-extrusion-opacity': 0.72,
+      'fill-extrusion-vertical-gradient': true,
+    },
+  });
   add('transportation', {
     id: 'madrid-roads', type: 'line', source: 'madrid-local', 'source-layer': 'transportation',
     paint: {
@@ -514,7 +533,7 @@ export async function createResultsMap({
   let appliedCatalog = null;
   let catalogInitialized = false;
   let current = { retrievals, selectedKey, catalogs, galleryId, gridVisible: false, buildingsVisible: true, mode: '2d' };
-  const extrusionLayers=['madrid-buildings-3d'];
+  const extrusionLayers=['madrid-buildings-3d','madrid-trees-3d'];
 
   async function ensureGalleryCatalog(nextGalleryId) {
     if (current.catalogs?.[nextGalleryId] || destroyed) return;
@@ -581,6 +600,7 @@ export async function createResultsMap({
     }
     const grid = map.getSource('catalog-cells');
     const catalog = current.catalogs?.[current.galleryId];
+    element.dataset.mapCatalogCellCount = String(catalog?.size || 0);
     if (!catalogInitialized || catalog !== appliedCatalog) {
       grid?.setData(catalog
         ? { type: 'FeatureCollection', features: [...catalog.values()] }
@@ -620,13 +640,20 @@ export async function createResultsMap({
           event.stopPropagation();
           onSelect?.(candidate.key);
         });
+        const popup = new Popup({ closeButton: false, closeOnClick: false, offset: 22, className: 'candidate-popup' }).setText(`Top-${candidate.rank} · ${candidate.id}`);
+        button.addEventListener('mouseenter',()=>marker.togglePopup());
+        button.addEventListener('mouseleave',()=>marker.getPopup()?.remove());
+        button.addEventListener('focus',()=>{if(!marker.getPopup()?.isOpen())marker.togglePopup();});
+        button.addEventListener('blur',()=>marker.getPopup()?.remove());
         const marker = new MapLibreMarker({ element: button, anchor: 'center' })
           .setLngLat([candidate.lon, candidate.lat])
+          .setPopup(popup)
           .addTo(map);
         entry = { button, marker };
         rankedMarkers.set(candidate.key, entry);
       }
       const { button, marker } = entry;
+      marker.getPopup()?.setText(`Top-${candidate.rank} · ${candidate.id}`);
       button.textContent = String(candidate.rank).padStart(2, '0');
       button.dataset.candidateKey = candidate.key;
       button.classList.toggle('is-top-result', candidate.rank === 1);
@@ -671,6 +698,23 @@ export async function createResultsMap({
         essential: false,
       });
     },
+    fitCandidates(candidates) {
+      if(destroyed||!Array.isArray(candidates)||!candidates.length)return;
+      let west=Infinity,south=Infinity,east=-Infinity,north=-Infinity;
+      for(const candidate of candidates){west=Math.min(west,candidate.lon);south=Math.min(south,candidate.lat);east=Math.max(east,candidate.lon);north=Math.max(north,candidate.lat);}
+      map.fitBounds([[west,south],[east,north]],{padding:window.innerWidth<720?54:84,maxZoom:17,pitch:current.mode==='3d'?45:0,bearing:current.mode==='3d'?18:0,duration:reducedMotion()?0:700});
+    },
+    inspectLocation(lon,lat,zoom=18) {
+      if(destroyed||!Number.isFinite(lon)||!Number.isFinite(lat))return;
+      map.jumpTo({center:[lon,lat],zoom,pitch:55,bearing:22});
+      map.once('idle',()=>{
+        if(destroyed)return;
+        element.dataset.mapEffectiveZoom=String(map.getZoom());
+        element.dataset.mapBuilding3dRenderedFeatureCount=String(map.queryRenderedFeatures({layers:['madrid-buildings-3d']}).length);
+        element.dataset.mapTree3dRenderedFeatureCount=String(map.queryRenderedFeatures({layers:['madrid-trees-3d']}).length);
+        element.dataset.mapTreeSourceFeatureCount=String(map.querySourceFeatures('madrid-local',{sourceLayer:'vegetation_3d'}).length);
+      });
+    },
     setMode(mode) {
       if (destroyed) return;
       current.mode = mode === '3d' && basemap.buildings3dAvailable ? '3d' : '2d';
@@ -679,7 +723,7 @@ export async function createResultsMap({
       element.dataset.mapMode = current.mode;
       element.dataset.mapBuilding3dRenderedFeatureCount = current.mode === '3d' ? 'pending' : '0';
       map.easeTo({
-        zoom: current.mode === '3d' ? Math.max(map.getZoom(),15.5) : map.getZoom(),
+        zoom: current.mode === '3d' ? Math.max(map.getZoom(),16.5) : map.getZoom(),
         pitch: current.mode === '3d' ? 48 : 0,
         bearing: current.mode === '3d' ? (map.getBearing() || 18) : 0,
         duration: reducedMotion() ? 0 : 620,
@@ -690,11 +734,14 @@ export async function createResultsMap({
         let attempts=0;
         const measure=()=>{
           if(destroyed||current.mode!=='3d')return;
-          const visible=map.queryRenderedFeatures({layers:extrusionLayers.filter(layerId=>map.getLayer(layerId))}).length;
-          element.dataset.mapBuildingSourceFeatureCount=String(map.querySourceFeatures('madrid-local',{sourceLayer:'building'}).length);
-          element.dataset.mapBuildingFootprintCount=String(map.queryRenderedFeatures({layers:['madrid-building-footprints']}).length);
-          element.dataset.mapEffectiveZoom=String(map.getZoom());element.dataset.mapExtrusionVisibility=String(map.getLayoutProperty('madrid-buildings-3d','visibility'));
-          if(visible>0||++attempts>=10)element.dataset.mapBuilding3dRenderedFeatureCount=String(visible);
+           const visible=map.queryRenderedFeatures({layers:extrusionLayers.filter(layerId=>map.getLayer(layerId))}).length;
+           element.dataset.mapBuilding3dRenderedFeatureCount=String(map.queryRenderedFeatures({layers:['madrid-buildings-3d'].filter(layerId=>map.getLayer(layerId))}).length);
+           element.dataset.mapTree3dRenderedFeatureCount=String(map.queryRenderedFeatures({layers:['madrid-trees-3d'].filter(layerId=>map.getLayer(layerId))}).length);
+           element.dataset.mapBuildingSourceFeatureCount=String(map.querySourceFeatures('madrid-local',{sourceLayer:'building'}).length);
+           element.dataset.mapTreeSourceFeatureCount=String(map.querySourceFeatures('madrid-local',{sourceLayer:'vegetation_3d'}).length);
+           element.dataset.mapBuildingFootprintCount=String(map.queryRenderedFeatures({layers:['madrid-building-footprints']}).length);element.dataset.mapRoadSourceFeatureCount=String(map.querySourceFeatures('madrid-local',{sourceLayer:'transportation'}).length);element.dataset.mapWaterSourceFeatureCount=String(map.querySourceFeatures('madrid-local',{sourceLayer:'water'}).length);element.dataset.mapLanduseSourceFeatureCount=String(map.querySourceFeatures('madrid-local',{sourceLayer:'landuse'}).length);
+           element.dataset.mapEffectiveZoom=String(map.getZoom());element.dataset.mapExtrusionVisibility=String(map.getLayoutProperty('madrid-buildings-3d','visibility'));element.dataset.mapTreeExtrusionVisibility=String(map.getLayoutProperty('madrid-trees-3d','visibility'));
+           if(visible>0||++attempts>=10)element.dataset.mapExtrusionRenderedFeatureCount=String(visible);
           else setTimeout(measure,500);
         };
         setTimeout(measure,reducedMotion()?100:700);

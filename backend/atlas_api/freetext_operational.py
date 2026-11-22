@@ -394,9 +394,10 @@ class OperationalFreeTextSessionService:
 
     def public(self, document: Mapping[str, Any]) -> dict[str, Any]:
         state = document["state"]
+        maximum_questions = int(getattr(self.executor, "max_questions", 3))
         current = state.get("turns", [])[-1] if document["status"] == "waiting_user" and state.get("turns") else None
         turns = [{"index": turn["index"], "question": turn["question"]["literal"], "question_sha256": turn["question"]["sha256"], "answer_literal": turn["answer"]["literal"] if turn.get("answer") else None, "answer_sha256": turn["answer"]["sha256"] if turn.get("answer") else None} for turn in state.get("turns", [])]
-        snapshots = [{"stage": row["stage"], "ranking_sha256": row["ranking_sha256"], "gallery_id": row["ranking"].get("gallery_id"), "candidate_count": len(row["ranking"]["results"]), "results": row["ranking"]["results"][:10]} for row in state.get("stages", [])]
+        snapshots = [{"stage": row["stage"], "ranking_sha256": row["ranking_sha256"], "gallery_id": row["ranking"].get("gallery_id"), "candidate_count": len(row["ranking"]["results"]), "results": row["ranking"]["results"][:10], **({"visual_postprocessing": row["visual_postprocessing"]} if row.get("visual_postprocessing") else {})} for row in state.get("stages", [])]
         return {
             "schema_version": "1.0",
             "contract_version": "atlas-dialogue-freetext-operational-session-public-v1",
@@ -406,6 +407,7 @@ class OperationalFreeTextSessionService:
             "description_sha256": document["description_sha256"],
             "status": document["status"],
             "stop_reason": document.get("stop_reason"),
+            "maximum_questions": maximum_questions,
             "experimental_query_id": document["session_id"],
             "turns": turns,
             "transcript": turns,

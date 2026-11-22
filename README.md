@@ -14,6 +14,10 @@ contexto original se conserva sin cambios en [BASELINE.md](BASELINE.md).
 
 ## Estado actual y siguiente experimento
 
+El cierre supervisado CrossText2Loc → DialogueVPR → Qwen3-VL-8B conserva el
+ranking por turno y el Top-10 final. Véase el [contrato y validación CPU](docs/DIALOGUE_FINAL_VISUAL.md).
+El supervisor de host y los pesos no forman parte de la distribución.
+
 Ya existen contratos propios de Fase 0 (`src/tfg_phase0/`, `schemas/`,
 `config/madrid.yaml`), documentación, una memoria LaTeX y un
 [frontend Vite](frontend/README.md) conectado a la API interna. La interfaz

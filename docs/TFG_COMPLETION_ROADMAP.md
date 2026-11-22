@@ -1,5 +1,17 @@
 # Hoja de ruta permanente para completar el TFG
 
+## 2026-11-22 — Cierre supervisado DialogueVPR → VLM
+
+- `IMPLEMENTED` en modo CPU con fixtures: reserva por turno, selección visual
+  Top-10/50/100, abstenciones, ranking combinado y fallback exacto, con FastAPI
+  y MapLibre. [Contrato y pruebas reproducibles](DIALOGUE_FINAL_VISUAL.md).
+- StageLease y DQ56 quedan externos. FastAPI conserva la verificación de
+  recibos; la prueba propia del host es opcional y no acredita inferencia real.
+- Verificación en worktree aislado y sin pesos: 104 pruebas Python aprobadas
+  (1 de StageLease omitida), 67 frontend aprobadas (1 omitida) y build Vite correcto.
+- **Siguiente acción:** acordar con el operador de GB10 la procedencia y versión
+  del supervisor, una ventana segura y permisos de inferencia. No se reemite Q1.
+
 ## Propósito y uso
 
 Este documento es la referencia operativa permanente para terminar el TFG de

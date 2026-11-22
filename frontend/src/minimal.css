@@ -120,6 +120,12 @@ textarea::placeholder { color: #89938e; }
 .progress-dot.state-completed { border-color:#2d7452; background:#4d9a70; }
 .progress-dot.state-failed { border-color:#9c4037; background:#c85d50; }
 .freetext-chat { display:grid; gap:9px; max-height:380px; margin:14px 0; padding:4px; overflow-y:auto; list-style:none; }
+.freetext-visual-status,.freetext-ranking-history { display:grid; gap:3px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:#f5f8f6; }
+.freetext-visual-status span,.freetext-ranking-history small { font-size:11px; color:var(--muted); }
+.freetext-visual-status small { font-size:10px; color:var(--muted); }
+.freetext-quick-actions { display:flex; flex-wrap:wrap; gap:7px; }
+.freetext-quick-actions button { min-height:38px; padding:7px 10px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--text); font:inherit; font-size:11px; cursor:pointer; }
+.freetext-quick-actions button:hover,.freetext-quick-actions button:focus-visible { border-color:var(--accent); color:var(--accent); }
 .freetext-chat li { display:grid; gap:4px; width:min(88%, 620px); padding:11px 13px; border-radius:13px; }
 .freetext-chat li > span { font-size:9px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; }
 .freetext-chat li > p { white-space:pre-wrap; font-size:12px; line-height:1.55; }
@@ -360,7 +366,8 @@ dialog::backdrop { background: #14231c57; backdrop-filter: blur(4px); }
 .app-mode { --app-sidebar: clamp(350px, 28vw, 410px); --app-header: 64px; background:#edf1ee; }
 .app-mode .header { min-height:var(--app-header); padding-inline:24px; }
 .app-mode .wordmark { font-size:18px; letter-spacing:-.45px; }
-.app-mode .top-nav, .app-mode .footer { display:none; }
+.app-mode .build-id { color:#75867e; font-size:9px; letter-spacing:.25px; }
+.app-mode .footer { display:none; }
 .app-mode #main { padding:14px; min-height:calc(100dvh - var(--app-header)); }
 .app-mode .page-heading { min-height:42px; margin:0 0 10px; padding:0 4px; align-items:center; }
 .app-mode .page-heading .eyebrow { margin:0 0 3px; }
@@ -375,6 +382,9 @@ dialog::backdrop { background: #14231c57; backdrop-filter: blur(4px); }
 .app-mode .search-panel form textarea { min-height:104px; }
 .app-mode .search-panel .freetext-panel { border:0; border-top:1px solid var(--line); border-radius:0; padding:18px 0 0; }
 .app-mode .freetext-header h3 { font-size:17px; }
+.pilot-translation-review { margin-top:14px; padding:14px; border:1px solid #d6b56e; border-radius:12px; background:#fff9ec; }
+.pilot-translation-review textarea { width:100%; min-height:70px; }
+.pilot-translation-actions { display:grid; grid-template-columns:2fr 1fr 1fr; gap:8px; }
 .app-mode .freetext-header .small { max-width:34ch; }
 .app-mode .freetext-chat { max-height:clamp(210px,31dvh,380px); padding:8px 2px; scroll-behavior:smooth; }
 .app-mode .freetext-chat li { width:92%; padding:10px 12px; }
@@ -391,6 +401,20 @@ dialog::backdrop { background: #14231c57; backdrop-filter: blur(4px); }
 .app-mode .card-detail { min-height:32px; padding:7px 10px; }
 
 .operation-modal { width:min(560px,calc(100vw - 32px)); padding:0; overflow:visible; border:0; border-radius:20px; background:#fff; box-shadow:0 30px 100px rgba(13,31,24,.3); }
+.dialogue-modal { width:min(680px,calc(100vw - 28px)); padding:0; overflow:auto; border:0; border-radius:22px; background:#fff; box-shadow:0 30px 100px rgba(13,31,24,.3); }
+.dialogue-modal::backdrop { background:rgba(12,28,22,.52); backdrop-filter:blur(5px); }
+.dialogue-modal .freetext-panel { margin:0; padding:24px; border:0; box-shadow:none; }
+.dialogue-modal .freetext-chat { max-height:min(38dvh,360px); }
+.dialogue-modal .freetext-header { position:relative; padding-right:42px; }
+.dialogue-modal .dialogue-close { position:absolute; top:-8px; right:-8px; }
+.map-primary-actions { display:flex; align-items:center; gap:10px; margin:12px 2px 0; padding:13px 14px; border:1px solid #d9e3dd; border-radius:14px; background:rgba(255,255,255,.94); box-shadow:0 8px 24px rgba(22,42,34,.07); }
+.map-primary-actions > div { display:grid; gap:3px; margin-right:auto; }
+.map-primary-actions > div strong { font-size:13px; }
+.accessible-ranking[hidden],.accessible-ranking-heading:has(+ .accessible-ranking[hidden]) { display:none; }
+.app-mode .accessible-ranking .gallery-results { margin-top:0; }
+.app-mode .accessible-ranking .result-grid { grid-template-columns:repeat(2,minmax(0,1fr)); max-height:320px; overflow:auto; }
+.app-mode .accessible-ranking .result-card { min-width:0; }
+.app-mode .accessible-ranking .score-row,.app-mode .accessible-ranking .coordinate-compact { display:none; }
 .operation-modal::backdrop { background:rgba(12,28,22,.58); backdrop-filter:blur(5px); }
 .operation-card { display:grid; grid-template-columns:76px minmax(0,1fr); gap:20px; padding:28px; }
 .operation-orbit { display:grid; place-items:center; width:68px; height:68px; border:1px solid #c9d9d1; border-radius:50%; background:#edf4f0; }
@@ -427,6 +451,10 @@ dialog::backdrop { background: #14231c57; backdrop-filter: blur(4px); }
  .app-mode .map-panel { height:100%; }
  .app-mode .freetext-chat { max-height:25dvh; }
  .operation-card { grid-template-columns:1fr; padding:22px; }.operation-orbit { width:54px; height:54px; }.operation-stages { grid-template-columns:1fr; }
+ .map-primary-actions { position:fixed; z-index:40; left:16px; right:16px; bottom:calc(76px + env(safe-area-inset-bottom)); flex-wrap:wrap; }
+ .map-primary-actions > div { flex:1 0 100%; }
+ .map-primary-actions .refine-button { flex:1; }
+ .dialogue-modal { max-height:calc(100dvh - 24px); }
 }
 
 /* Mapa local MapLibre y controles cartográficos accesibles. */

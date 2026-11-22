@@ -3,6 +3,11 @@ WORKDIR /workspace/project
 RUN mkdir -p /workspace/project/data/processed /workspace/project/data/embeddings /workspace/project/external /workspace/project/checkpoints/CrossText2Loc
 COPY backend ./backend
 COPY src ./src
+RUN mkdir -p research
+COPY research/dq_pilot_iterative_controller_v1.py research/dq_pilot_real_adapters_v1.py research/dq_pilot_translation_v1.py ./research/
+COPY research/dq_pilot_supervised_v1.py research/dialogue_visual_generative_v1.py research/dq_pilot_zero_shot_v1.py ./research/
+COPY research/dq_pilot_supervised_visual_v1.py ./research/
+COPY research/ct2l_supervisor_v3.py research/dialogue_transition_runner_dqdev2.py ./research/
 RUN mkdir -p scripts config schemas
 RUN mkdir -p docker
 COPY scripts/run_mvp1_api.sh scripts/run_dialogue_freetext_worker.py scripts/run_mvp_dialogue_worker.py scripts/run_mvp_ephemeral_retrieval_worker.py scripts/generate_freetext_application_profile.py ./scripts/

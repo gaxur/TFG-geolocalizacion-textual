@@ -375,4 +375,5 @@ class ApplicationFreeTextSessionService(OperationalFreeTextSessionService):
         result = super().public(document)
         result["contract_version"] = "atlas-dialogue-freetext-application-session-public-v1"
         result["policy_id"] = POLICY_ID
+        result["maximum_questions"] = QUOTAS["maximum_questions"]
         return result

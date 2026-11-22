@@ -55,6 +55,7 @@
 /results/cross_text2loc_docker/
 /results/cross_text2loc_wait_run/
 /runtime/
+/.runtime/
 *.log
 *.tmp
 *.temp

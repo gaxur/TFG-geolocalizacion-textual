@@ -168,6 +168,13 @@ class ApplicationFreeTextStartRequest(StrictModel):
     description_es: Annotated[str, StringConstraints(min_length=3, max_length=2400)]
     client_operation_id: NonEmpty
 
+class DQIterativeStartRequest(StrictModel):
+    schema_version: Literal["1.0"]
+    contract_version: Literal["atlas-dialogue-freetext-start-request-v2"]
+    policy_id: Literal["dialogue-vpr-dq-pilot-v1"]
+    description_es: Annotated[str, StringConstraints(min_length=3, max_length=2400)]
+    client_operation_id: NonEmpty
+
 class FreeTextAnswerRequest(StrictModel):
     schema_version: Literal["1.0"]
     contract_version: Literal["atlas-dialogue-freetext-answer-request-v1"]
@@ -192,3 +199,9 @@ class OperationalFreeTextAnswerRequest(StrictModel):
         if self.question_id is None and self.question_sha256 is None:
             raise ValueError("question_id or question_sha256 is required")
         return self
+
+class DQIterativeAnswerRequest(OperationalFreeTextAnswerRequest):
+    user_requests_stop: bool = False
+
+class DQIterativeStopRequest(OperationalFreeTextAnswerRequest):
+    user_requests_stop: Literal[True] = True

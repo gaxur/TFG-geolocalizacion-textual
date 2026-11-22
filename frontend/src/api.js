@@ -86,9 +86,29 @@ export function getFreeTextPilots(options={}){return fetchJson('/dialogue-freete
 export function startFreeText(request,options={}){const operationId=request?.client_operation_id;return fetchJson('/dialogue-freetext/sessions',{...options,method:'POST',body:request,headers:{...(options.headers||{}),...(operationId?{'Idempotency-Key':operationId}:{})}});}
 export function getFreeTextSession(sessionId,options={}){return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}`,options);}
 export function getApplicationSessionByOperation(operationId,options={}){return fetchJson(`/dialogue-freetext/application/operations/${encodeURIComponent(operationId)}`,options);}
+export function getDQIterativeSessionByOperation(operationId,options={}){return fetchJson(`/dialogue-freetext/iterative/operations/${encodeURIComponent(operationId)}`,options);}
+export function prepareDQIterative(request,options={}){const operationId=request?.client_operation_id;return fetchJson('/dialogue-freetext/iterative/preparations',{...options,method:'POST',body:request,headers:{...(options.headers||{}),...(operationId?{'Idempotency-Key':operationId}:{})}});}
+export function startHistoricalReplay(operationId, options={}) {
+  return fetchJson('/dialogue-freetext/iterative/historical-replays',{...options,method:'POST',body:{client_operation_id:operationId},headers:{...(options.headers||{}),'Idempotency-Key':operationId}});
+}
+export function saveHistoricalTranslation(sessionId, request, options={}) {
+  return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/historical-translation`,{...options,method:'POST',body:request});
+}
 export function answerFreeText(sessionId,request,options={}){const operationId=request?.client_operation_id;return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/answers`,{...options,method:'POST',body:request,headers:{...(options.headers||{}),...(operationId?{'Idempotency-Key':operationId}:{})}});}
+export function stopDQIterative(sessionId,request,options={}){const operationId=request?.client_operation_id;return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/stop`,{...options,method:'POST',body:request,headers:{...(options.headers||{}),...(operationId?{'Idempotency-Key':operationId}:{})}});}
+export function decidePilotTranslation(sessionId,request,options={}){return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/pilot-translation-decisions`,{...options,method:'POST',body:request});}
+export function submitDQVisualAction(sessionId, kind, request, options={}) {
+  const leaf={panel:'panel-reviews',question:'question-reviews',manual:'visual-translation'}[kind];
+  if(!leaf)throw new TypeError('Acción visual desconocida.');
+  return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/${leaf}`,{...options,method:'POST',body:request});
+}
+export function cancelDQIterative(sessionId,request,options={}){return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/cancel`,{...options,method:'POST',body:request});}
 export function getFreeTextEvents(sessionId,options={}){return fetchJson(`/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/events`,options);}
 export function freeTextEventStreamUrl(sessionId,{baseUrl=DEFAULT_BASE_URL,after}={}){const suffix=after?`&after=${encodeURIComponent(after)}`:'';return `${String(baseUrl).replace(/\/$/,'')}/dialogue-freetext/sessions/${encodeURIComponent(sessionId)}/events/stream?follow=true${suffix}`;}
+export function getDevelopmentQueries(options={}){return fetchJson('/dialogue-development/queries',options);}
+export function prepareDevelopmentSession(request,options={}){return fetchJson('/dialogue-development/sessions',{...options,method:'POST',body:request});}
+export function getDevelopmentSession(sessionId,{operatorView=true,...options}={}){return fetchJson(`/dialogue-development/sessions/${encodeURIComponent(sessionId)}?operator_view=${operatorView?'true':'false'}`,options);}
+export function answerDevelopmentSession(sessionId,request,options={}){return fetchJson(`/dialogue-development/sessions/${encodeURIComponent(sessionId)}/answers`,{...options,method:'POST',body:request});}
 
 export const apiBaseUrl = import.meta.env?.VITE_ATLAS_API_BASE_URL || DEFAULT_BASE_URL;
 

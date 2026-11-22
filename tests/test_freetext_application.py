@@ -242,6 +242,7 @@ def test_application_api_contract_metadata_and_shared_gate(tmp_path):
         assert "executor_identity" not in json.dumps(public) and "sha256" not in json.dumps(public["profile"])
         response = client.post("/api/v1/dialogue-freetext/sessions", json=payload, headers={"Idempotency-Key": "api-start"})
         assert response.status_code == 200 and response.json()["policy_id"] == "dialogue-vpr-freetext-v1-application"
+        assert response.json()["maximum_questions"] == public["maximum_questions"] == 3
         lookup=client.get('/api/v1/dialogue-freetext/application/operations/api-start');assert lookup.status_code==200 and lookup.json()['session_id']==response.json()['session_id']
         assert app.state.model_gate is app.state.inference_gate is app.state.dialogue_gate
     assert executor.calls == ["E0"]

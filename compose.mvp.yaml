@@ -3,79 +3,43 @@ name: atlas-mvp
 services:
   api:
     container_name: ${MVP_API_CONTAINER_NAME:-atlas-mvp-api}
-    image: ${MVP_API_IMAGE:-crosstext2loc-gb10:f511}
-    gpus: all
+    image: ${MVP_API_IMAGE:-atlas-mvp-api:local}
+    build:
+      context: .
+      dockerfile: docker/app-api.Dockerfile
+    pull_policy: never
     init: true
     read_only: true
     restart: "no"
     environment:
-      CUDA_VISIBLE_DEVICES: "0"
       HOME: /root
       HF_HOME: /tmp/huggingface
-      GIT_CONFIG_COUNT: "1"
-      GIT_CONFIG_KEY_0: safe.directory
-      GIT_CONFIG_VALUE_0: /workspace/project/external/CVG-Text
-      CLIP_WEIGHTS_PATH: /root/.cache/clip/ViT-L-14-336px.pt
+      ATLAS_CVG_UTILS_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
+      CLIP_WEIGHTS_PATH: /models-not-loaded/ViT-L-14-336px.pt
       ATLAS_API_HOST: 0.0.0.0
       ATLAS_API_PORT: "8000"
-      ATLAS_QWEN_MODEL_PATH: /models/Qwen3-8B
-      ATLAS_QWEN_MODEL_ID: Qwen/Qwen3-8B
-      ATLAS_QWEN_MODEL_REVISION: b968826d9c46dd6066d109eabc6255188de91218
-      ATLAS_QWEN_REQUIRED: ${ATLAS_QWEN_REQUIRED:-false}
-      ATLAS_VISUAL_PROMOTION_ENABLED: ${ATLAS_VISUAL_PROMOTION_ENABLED:-false}
-      ATLAS_VISUAL_PRECOMPUTED_BUNDLE: ${ATLAS_VISUAL_PRECOMPUTED_BUNDLE_CONTAINER:-}
-      ATLAS_VISUAL_PROMOTION_FALLBACK: baseline
+      ATLAS_QWEN_REQUIRED: "false"
+      ATLAS_VISUAL_PROMOTION_ENABLED: "false"
       ATLAS_VISUAL_PROMOTION_REQUIRED: "false"
-      ATLAS_DIALOGUE_ENABLED: ${ATLAS_DIALOGUE_ENABLED:-false}
-      ATLAS_DIALOGUE_COHORT_PATH: /dialogue-inputs/cohort.json
-      ATLAS_DIALOGUE_SESSION_ROOT: /dialogue-sessions
-      ATLAS_DIALOGUE_IMAGE_ROOT: /dialogue-images
-      ATLAS_DIALOGUE_COMPLETED_QUERY_IDS: ${ATLAS_DIALOGUE_COMPLETED_QUERY_IDS:-H26}
-      ATLAS_DIALOGUE_AUTHORIZATION_PATH: /dialogue-authorizations
-      ATLAS_DIALOGUE_ADAPTIVE_AUTHORIZATION_FILE: ${ATLAS_DIALOGUE_ADAPTIVE_AUTHORIZATION_FILE:-dialogue_adaptive_h28_v2_authorization.request.json}
-      ATLAS_DIALOGUE_ADAPTIVE_AUTHORIZATION_PATTERN: ${ATLAS_DIALOGUE_ADAPTIVE_AUTHORIZATION_PATTERN:-}
-      ATLAS_DIALOGUE_ADAPTIVE_ENABLED: ${ATLAS_DIALOGUE_ADAPTIVE_ENABLED:-false}
-      ATLAS_DIALOGUE_VARIANTS_PATH: /dialogue-inputs/description-length-manifest.json
-      ATLAS_FREETEXT_ENABLED: ${ATLAS_FREETEXT_ENABLED:-false}
-      ATLAS_FREETEXT_AUTHORIZATION_PATH: /freetext-authorizations
-      ATLAS_FREETEXT_AUTHORIZATION_FILE: ${ATLAS_FREETEXT_AUTHORIZATION_FILE:-freetext_h27_authorization.request.json}
-      ATLAS_FREETEXT_SESSION_ROOT: /freetext-sessions
-      ATLAS_FREETEXT_OPERATIONAL_ENABLED: ${ATLAS_FREETEXT_OPERATIONAL_ENABLED:-false}
-      ATLAS_FREETEXT_OPERATIONAL_SESSION_ROOT: /freetext-operational-sessions
-      ATLAS_FREETEXT_OPERATIONAL_AUTHORIZATION_ROOT: /freetext-operational-authorizations
-      ATLAS_FREETEXT_OPERATIONAL_EXECUTION_ID: ${ATLAS_FREETEXT_OPERATIONAL_EXECUTION_ID:-}
-      ATLAS_DIALOGUE_F3_BUNDLE: ${ATLAS_DIALOGUE_F3_BUNDLE_CONTAINER:-/workspace/project/data/processed/osm/osm-madrid-pilot-osmxml-sha256-f2152555c742ab5fbe54b02fe7145c144757d00ed3941695856db9a52b983141/f3-madrid-pilot-associations-sha256-5f4af89b9349de792d3a60752a15f227d49b96cdb688a671504e4cf30bf68453}
-      ATLAS_OLLAMA_PS_URL: ${ATLAS_OLLAMA_PS_URL:-http://host.docker.internal:11434/api/ps}
+      ATLAS_DIALOGUE_ENABLED: "false"
+      ATLAS_FREETEXT_OPERATIONAL_ENABLED: "false"
+      ATLAS_FREETEXT_APPLICATION_ENABLED: "false"
+      ATLAS_DQ_ITERATIVE_ENABLED: "true"
+      ATLAS_DQ_ITERATIVE_SESSION_ROOT: /dq-state/sessions
+      HF_DATASETS_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      WANDB_DISABLED: "true"
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=1g
+      - /tmp:rw,noexec,nosuid,size=256m
     volumes:
-      - .:/workspace/project:ro
-      - ${MVP_CLIP_CACHE_DIR:-${HOME}/.cache/clip}:/root/.cache/clip:ro
-      - ${MVP_QWEN_MODEL_DIR:-${HOME}/models/hf/Qwen3-8B-b968826d9c46}:/models/Qwen3-8B:ro
-      - ${MVP_VISUAL_BUNDLE_DIR:-./config}:/visual-bundles:ro
-      - ${MVP_DIALOGUE_COHORT_FILE:-./config/dialogue_development_h26_h37_cohort.json}:/dialogue-inputs/cohort.json:ro
-      - ${MVP_DIALOGUE_AUTHORIZATION_DIR:-./config}:/dialogue-authorizations:ro
-      - ${MVP_DIALOGUE_VARIANTS_FILE:-./results/generated/description-length-experiments/manifest.json}:/dialogue-inputs/description-length-manifest.json:ro
-      - ${MVP_DIALOGUE_SESSION_DIR:-./results/generated/mvp-dialogue-sessions}:/dialogue-sessions:rw
-      - ${MVP_FREETEXT_AUTHORIZATION_DIR:-./results/generated/dialogue-vpr-freetext-v1-h27-comparison-design}:/freetext-authorizations:ro
-      - ${MVP_FREETEXT_SESSION_DIR:-./results/generated/mvp-freetext-sessions}:/freetext-sessions:rw
-      - ${MVP_FREETEXT_OPERATIONAL_SESSION_DIR:-./runtime/freetext-operational-sessions}:/freetext-operational-sessions:rw
-      - ${MVP_FREETEXT_OPERATIONAL_AUTHORIZATION_DIR:-./config/freetext-operational-authorizations}:/freetext-operational-authorizations:ro
-      - ${MVP_DIALOGUE_IMAGE_DIR:-./data/cache/mapillary/images}:/dialogue-images:ro
-      - ${MVP_PROCESSED_DATA_DIR:-./data/processed}:/workspace/project/data/processed:ro
-      - ${MVP_EMBEDDINGS_DIR:-./data/embeddings}:/workspace/project/data/embeddings:ro
-      - ${MVP_EXTERNAL_DIR:-./external}:/workspace/project/external:ro
-      - ${MVP_CHECKPOINT_DIR:-./checkpoints/CrossText2Loc}:/workspace/project/checkpoints/CrossText2Loc:ro
+      - dq-state:/dq-state
     working_dir: /workspace/project
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     command:
       - /bin/bash
       - -lc
-      - >-
-        export ATLAS_CVG_UTILS_SHA256=$$(sha256sum
-        /workspace/project/external/CVG-Text/utils.py | cut -d' ' -f1) &&
-        exec /workspace/project/scripts/run_mvp1_api.sh
+      - exec /workspace/project/scripts/run_mvp1_api.sh
     expose:
       - "8000"
     healthcheck:
@@ -83,7 +47,7 @@ services:
       interval: 5s
       timeout: 4s
       retries: 36
-      start_period: 120s
+      start_period: 10s
     networks:
       - internal
 
@@ -100,14 +64,14 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "${MVP_BIND_HOST:-0.0.0.0}:${MVP_HTTP_PORT:-8080}:8080"
+      - "${MVP_BIND_HOST:-0.0.0.0}:${MVP_HTTP_PORT:-18080}:8080"
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m
       - /var/cache/nginx:rw,noexec,nosuid,size=32m
       - /var/run:rw,noexec,nosuid,size=1m
     volumes:
-      - ${MVP_MAP_ASSETS_DIR:-./data/processed/map-assets}:/usr/share/nginx/map-assets:ro
-      - ${MVP_MAP_CONTEXT_DIR:-./results/generated/map-assets-context-2000m}:/usr/share/nginx/map-context:ro
+      - ${MVP_MAP_ASSETS_DIR:-${APP_MAP_ASSETS_DIR:-./data/processed/map-assets}}:/usr/share/nginx/map-assets:ro
+      - ${MVP_MAP_CONTEXT_DIR:-${APP_MAP_CONTEXT_DIR:-./results/generated/map-assets-context-2000m}}:/usr/share/nginx/map-context:ro
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 5s
@@ -131,8 +95,13 @@ services:
     depends_on:
       frontend:
         condition: service_healthy
+    command: ["node", "scripts/browser-mvp-blocked-check.mjs"]
     networks:
       - internal
 
 networks:
   internal: {}
+
+volumes:
+  dq-state:
+    name: ${MVP_DQ_STATE_VOLUME:-atlas-mvp-dq-state}

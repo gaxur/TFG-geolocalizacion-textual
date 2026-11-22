@@ -10,6 +10,8 @@ import {
   buildOperationalFreeTextStart,
   buildApplicationFreeTextStart,
   compareFreeTextStages,
+  freeTextQuickLiteral,
+  freeTextStopPresentation,
   isFreeTextComponentEvent,
   isFreeTextSessionBoundaryEvent,
   normalizeFreeTextEvents,
@@ -26,6 +28,12 @@ const results=()=>Array.from({length:10},(_,i)=>({rank:i+1,candidate_id:`c${i}`,
 
 test('valida sesión operacional y adapta E0 al mapa',()=>{
  const session=validateFreeTextSession({schema_version:'1.0',contract_version:'atlas-dialogue-freetext-operational-session-public-v1',session_id:'freetext-operational-00000000-0000-0000-0000-000000000000',policy_id:OPERATIONAL_FREETEXT_POLICY,status:'waiting_user',turns:[{index:1,question:'¿Pregunta?',answer_literal:null}],stage_snapshots:[{stage:'E0',gallery_id:'madrid-50m',candidate_count:253,ranking_sha256:'b'.repeat(64),results:results()}],current_question:{turn_index:1,question_id:'q1',question:'¿Pregunta?',question_sha256:'c'.repeat(64)}});assert.equal(adaptFreeTextStage(session,'E0').results.length,10);
+});
+test('adapta ranking visual final sin perder baseline CT2L',()=>{
+ const baseline=results(),final=results();final[0]={...final[1],rank:1};final[1]={...baseline[0],rank:2};const stage={stage:'E1',gallery_id:'madrid-50m',candidate_count:253,results:baseline,visual_postprocessing:{status:'applied',baseline_results:baseline,final_results:final,evidence:[]}},adapted=adaptFreeTextStage({stage_snapshots:[stage]},'E1');assert.equal(adapted.results[0].id,'c1');assert.equal(adapted.baselineResults[0].candidate_id,'c0');assert.equal(adapted.visualPostprocessing.status,'applied');
+});
+test('fallback visual conserva exactamente CT2L',()=>{
+ const baseline=results(),stage={stage:'E1',gallery_id:'madrid-50m',candidate_count:253,results:baseline,visual_postprocessing:{status:'fallback_baseline',baseline_results:baseline,final_results:baseline,evidence:[]}},adapted=adaptFreeTextStage({stage_snapshots:[stage]},'E1');assert.deepEqual(adapted.results.map(x=>x.id),baseline.map(x=>x.candidate_id));
 });
 
 test('selecciona operacional y liga operaciones idempotentes',()=>{
@@ -72,12 +80,27 @@ test('application persiste operation id y reconcilia errores de red ambiguos',as
 test('waiting_user exige una pregunta identificada',()=>{
  const base={contract_version:'atlas-dialogue-freetext-application-session-public-v1',session_id:'freetext-application-00000000-0000-0000-0000-000000000000',policy_id:APPLICATION_FREETEXT_POLICY,status:'waiting_user',turns:[{index:1,question:'Pregunta',answer_literal:null}],stage_snapshots:[{stage:'E0',gallery_id:'madrid-50m',candidate_count:253,results:results()}]};assert.throws(()=>validateFreeTextSession(base),/Pregunta FreeText incompatible/);assert.throws(()=>validateFreeTextSession({...base,current_question:{turn_index:1,question:'Pregunta'}}),/Pregunta FreeText incompatible/);
 });
+test('el límite público gobierna la pregunta sin quedar fijado en la UI',()=>{
+ const base={contract_version:'atlas-dialogue-freetext-application-session-public-v1',session_id:'freetext-application-00000000-0000-0000-0000-000000000000',policy_id:APPLICATION_FREETEXT_POLICY,status:'waiting_user',maximum_questions:2,turns:[{index:1,question:'Pregunta',answer_literal:null}],stage_snapshots:[{stage:'E0',gallery_id:'madrid-50m',candidate_count:253,results:results()}],current_question:{turn_index:1,question_id:'q1',question:'Pregunta'}};assert.equal(validateFreeTextSession(base).maximum_questions,2);assert.throws(()=>validateFreeTextSession({...base,maximum_questions:1,current_question:{...base.current_question,turn_index:2}}),/Pregunta FreeText incompatible/);
+});
+test('la aplicación abre DialogueVPR explícitamente y oculta la lista compacta',async()=>{
+ const source=await readFile(new URL('../src/main.js',import.meta.url),'utf8');assert.match(source,/data-action="open-dialogue"/);assert.match(source,/Refinar ubicación/);assert.match(source,/accessible-ranking/);assert.match(source,/rankingOpen/);assert.match(source,/ft\.status==='loading'&&\['pending','running'\]\.includes\(eventState\)/);assert.doesNotMatch(source,/Pregunta \$\{question\.turn_index\} de 3/);
+});
 test('application reabre SSE al recuperar y permite nueva búsqueda terminal',async()=>{
- const source=await readFile(new URL('../src/main.js',import.meta.url),'utf8');assert.match(source,/async function adoptFreeTextSession/);assert.match(source,/isFreeTextSessionBoundaryEvent\(latest\).*getFreeTextSession/);assert.match(source,/\['pending','running'\]\.includes\(status\).*openFreeTextSessionEvents/);assert.match(source,/function resetFreeTextSession/);assert.match(source,/new-freetext-search/);assert.match(source,/safeLocalStorage\('remove',applicationPendingOperationKey\)/);
+ const source=await readFile(new URL('../src/main.js',import.meta.url),'utf8');assert.match(source,/async function adoptFreeTextSession/);assert.match(source,/isFreeTextSessionBoundaryEvent\(latest\)[^{]*\{\s*current=validateFreeTextSession\(await getFreeTextSession/);assert.match(source,/freetext\.status=\['pending','running'\]\.includes\(status\)\?'loading':'ready'/);assert.match(source,/function resetFreeTextSession/);assert.match(source,/new-freetext-search/);assert.match(source,/safeLocalStorage\('remove',applicationPendingOperationKey\)/);
 });
 test('application falla antes del POST si no puede persistir la operación',async()=>{
  const source=await readFile(new URL('../src/main.js',import.meta.url),'utf8');assert.match(source,/LOCAL_RECOVERY_UNAVAILABLE/);assert.match(source,/key===applicationPendingOperationKey.*throw new TypeError/);assert.match(source,/pointer\?\.session_id!==session\.session_id/);
 });
 test('una respuesta ambigua exige avance durable antes de reconciliar',async()=>{
  const source=await readFile(new URL('../src/main.js',import.meta.url),'utf8');assert.match(source,/answerOperation=.*freetext-answer-/);assert.match(source,/stage_snapshots\.length>previous\.stage_snapshots\.length/);assert.match(source,/answerOperation&&!advanced/);
+});
+test('accesos rápidos conservan contrato literal y no fingen semántica backend',()=>{
+ const literal=freeTextQuickLiteral('unknown');assert.equal(literal,'No lo sé.');const answer=buildOperationalFreeTextAnswer({literal,turnIndex:1,questionId:'q1',clientOperationId:'quick-1'});assert.equal(answer.answer_literal,literal);assert.equal(Object.hasOwn(answer,'answer_kind'),false);assert.throws(()=>freeTextQuickLiteral('invalid'));
+});
+test('presenta parada temprana sin afirmar mejora geográfica',()=>{
+ assert.match(freeTextStopPresentation('no_valid_question').title,/antes del límite/);assert.match(freeTextStopPresentation('max_questions_reached_after_e3').message,/tres preguntas/);assert.match(freeTextStopPresentation('future_reason').message,/último ranking válido/);
+});
+test('frontend declara visual offline pendiente y no inicia Mapillary',async()=>{
+ const source=await readFile(new URL('../src/main.js',import.meta.url),'utf8');assert.match(source,/DialogueVPR visual/);assert.match(source,/pendiente de autorización GPU y perfil nuevo/);assert.doesNotMatch(source,/fetch\([^)]*mapillary/i);assert.match(source,/data-freetext-quick/);
 });

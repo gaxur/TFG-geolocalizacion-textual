@@ -44,8 +44,8 @@ class RuntimeRetrievalPort:
 
 class FreeTextRuntimeExecutor(SequentialDialogueExecutor):
  policy_id='dialogue-vpr-freetext-v1'
- def __init__(self,policy_config:Path|None=None,ollama_status_config:Path|None=None,resident_models:bool=False,qwen_factory=None,retriever_factory=None,**kwargs):
-  super().__init__(**kwargs);self.policy_config=policy_config or Path(__file__).resolve().parents[2]/'config/interactive_dialogue_freetext_v1.json';self.ollama_status_config=ollama_status_config;self.resident_models=resident_models;self._qwen_factory=qwen_factory;self._retriever_factory=retriever_factory;self._resident_qwen=None;self._resident_retriever=None;self._resident_gallery_ids=();self._resident_gated_models=set();self._resident_lock=threading.RLock();raw=json.loads(self.policy_config.read_text());self.policy=DialoguePolicyConfig(reserve_size=raw['reserve_size'],cluster_radius_m=raw['cluster_radius_m'],minimum_hypotheses=raw['minimum_hypotheses'],minimum_supported_hypotheses=raw['minimum_supported_hypotheses'],maximum_supported_fraction=raw['maximum_supported_fraction'],allow_qwen_question=False,enable_controlled_rewrite=False);self.max_questions=raw['maximum_questions'];self.progress_callback=None;self._identity,self._identity_stats=self._build_identity()
+ def __init__(self,policy_config:Path|None=None,ollama_status_config:Path|None=None,resident_models:bool=False,qwen_factory=None,retriever_factory=None,question_policy_factory=None,final_ranking_postprocessor_factory=None,**kwargs):
+  super().__init__(**kwargs);self.policy_config=policy_config or Path(__file__).resolve().parents[2]/'config/interactive_dialogue_freetext_v1.json';self.ollama_status_config=ollama_status_config;self.resident_models=resident_models;self._qwen_factory=qwen_factory;self._retriever_factory=retriever_factory;self._question_policy_factory=question_policy_factory;self._final_ranking_postprocessor_factory=final_ranking_postprocessor_factory;self._resident_qwen=None;self._resident_retriever=None;self._resident_gallery_ids=();self._resident_gated_models=set();self._resident_lock=threading.RLock();raw=json.loads(self.policy_config.read_text());self.policy=DialoguePolicyConfig(reserve_size=raw['reserve_size'],cluster_radius_m=raw['cluster_radius_m'],minimum_hypotheses=raw['minimum_hypotheses'],minimum_supported_hypotheses=raw['minimum_supported_hypotheses'],maximum_supported_fraction=raw['maximum_supported_fraction'],allow_qwen_question=False,enable_controlled_rewrite=False);self.max_questions=raw['maximum_questions'];self.progress_callback=None;self._identity,self._identity_stats=self._build_identity()
  def _emit(self,stage,component,state):
   if self.progress_callback:self.progress_callback(stage,component,state)
  @property
@@ -71,6 +71,8 @@ class FreeTextRuntimeExecutor(SequentialDialogueExecutor):
   checkpoint_path=root/runtime['model']['checkpoint'];checkpoint_sha256=_artifact_digest(checkpoint_path)
   if checkpoint_sha256!=embedding_manifest['checkpoint']['sha256']:raise RuntimeError('checkpoint real divergente del manifest de embeddings')
   base.update({'checkpoint_sha256':checkpoint_sha256,'madrid_50m_embedding_dataset_id':embedding_manifest['embedding_dataset_id'],'madrid_50m_visual_dataset_id':visual_manifest['visual_dataset_id']})
+  if self._question_policy_factory is not None:base['question_policy_injection']='authorized_factory_required'
+  if self._final_ranking_postprocessor_factory is not None:base['final_ranking_postprocessor_injection']='authorized_factory_required'
   qwen_files={name:self.qwen_model/name for name in ('config.json','model.safetensors.index.json','tokenizer_config.json')}
   missing=[name for name,path in qwen_files.items() if not path.is_file()]
   if missing:raise RuntimeError(f"identidad Qwen incompleta: {', '.join(missing)}")
@@ -148,6 +150,9 @@ class FreeTextRuntimeExecutor(SequentialDialogueExecutor):
     finally:setattr(self,name,None)
    self._resident_gallery_ids=();self._resident_gated_models.clear()
    if errors:raise RuntimeError('falló el cierre de recursos residentes') from errors[0]
- def _core(self,root):return FreeTextDialogueExecutor(qwen=RuntimeQwenPort(self,root),retriever=RuntimeRetrievalPort(self,root),questions=RuntimeQuestionPort(self))
+ def _core(self,root):
+  common={'qwen':RuntimeQwenPort(self,root),'retriever':RuntimeRetrievalPort(self,root),'final_ranking_postprocessor':self._final_ranking_postprocessor_factory(self,root) if self._final_ranking_postprocessor_factory is not None else None}
+  if self._question_policy_factory is None:return FreeTextDialogueExecutor(**common,questions=RuntimeQuestionPort(self))
+  return FreeTextDialogueExecutor(**common,question_policy=self._question_policy_factory(self,root))
  def start(self,*,query_id,description,session_root):return self._core(session_root).start(query_id=query_id,description=description)
  def answer(self,*,state,answer,answer_kind,session_root):return self._core(session_root).answer(state=state,answer_literal=answer)

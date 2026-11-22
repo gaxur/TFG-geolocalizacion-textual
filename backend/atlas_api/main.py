@@ -17,7 +17,7 @@ from .routes.health import router as health_router
 from .routes.dialogue import router as dialogue_router
 from .routes.progress import router as progress_router
 from .routes.retrieval import router as retrieval_router
-from .routes.freetext import router as freetext_router
+from .routes.freetext import router as freetext_router, supervisor_router
 from .progress import ProgressHub
 from .dialogue_sessions import DialogueSessionService
 from .settings import Settings
@@ -27,10 +27,15 @@ from .freetext_operational import OperationalFreeTextSessionService
 from .freetext_application import ApplicationFreeTextSessionService
 from .dialogue_sessions import sha256_file
 from .model_gate import ModelGate
+from .dq_iterative_sessions import IterativeDialogueSessionService
 
 
-def create_app(*, settings: Settings | None = None, retriever_factory: Callable | None = None, transformer_factory: Callable | None = None, visual_factory: Callable | None = None, dialogue_executor=None, freetext_service=None, freetext_operational_service=None, freetext_application_service=None, operational_retriever_factory: Callable | None = None, operational_transformer_factory: Callable | None = None) -> FastAPI:
+def create_app(*, settings: Settings | None = None, retriever_factory: Callable | None = None, transformer_factory: Callable | None = None, visual_factory: Callable | None = None, dialogue_executor=None, freetext_service=None, freetext_operational_service=None, freetext_application_service=None, dq_iterative_service=None, operational_retriever_factory: Callable | None = None, operational_transformer_factory: Callable | None = None, freetext_question_policy_factory: Callable | None = None, freetext_final_ranking_postprocessor_factory: Callable | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
+    inbox = os.environ.get('ATLAS_DQ_SUPERVISED_INBOX')
+    if inbox and (not settings.dq_iterative_enabled or settings.dialogue_enabled
+                  or settings.freetext_operational_enabled or settings.freetext_application_enabled):
+        raise ValueError('el buzón supervisado requiere el modo iterativo sin ejecutores GPU antiguos')
     if settings.freetext_operational_enabled and settings.freetext_application_enabled:
         raise ValueError("FreeText application y operacional científico son mutuamente exclusivos")
     if freetext_operational_service is not None and freetext_application_service is not None:
@@ -62,7 +67,7 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
         missing = [name for name in required if not os.environ.get(name)]
         if missing:
             raise ValueError(f"FreeText operacional requiere: {', '.join(missing)}")
-        executor = FreeTextRuntimeExecutor(qwen_model=Path(os.environ["ATLAS_QWEN_MODEL_PATH"]), runtime_config=settings.runtime_config, region_config=settings.region_config, f3_bundle=Path(os.environ["ATLAS_DIALOGUE_F3_BUNDLE"]), clip_weights=Path(settings.clip_weights_path), cvg_utils_sha256=settings.cvg_utils_sha256, ollama_ps_url=os.environ["ATLAS_OLLAMA_PS_URL"])
+        executor = FreeTextRuntimeExecutor(qwen_model=Path(os.environ["ATLAS_QWEN_MODEL_PATH"]), runtime_config=settings.runtime_config, region_config=settings.region_config, f3_bundle=Path(os.environ["ATLAS_DIALOGUE_F3_BUNDLE"]), clip_weights=Path(settings.clip_weights_path), cvg_utils_sha256=settings.cvg_utils_sha256, ollama_ps_url=os.environ["ATLAS_OLLAMA_PS_URL"], question_policy_factory=freetext_question_policy_factory, final_ranking_postprocessor_factory=freetext_final_ranking_postprocessor_factory)
         root = Path(__file__).resolve().parents[2]
         operational_policy = root / "config/dialogue_freetext_operational_v1.json"
         core_policy = root / "config/interactive_dialogue_freetext_v1.json"
@@ -75,7 +80,7 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
             raise ValueError(f"FreeText application requiere: {', '.join(missing)}")
         application_core_policy = Path(__file__).resolve().parents[2] / "config/interactive_dialogue_freetext_application_v1.json"
         approval = Path(__file__).resolve().parents[2] / "config/freetext_application_approval_d098.json"
-        executor = FreeTextRuntimeExecutor(qwen_model=Path(os.environ["ATLAS_QWEN_MODEL_PATH"]), runtime_config=settings.runtime_config, region_config=settings.region_config, f3_bundle=Path(os.environ["ATLAS_DIALOGUE_F3_BUNDLE"]), clip_weights=Path(settings.clip_weights_path), cvg_utils_sha256=settings.cvg_utils_sha256, ollama_ps_url=os.environ["ATLAS_OLLAMA_PS_URL"], policy_config=application_core_policy, ollama_status_config=Path(os.environ["ATLAS_OLLAMA_STATUS_CONFIG"]), resident_models=True)
+        executor = FreeTextRuntimeExecutor(qwen_model=Path(os.environ["ATLAS_QWEN_MODEL_PATH"]), runtime_config=settings.runtime_config, region_config=settings.region_config, f3_bundle=Path(os.environ["ATLAS_DIALOGUE_F3_BUNDLE"]), clip_weights=Path(settings.clip_weights_path), cvg_utils_sha256=settings.cvg_utils_sha256, ollama_ps_url=os.environ["ATLAS_OLLAMA_PS_URL"], policy_config=application_core_policy, ollama_status_config=Path(os.environ["ATLAS_OLLAMA_STATUS_CONFIG"]), resident_models=True, question_policy_factory=freetext_question_policy_factory, final_ranking_postprocessor_factory=freetext_final_ranking_postprocessor_factory)
         root = Path(__file__).resolve().parents[2]
         application_policy = root / "config/dialogue_freetext_application_v1.json"
         core_policy = application_core_policy
@@ -96,6 +101,21 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
             },
         )
     app.state.freetext_application_service = freetext_application_service
+    if dq_iterative_service is None and settings.dq_iterative_enabled:
+        dq_iterative_service = IterativeDialogueSessionService(
+            session_root=settings.dq_iterative_session_root,
+            enabled=True,
+            controller_factory=None,
+            real_inference_available=False,
+            translation_available=False,
+            quality_gate_available=False,
+            supervised_inbox=Path(inbox) if inbox else None,
+            host_lease_receipts=Path(lease) if (lease := os.environ.get('ATLAS_DQ_HOST_LEASE_RECEIPTS')) else None,
+            final_visual_depth=int(os.environ.get('ATLAS_DQ_FINAL_VISUAL_DEPTH', '50')),
+            cells_geojson=Path(cells) if (cells := os.environ.get('ATLAS_DQ_CELLS_GEOJSON')) else None,
+            historical_root=Path(replay) if (replay := os.environ.get("ATLAS_DQ_HISTORICAL_ROOT")) else None,
+        )
+    app.state.dq_iterative_service = dq_iterative_service
     app.state.dialogue_variants = json.loads(settings.dialogue_variants_path.read_text()) if settings.dialogue_variants_path and settings.dialogue_variants_path.is_file() else {"schema_version":"1.0","contract_version":"description-length-experiments-v1","status":"not_configured","variant_count":0,"condition_count":0,"variants":[],"conditions":[]}
     if settings.allowed_origins:
         app.add_middleware(CORSMiddleware, allow_origins=list(settings.allowed_origins), allow_credentials=False, allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-Request-ID", "Idempotency-Key", "Last-Event-ID"], expose_headers=["X-Request-ID"])
@@ -117,5 +137,7 @@ def create_app(*, settings: Settings | None = None, retriever_factory: Callable 
         app.include_router(progress_router)
         app.include_router(dialogue_router)
         app.include_router(retrieval_router)
-    if freetext_service is not None or freetext_operational_service is not None or freetext_application_service is not None: app.include_router(freetext_router)
+    if freetext_service is not None or freetext_operational_service is not None or freetext_application_service is not None or dq_iterative_service is not None: app.include_router(freetext_router)
+    if dq_iterative_service is not None and dq_iterative_service.supervisor is not None:
+        app.include_router(supervisor_router)
     return app

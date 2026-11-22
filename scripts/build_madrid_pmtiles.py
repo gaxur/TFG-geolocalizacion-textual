@@ -41,12 +41,12 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _catalog_lineage(validation_dir: Path) -> tuple[dict[str, Any], dict[str, str]]:
+def _catalog_lineage(validation_dir: Path, *, manifest_25m: Path, manifest_50m: Path) -> tuple[dict[str, Any], dict[str, str]]:
     asset_manifest = build_map_assets(
         config_path=ROOT / "config/madrid.yaml",
         output_dir=validation_dir,
-        manifest_25m=ROOT / "data/processed/catalog/manifest-25m.json",
-        manifest_50m=ROOT / "data/processed/catalog/manifest-50m.json",
+        manifest_25m=manifest_25m,
+        manifest_50m=manifest_50m,
     )
     manifest_hashes = {}
     for size in (25, 50):
@@ -61,6 +61,9 @@ def build_archive(
     margin_m: float = DEFAULT_MARGIN_METERS,
     min_zoom: int = DEFAULT_MIN_ZOOM,
     max_zoom: int = DEFAULT_MAX_ZOOM,
+    source_dir: Path | None = None,
+    manifest_25m: Path | None = None,
+    manifest_50m: Path | None = None,
 ) -> dict[str, Any]:
     output_path = output_path.resolve()
     provenance_path = output_path.with_suffix(output_path.suffix + ".provenance.json")
@@ -70,7 +73,9 @@ def build_archive(
         )
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    source_dir = ROOT / "data/raw/osm/f4_sources/madrid-geofabrik-20261014"
+    source_dir = (source_dir or ROOT / "data/raw/osm/f4_sources/madrid-geofabrik-20261014").resolve()
+    manifest_25m = (manifest_25m or ROOT / "data/processed/catalog/manifest-25m.json").resolve()
+    manifest_50m = (manifest_50m or ROOT / "data/processed/catalog/manifest-50m.json").resolve()
     features, audit = audit_local_pbf(
         source_dir,
         ROOT / "config/madrid.yaml",
@@ -110,7 +115,11 @@ def build_archive(
 
     catalog_dir = ROOT / "data/processed/catalog"
     with TemporaryDirectory(prefix="madrid-pmtiles-validation-") as validation_temp:
-        validation_assets, catalog_hashes = _catalog_lineage(Path(validation_temp) / "cells")
+        validation_assets, catalog_hashes = _catalog_lineage(
+            Path(validation_temp) / "cells",
+            manifest_25m=manifest_25m,
+            manifest_50m=manifest_50m,
+        )
         f1_geojson_hashes = {
             gallery: validation_assets["galleries"][gallery]["geojson_sha256"]
             for gallery in ("madrid-25m", "madrid-50m")
@@ -184,12 +193,18 @@ def main() -> int:
     parser.add_argument("--margin-m", type=float, default=DEFAULT_MARGIN_METERS)
     parser.add_argument("--min-zoom", type=int, default=DEFAULT_MIN_ZOOM)
     parser.add_argument("--max-zoom", type=int, default=DEFAULT_MAX_ZOOM)
+    parser.add_argument("--source-dir", type=Path, help="Directorio F4 verificado con source.osm.pbf y provenance.json.")
+    parser.add_argument("--manifest-25m", type=Path, help="Manifest F1/F4 de 25 m usado para validar lineage.")
+    parser.add_argument("--manifest-50m", type=Path, help="Manifest F1/F4 de 50 m usado para validar lineage.")
     args = parser.parse_args()
     result = build_archive(
         output_path=args.output,
         margin_m=args.margin_m,
         min_zoom=args.min_zoom,
         max_zoom=args.max_zoom,
+        source_dir=args.source_dir,
+        manifest_25m=args.manifest_25m,
+        manifest_50m=args.manifest_50m,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0

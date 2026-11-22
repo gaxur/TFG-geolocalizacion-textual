@@ -1,0 +1,7 @@
+export function deriveReadiness({capabilitiesStatus,policy,mapAssets,sessionStatus}){
+ const frontendReady=true,apiReady=capabilitiesStatus==='ready',mapUiReady=['maplibre','leaflet-2d'].includes(mapAssets?.renderer),mapBaseReady=mapAssets?.basemap==='ready',mapCellsReady=mapAssets?.cells==='ready',execution=policy?.execution_readiness||{};
+ const dialogueUiReady=Boolean(policy),runtimeReady=execution.runtime_connected===true,artifactsReady=execution.artifacts_ready===true,authorized=execution.authorization_ready===true,translationReady=execution.translation_ready===true,qualityReady=execution.quality_gate_ready===true;
+ const realInferenceReady=runtimeReady&&artifactsReady&&authorized&&translationReady&&qualityReady&&policy?.available===true&&policy?.enabled!==false;
+ const fixtureReady=policy?.policy_id==='dialogue-vpr-dq-pilot-v1'&&policy?.execution_mode==='cpu_fixture'&&policy?.available===true&&policy?.enabled===true;
+ return{frontendReady,apiReady,mapUiReady,mapBaseReady,mapCellsReady,mapReady:mapUiReady&&mapBaseReady&&mapCellsReady,dialogueUiReady,searchReady:apiReady&&(realInferenceReady||fixtureReady),fixtureReady,realInferencePending:dialogueUiReady&&!realInferenceReady,realInferenceReady,realInferenceRunning:!fixtureReady&&(sessionStatus==='pending'||sessionStatus==='running'),waitingHumanAnswer:sessionStatus==='waiting_user',sessionCompleted:sessionStatus==='completed',recoverableError:sessionStatus==='unknown',nonRecoverableError:sessionStatus==='failed'};
+}

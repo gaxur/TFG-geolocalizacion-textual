@@ -1,5 +1,13 @@
 # Registro de experimentos
 
+## 2026-11-22 — Cierre supervisado con fixtures CPU
+
+Las pruebas en worktree aislado verifican la reserva exhaustiva, la actualización
+por respuesta, la selección visual del Top-50 final, promoción desde fuera del
+Top-10, abstención, fallback, rechazo de recibos inválidos y relectura. Se usaron
+dobles sintéticos: no se cargaron pesos ni se validó el supervisor del host.
+Véase [contrato y reproducción](DIALOGUE_FINAL_VISUAL.md).
+
 Conservar por separado el protocolo oficial de Nueva York, cuya galería de 100
 vecinos se obtiene usando las coordenadas reales de cada consulta, y cualquier
 evaluación sobre una galería que no utilice el ground truth para seleccionar

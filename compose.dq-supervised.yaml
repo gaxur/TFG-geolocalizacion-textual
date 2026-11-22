@@ -1,0 +1,22 @@
+# Overlay opt-in: solo conecta el buzón privado; no define ni inicia servicios GPU.
+services:
+  api:
+    environment:
+      ATLAS_DQ_SUPERVISED_INBOX: /dq-supervised-inbox
+      ATLAS_DQ_HOST_LEASE_RECEIPTS: /dq-host-gpu-lease
+    volumes:
+      - type: bind
+        source: ${ATLAS_DQ_HOST_INBOX:?configure el buzón privado del supervisor}
+        target: /dq-supervised-inbox
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ATLAS_DQ_HOST_STAGELEASE:?configure la ruta canónica devuelta por host_lease_root}
+        target: /dq-host-gpu-lease
+        read_only: true
+        bind:
+          create_host_path: false
+  frontend:
+    ports: !override
+      - "127.0.0.1:${MVP_HTTP_PORT:-18080}:8080"

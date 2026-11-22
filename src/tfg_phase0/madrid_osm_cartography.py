@@ -326,6 +326,24 @@ def collect_local_features(
             },
         })
 
+    def add_projected_feature(
+        layer: str,
+        source_type: str,
+        osm_id: int,
+        geometry: Any,
+        properties: dict[str, Any],
+    ) -> None:
+        clipped = geometry.intersection(coverage)
+        if clipped.is_empty:
+            return
+        features.append({
+            "layer": layer,
+            "source_type": source_type,
+            "osm_id": int(osm_id),
+            "geometry": clipped,
+            "properties": {**properties, "osm_type": source_type, "osm_id": int(osm_id)},
+        })
+
     class Collector(osmium.SimpleHandler):
         def _check_order(self, kind: str, osm_id: int) -> None:
             counters[f"{kind}_objects"] += 1
@@ -347,6 +365,21 @@ def collect_local_features(
             amenity = _tag_value(tags, "amenity")
             tourism = _tag_value(tags, "tourism")
             historic = _tag_value(tags, "historic")
+            natural = _tag_value(tags, "natural")
+            if natural == "tree" and node.location.valid():
+                properties = {"class": "tree", "dimensions_observed": False}
+                height = parse_explicit_height_m(_tag_value(tags, "height"))
+                if height is not None:
+                    properties.update(height=height, dimensions_observed=True)
+                point = Point(node.location.lon, node.location.lat)
+                add_feature("vegetation_point", "node", node.id, point, properties)
+                projected = project_geometry(point)
+                visual_height = height if height is not None else 6.0
+                add_projected_feature(
+                    "vegetation_3d", "node", node.id, projected.buffer(2.5, quad_segs=3),
+                    {**properties, "visual_height": visual_height, "visual_base": min(1.8, visual_height * 0.3), "dimensions_illustrative": height is None},
+                )
+                counters["tree_points"] += 1
             if not name or not node.location.valid():
                 return
             if place not in {"city", "town", "village", "hamlet", "suburb", "neighbourhood", "locality", "square"} and amenity not in {"school", "hospital", "place_of_worship", "townhall", "marketplace"} and tourism not in {"attraction", "museum", "viewpoint"} and not historic:
@@ -379,6 +412,13 @@ def collect_local_features(
                     else:
                         counters["open_building_ways_coarse_bbox_candidates"] += 1
 
+            if len(coords) >= 2 and (_tag_value(tags, "natural") == "tree_row" or _tag_value(tags, "barrier") == "hedge"):
+                try:
+                    vegetation_line = from_wkb(wkb_factory.create_linestring(way))
+                    add_feature("vegetation_line", "way", way.id, vegetation_line, {"class": "tree_row" if _tag_value(tags, "natural") == "tree_row" else "hedge"})
+                    counters["vegetation_lines"] += 1
+                except Exception:
+                    counters["invalid_vegetation_lines"] += 1
             highway_class = _highway_class(tags)
             if highway_class is None or len(coords) < 2:
                 return
